@@ -64,35 +64,8 @@ COMMENT ON COLUMN ciclos_formativos.tema3 IS 'Tema del curso 3 (C3)';
 COMMENT ON COLUMN ciclos_formativos.tema4 IS 'Tema del curso 4 (C4)';
 
 -- =============================================================
--- 4. TABLA: agenda_contactos
--- Equivalente a la hoja AGENDA_CONTACTOS del sistema original
--- =============================================================
-CREATE TABLE IF NOT EXISTS agenda_contactos (
-  id_contacto TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
-  tecnico_carnet TEXT REFERENCES tecnicos(carnet) ON DELETE SET NULL,
-  nombre TEXT,
-  telefono TEXT,
-  lugar TEXT,
-  link_maps TEXT,
-  descripcion TEXT,
-  fecha_interaccion TIMESTAMPTZ,
-  estado_semaforo TEXT DEFAULT 'Pendiente',
-  color TEXT DEFAULT '#2f80ed',
-  created_at TIMESTAMPTZ DEFAULT now(),
-  updated_at TIMESTAMPTZ DEFAULT now()
-);
-
-COMMENT ON TABLE agenda_contactos IS 'Agenda de organizadores, contactos y lugares vinculados a cursos';
-COMMENT ON COLUMN agenda_contactos.estado_semaforo IS 'Estado visual: Pendiente, Atendido, etc.';
-COMMENT ON COLUMN agenda_contactos.link_maps IS 'Link de Google Maps, iframe embed o link corto';
-
-CREATE INDEX idx_agenda_tecnico ON agenda_contactos(tecnico_carnet);
-CREATE INDEX idx_agenda_estado ON agenda_contactos(estado_semaforo);
-
--- =============================================================
--- 5. TABLA: cursos
--- Equivalente principal a la hoja CONEXION del sistema original
--- Cada fila es una nota/curso visible en la pantalla principal
+-- 4. TABLA: cursos
+-- Tabla principal de notas / cursos
 -- =============================================================
 CREATE TABLE IF NOT EXISTS cursos (
   id TEXT PRIMARY KEY,
@@ -110,7 +83,13 @@ CREATE TABLE IF NOT EXISTS cursos (
   inscritos INTEGER DEFAULT 0,
   costo NUMERIC(10,2) DEFAULT 0,
   total_bs NUMERIC(10,2) DEFAULT 0,
-  contacto_agenda TEXT REFERENCES agenda_contactos(id_contacto) ON DELETE SET NULL,
+  organizador_nombre TEXT,
+  organizador_telefono TEXT,
+  organizador_lugar TEXT,
+  organizador_maps TEXT,
+  organizador_descripcion TEXT,
+  organizador_semaforo TEXT DEFAULT 'Atendido',
+  organizador_color TEXT DEFAULT '#3b82f6',
   link_archivo TEXT,
   link_sheet_participantes TEXT,
   mes TEXT,
@@ -457,7 +436,7 @@ ON CONFLICT DO NOTHING;
 -- 12. VISTAS ÚTILES
 -- =============================================================
 
--- Vista de cursos con datos enriquecidos (equivale a actualizarConexiones2)
+-- Vista de cursos con datos enriquecidos
 CREATE OR REPLACE VIEW cursos_enriquecidos AS
 SELECT
   c.*,
@@ -466,21 +445,13 @@ SELECT
   cf.nombre AS ciclo_nombre,
   cf.grupo AS ciclo_grupo,
   cf.area_formativa,
-  cf.tema1, cf.tema2, cf.tema3, cf.tema4,
-  ac.nombre AS organizador_nombre,
-  ac.telefono AS organizador_telefono,
-  ac.lugar AS organizador_lugar,
-  ac.link_maps AS organizador_maps,
-  ac.descripcion AS organizador_descripcion,
-  ac.estado_semaforo AS organizador_semaforo,
-  ac.color AS organizador_color
+  cf.tema1, cf.tema2, cf.tema3, cf.tema4
 FROM cursos c
 LEFT JOIN tecnicos t ON c.tecnico_carnet = t.carnet
 LEFT JOIN facilitadores f ON c.facilitador_carnet = f.carnet
-LEFT JOIN ciclos_formativos cf ON c.ciclo_id = cf.id
-LEFT JOIN agenda_contactos ac ON c.contacto_agenda = ac.id_contacto;
+LEFT JOIN ciclos_formativos cf ON c.ciclo_id = cf.id;
 
-COMMENT ON VIEW cursos_enriquecidos IS 'Vista con todos los datos de cursos enriquecidos con nombres de técnico, facilitador, ciclo y organizador';
+COMMENT ON VIEW cursos_enriquecidos IS 'Vista con todos los datos de cursos enriquecidos con nombres de técnico, facilitador y ciclo';
 
 -- =============================================================
 -- 13. TABLA: plantillas_reporte

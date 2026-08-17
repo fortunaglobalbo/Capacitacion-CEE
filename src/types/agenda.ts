@@ -10,11 +10,11 @@ export interface AgendaContacto {
   lugar: string;
   link_maps: string;
   descripcion: string;
-  fecha_interaccion: string | null;
+  fecha_interaccion?: string | null;
   estado_semaforo: string;
   color: string;
-  created_at: string;
-  updated_at: string;
+  created_at?: string;
+  updated_at?: string;
 }
 
 export interface AgendaFormData {

@@ -236,7 +236,7 @@ function marcarPrioritarios() {
   return finalHtml;
 }
 
-// Helper para obtener HTML del reporte desde Supabase (prioriza reportes_html, fallback a agenda_contactos)
+// Helper para obtener HTML del reporte desde Supabase (utiliza reportes_html)
 async function getReportHtmlFromDb(): Promise<string | null> {
   try {
     const { data, error } = await supabase
@@ -247,28 +247,6 @@ async function getReportHtmlFromDb(): Promise<string | null> {
 
     if (!error && data?.contenido && data.contenido.trim().length > 0) {
       return data.contenido;
-    }
-  } catch (e) {}
-
-  try {
-    const { data: d2, error: e2 } = await supabase
-      .from('agenda_contactos')
-      .select('descripcion')
-      .eq('id_contacto', 'REPORTE_DIARIO_ACTUAL')
-      .maybeSingle();
-
-    if (!e2 && d2?.descripcion && d2.descripcion.trim().length > 0) {
-      return d2.descripcion;
-    }
-
-    const { data: d3, error: e3 } = await supabase
-      .from('agenda_contactos')
-      .select('descripcion')
-      .eq('id_contacto', 'CONFIG-REPORTE-PLANTILLA-HTML')
-      .maybeSingle();
-
-    if (!e3 && d3?.descripcion && d3.descripcion.trim().length > 0) {
-      return d3.descripcion;
     }
   } catch (e) {}
 
@@ -285,17 +263,6 @@ async function saveReportHtmlToDb(html: string): Promise<boolean> {
       updated_at: new Date().toISOString(),
     });
     if (!err1) return true;
-  } catch (e) {}
-
-  try {
-    const { error: err2 } = await supabase.from('agenda_contactos').upsert({
-      id_contacto: 'REPORTE_DIARIO_ACTUAL',
-      tecnico_carnet: '8639300',
-      nombre: 'PLANTILLA_REPORTE_DIARIO',
-      descripcion: html,
-      updated_at: new Date().toISOString(),
-    });
-    return !err2;
   } catch (e) {}
 
   return false;
@@ -435,12 +402,6 @@ export async function DELETE() {
   try {
     try {
       await supabase.from('reportes_html').delete().eq('id', 'REPORTE_DIARIO_ACTUAL');
-    } catch (e) {}
-    try {
-      await supabase.from('agenda_contactos').delete().eq('id_contacto', 'REPORTE_DIARIO_ACTUAL');
-    } catch (e) {}
-    try {
-      await supabase.from('agenda_contactos').delete().eq('id_contacto', 'CONFIG-REPORTE-PLANTILLA-HTML');
     } catch (e) {}
 
     return NextResponse.json({

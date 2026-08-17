@@ -953,7 +953,7 @@ if (document.readyState === 'loading') {
 </body>
 </html>`;
 
-    // Save directly to Supabase Database (reportes_html table, fallback to agenda_contactos if table not created)
+    // Save directly to Supabase Database (reportes_html table)
     let savedOk = false;
     try {
       const { error: dbErr1 } = await supabase.from('reportes_html').upsert({
@@ -964,19 +964,6 @@ if (document.readyState === 'loading') {
       });
       if (!dbErr1) savedOk = true;
     } catch (e) {}
-
-    if (!savedOk) {
-      try {
-        await supabase.from('agenda_contactos').upsert({
-          id_contacto: 'REPORTE_DIARIO_ACTUAL',
-          tecnico_carnet: '8639300',
-          nombre: 'PLANTILLA_REPORTE_DIARIO',
-          descripcion: finalHtml,
-          updated_at: new Date().toISOString(),
-        });
-        savedOk = true;
-      } catch (e) {}
-    }
 
     console.log('Sincronización SIE guardada con éxito en Supabase DB. (Éxito:', savedOk, ')');
 

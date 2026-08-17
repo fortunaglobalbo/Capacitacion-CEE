@@ -56,7 +56,28 @@ function HomePage() {
   const [tecnicos, setTecnicos] = useState<Tecnico[]>([]);
   const [facilitadores, setFacilitadores] = useState<Facilitador[]>([]);
   const [ciclos, setCiclos] = useState<CicloFormativo[]>([]);
-  const [agenda, setAgenda] = useState<AgendaContacto[]>([]);
+  const agenda = useMemo<AgendaContacto[]>(() => {
+    const map = new Map<string, AgendaContacto>();
+    cursos.forEach((c) => {
+      if (c.organizador_nombre && c.organizador_nombre.trim().length > 0) {
+        const key = c.organizador_nombre.trim().toLowerCase();
+        if (!map.has(key)) {
+          map.set(key, {
+            id_contacto: `ORG-${c.id}`,
+            nombre: c.organizador_nombre,
+            telefono: c.organizador_telefono || '',
+            lugar: c.organizador_lugar || c.lugar || '',
+            link_maps: c.organizador_maps || '',
+            descripcion: c.organizador_descripcion || '',
+            estado_semaforo: c.organizador_semaforo || 'Atendido',
+            color: c.organizador_color || '#3b82f6',
+            tecnico_carnet: c.tecnico_carnet || '',
+          });
+        }
+      }
+    });
+    return Array.from(map.values());
+  }, [cursos]);
   const [matchingCursoIds, setMatchingCursoIds] = useState<Set<string>>(new Set());
   const [matchedParticipantsMap, setMatchedParticipantsMap] = useState<{[cursoId: string]: string[]}>({});
   const [searchLoading, setSearchLoading] = useState(false);
@@ -262,28 +283,24 @@ function HomePage() {
         }
       };
 
-      const [tecRes, facRes, cicRes, agendaRes] = await Promise.all([
+      const [tecRes, facRes, cicRes] = await Promise.all([
         safeFetch(() => supabase.from('tecnicos').select('*').order('nombre')),
         safeFetch(() => supabase.from('facilitadores').select('*').order('nombre')),
         safeFetch(() => supabase.from('ciclos_formativos').select('*').order('grupo, nombre')),
-        safeFetch(() => supabase.from('agenda_contactos').select('*').order('nombre')),
       ]);
 
       const tecnicosData = (tecRes.data as Tecnico[]) || [];
       const facilitadoresData = (facRes.data as Facilitador[]) || [];
       const ciclosData = (cicRes.data as CicloFormativo[]) || [];
-      const agendaData = (agendaRes.data as AgendaContacto[]) || [];
 
       if (tecRes.data) setTecnicos(tecnicosData);
       if (facRes.data) setFacilitadores(facilitadoresData);
       if (cicRes.data) setCiclos(ciclosData);
-      if (agendaRes.data) setAgenda(agendaData);
 
       // Map lookup helpers for fallback enrichment
       const tecMap = new Map(tecnicosData.map((t) => [t.carnet, t.nombre]));
       const facMap = new Map(facilitadoresData.map((f) => [f.carnet, f.nombre]));
       const cicMap = new Map(ciclosData.map((c) => [c.id, c]));
-      const agendaMap = new Map(agendaData.map((a) => [a.id_contacto, a]));
 
       let cursosRaw: any[] | null = null;
       
@@ -307,7 +324,6 @@ function HomePage() {
         if (cursosBaseRes.data) {
           cursosRaw = cursosBaseRes.data.map((c: any) => {
             const cf = cicMap.get(c.ciclo_id) || ({} as any);
-            const ac = agendaMap.get(c.contacto_agenda) || ({} as any);
             return {
               ...c,
               tecnico_nombre: c.tecnico_nombre || tecMap.get(c.tecnico_carnet) || null,
@@ -319,13 +335,6 @@ function HomePage() {
               tema2: c.tema2 || cf.tema2 || null,
               tema3: c.tema3 || cf.tema3 || null,
               tema4: c.tema4 || cf.tema4 || null,
-              organizador_nombre: c.organizador_nombre || ac.nombre || null,
-              organizador_telefono: c.organizador_telefono || ac.telefono || null,
-              organizador_lugar: c.organizador_lugar || ac.lugar || null,
-              organizador_maps: c.organizador_maps || ac.link_maps || null,
-              organizador_descripcion: c.organizador_descripcion || ac.descripcion || null,
-              organizador_semaforo: c.organizador_semaforo || ac.estado_semaforo || null,
-              organizador_color: c.organizador_color || ac.color || null,
             };
           });
         }
@@ -886,58 +895,35 @@ function HomePage() {
 
   const handleUpdateCurso = async (id: string, data: Partial<Curso>) => {
     try {
-      // 1. Intercept organizer updates
-      const hasOrganizerUpdate = 'organizador_nombre' in data || 'organizador_telefono' in data || 'organizador_maps' in data;
-      
-      if (hasOrganizerUpdate) {
-        // Fetch current curso to get contacto_agenda
-        const { data: cursoDb, error: fetchErr } = await supabase
-          .from('cursos')
-          .select('contacto_agenda')
-          .eq('id', id)
-          .single();
-          
-        if (fetchErr) throw fetchErr;
-        
-        const orgData = {
-          nombre: data.organizador_nombre,
-          telefono: data.organizador_telefono,
-          link_maps: data.organizador_maps
-        };
-        
-        // Remove organizer fields from the cursos update payload (since they are not columns of "cursos")
-        delete data.organizador_nombre;
-        delete data.organizador_telefono;
-        delete data.organizador_maps;
-        
-        if (cursoDb?.contacto_agenda) {
-          // Update existing contact
-          const { error: updateContactErr } = await supabase
-            .from('agenda_contactos')
-            .update(orgData)
-            .eq('id_contacto', cursoDb.contacto_agenda);
-            
-          if (updateContactErr) throw updateContactErr;
-        } else {
-          // Insert new contact
-          const { data: newContact, error: insertContactErr } = await supabase
-            .from('agenda_contactos')
-            .insert({
-              ...orgData,
-              estado_semaforo: 'Atendido'
-            })
-            .select('id_contacto')
-            .single();
-            
-          if (insertContactErr) throw insertContactErr;
-          
-          // Reference the new contact in cursos
-          data.contacto_agenda = newContact.id_contacto;
+      const { error } = await supabase.from('cursos').update(data).eq('id', id);
+
+      if (error) {
+        // Fallback if organizer columns are not yet added to 'cursos' table in Supabase
+        if (error.message && error.message.includes('organizador_')) {
+          const cleanData = { ...data };
+          delete cleanData.organizador_nombre;
+          delete cleanData.organizador_telefono;
+          delete cleanData.organizador_lugar;
+          delete cleanData.organizador_maps;
+          delete cleanData.organizador_descripcion;
+          delete cleanData.organizador_semaforo;
+          delete cleanData.organizador_color;
+
+          const { error: retryErr } = await supabase.from('cursos').update(cleanData).eq('id', id);
+          if (retryErr) throw retryErr;
+
+          Swal.fire({
+            icon: 'info',
+            title: 'Actualizado parcialmente',
+            text: 'Para guardar los datos del organizador directamente en la tabla cursos, por favor ejecuta la sentencia SQL provista en Supabase.',
+            confirmButtonColor: '#bfa05e',
+          });
+          loadData();
+          return;
         }
+        throw error;
       }
 
-      const { error } = await supabase.from('cursos').update(data).eq('id', id);
-      if (error) throw error;
       loadData();
     } catch (err: unknown) {
       const errorMsg = err instanceof Error ? err.message : 'Error desconocido';
@@ -985,64 +971,25 @@ function HomePage() {
     localStorage.setItem('grupo_orden', JSON.stringify(newOrder));
   }, [grupos]);
 
-  // ─── Agenda CRUD callbacks ──────────────────────────────────
-  const handleSaveContacto = async (data: Partial<AgendaContacto>) => {
-    try {
-      if (editingContacto) {
-        const { error } = await supabase.from('agenda_contactos').update(data).eq('id_contacto', editingContacto.id_contacto);
-        if (error) throw error;
-        Swal.fire({
-          icon: 'success',
-          title: '¡Actualizado con éxito!',
-          text: 'El contacto de la agenda se ha actualizado correctamente.',
-          confirmButtonText: 'Aceptar',
-          confirmButtonColor: '#bfa05e',
-          timer: 2500,
-          timerProgressBar: true,
-          showConfirmButton: true
-        });
-      } else {
-        const { error } = await supabase.from('agenda_contactos').insert(data);
-        if (error) throw error;
-        Swal.fire({
-          icon: 'success',
-          title: '¡Creado con éxito!',
-          text: 'El contacto se ha registrado correctamente en la agenda.',
-          confirmButtonText: 'Aceptar',
-          confirmButtonColor: '#bfa05e',
-          timer: 2500,
-          timerProgressBar: true,
-          showConfirmButton: true
-        });
-      }
-      setShowAgendaForm(false);
-      setEditingContacto(null);
-      loadData();
-    } catch (err: unknown) {
-      const errorMsg = err instanceof Error ? err.message : 'Error desconocido';
-      Swal.fire('Error', errorMsg, 'error');
-    }
+  // ─── Agenda Callbacks ──────────────────────────────────────
+  const handleSaveContacto = async (_data: Partial<AgendaContacto>) => {
+    Swal.fire({
+      icon: 'info',
+      title: 'Organizador integrado',
+      text: 'Los datos del organizador se gestionan y guardan directamente en cada curso.',
+      confirmButtonColor: '#bfa05e',
+    });
+    setShowAgendaForm(false);
+    setEditingContacto(null);
   };
 
-  const handleDeleteContacto = async (id: string) => {
-    const result = await Swal.fire({
-      title: '¿Eliminar contacto?',
-      text: 'Se eliminará el contacto. Esta acción no se puede deshacer.',
-      icon: 'warning',
-      showCancelButton: true,
-      confirmButtonColor: '#d93025',
-      cancelButtonText: 'Cancelar',
-      confirmButtonText: 'Sí, eliminar',
+  const handleDeleteContacto = async (_id: string) => {
+    Swal.fire({
+      icon: 'info',
+      title: 'Organizador integrado',
+      text: 'Los datos del organizador pertenecen directamente a sus respectivos cursos.',
+      confirmButtonColor: '#bfa05e',
     });
-    if (result.isConfirmed) {
-      const { error } = await supabase.from('agenda_contactos').delete().eq('id_contacto', id);
-      if (error) {
-        Swal.fire('Error', error.message, 'error');
-      } else {
-        Swal.fire({ icon: 'success', title: 'Eliminado', timer: 1200, showConfirmButton: false });
-        loadData();
-      }
-    }
   };
 
   const handleEditContacto = (contacto: AgendaContacto) => {
