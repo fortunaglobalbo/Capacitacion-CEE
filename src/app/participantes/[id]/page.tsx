@@ -72,13 +72,49 @@ export default function ParticipanteRegistroPage() {
     async function fetchCurso() {
       setLoadingCurso(true);
       try {
-        const { data, error } = await supabase
+        let rawData: any = null;
+
+        const viewRes = await supabase
           .from('cursos_enriquecidos')
           .select('*')
           .eq('id', id)
           .single();
 
-        if (error) throw error;
+        if (viewRes.data && !viewRes.error) {
+          rawData = viewRes.data;
+        } else {
+          // Fallback to table 'cursos'
+          const baseRes = await supabase
+            .from('cursos')
+            .select('*')
+            .eq('id', id)
+            .single();
+
+          if (baseRes.error || !baseRes.data) {
+            throw baseRes.error || new Error('Curso no encontrado');
+          }
+
+          rawData = baseRes.data;
+
+          // Enrich details if needed
+          const [tecRes, facRes, cicRes] = await Promise.all([
+            rawData.tecnico_carnet ? supabase.from('tecnicos').select('nombre').eq('carnet', rawData.tecnico_carnet).maybeSingle() : Promise.resolve({ data: null }),
+            rawData.facilitador_carnet ? supabase.from('facilitadores').select('nombre').eq('carnet', rawData.facilitador_carnet).maybeSingle() : Promise.resolve({ data: null }),
+            rawData.ciclo_id ? supabase.from('ciclos_formativos').select('*').eq('id', rawData.ciclo_id).maybeSingle() : Promise.resolve({ data: null }),
+          ]);
+
+          if (tecRes.data?.nombre) rawData.tecnico_nombre = tecRes.data.nombre;
+          if (facRes.data?.nombre) rawData.facilitador_nombre = facRes.data.nombre;
+          if (cicRes.data) {
+            rawData.ciclo_nombre = cicRes.data.nombre;
+            rawData.ciclo_grupo = cicRes.data.grupo;
+            rawData.area_formativa = cicRes.data.area_formativa;
+            rawData.tema1 = cicRes.data.tema1;
+            rawData.tema2 = cicRes.data.tema2;
+            rawData.tema3 = cicRes.data.tema3;
+            rawData.tema4 = cicRes.data.tema4;
+          }
+        }
 
         // Fetch exact real-time count of participants registered for this course
         const { count, error: countErr } = await supabase
@@ -86,7 +122,7 @@ export default function ParticipanteRegistroPage() {
           .select('*', { count: 'exact', head: true })
           .eq('curso_id', id);
 
-        const cursoData = data as Curso;
+        const cursoData = rawData as Curso;
         if (!countErr && count !== null) {
           cursoData.inscritos_formulario = count;
         }

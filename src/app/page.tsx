@@ -254,16 +254,85 @@ function HomePage() {
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
-      const [cursosRes, tecRes, facRes, cicRes, agendaRes] = await Promise.all([
-        supabase.from('cursos_enriquecidos').select('*, inscripcion_ciclo(count)').order('created_at', { ascending: false }).order('id', { ascending: true }),
-        supabase.from('tecnicos').select('*').order('nombre'),
-        supabase.from('facilitadores').select('*').order('nombre'),
-        supabase.from('ciclos_formativos').select('*').order('grupo, nombre'),
-        supabase.from('agenda_contactos').select('*').order('nombre'),
+      const safeFetch = async (fn: () => PromiseLike<any>) => {
+        try {
+          return await fn();
+        } catch {
+          return { data: null };
+        }
+      };
+
+      const [tecRes, facRes, cicRes, agendaRes] = await Promise.all([
+        safeFetch(() => supabase.from('tecnicos').select('*').order('nombre')),
+        safeFetch(() => supabase.from('facilitadores').select('*').order('nombre')),
+        safeFetch(() => supabase.from('ciclos_formativos').select('*').order('grupo, nombre')),
+        safeFetch(() => supabase.from('agenda_contactos').select('*').order('nombre')),
       ]);
 
-      if (cursosRes.data) {
-        const mapped = (cursosRes.data as any[]).map((c) => {
+      const tecnicosData = (tecRes.data as Tecnico[]) || [];
+      const facilitadoresData = (facRes.data as Facilitador[]) || [];
+      const ciclosData = (cicRes.data as CicloFormativo[]) || [];
+      const agendaData = (agendaRes.data as AgendaContacto[]) || [];
+
+      if (tecRes.data) setTecnicos(tecnicosData);
+      if (facRes.data) setFacilitadores(facilitadoresData);
+      if (cicRes.data) setCiclos(ciclosData);
+      if (agendaRes.data) setAgenda(agendaData);
+
+      // Map lookup helpers for fallback enrichment
+      const tecMap = new Map(tecnicosData.map((t) => [t.carnet, t.nombre]));
+      const facMap = new Map(facilitadoresData.map((f) => [f.carnet, f.nombre]));
+      const cicMap = new Map(ciclosData.map((c) => [c.id, c]));
+      const agendaMap = new Map(agendaData.map((a) => [a.id_contacto, a]));
+
+      let cursosRaw: any[] | null = null;
+      
+      // Try querying view first
+      const cursosViewRes = await supabase
+        .from('cursos_enriquecidos')
+        .select('*, inscripcion_ciclo(count)')
+        .order('created_at', { ascending: false })
+        .order('id', { ascending: true });
+
+      if (cursosViewRes.data && !cursosViewRes.error) {
+        cursosRaw = cursosViewRes.data;
+      } else {
+        // Fallback to table 'cursos' if view doesn't exist
+        const cursosBaseRes = await supabase
+          .from('cursos')
+          .select('*, inscripcion_ciclo(count)')
+          .order('created_at', { ascending: false })
+          .order('id', { ascending: true });
+
+        if (cursosBaseRes.data) {
+          cursosRaw = cursosBaseRes.data.map((c: any) => {
+            const cf = cicMap.get(c.ciclo_id) || ({} as any);
+            const ac = agendaMap.get(c.contacto_agenda) || ({} as any);
+            return {
+              ...c,
+              tecnico_nombre: c.tecnico_nombre || tecMap.get(c.tecnico_carnet) || null,
+              facilitador_nombre: c.facilitador_nombre || facMap.get(c.facilitador_carnet) || null,
+              ciclo_nombre: c.ciclo_nombre || cf.nombre || null,
+              ciclo_grupo: c.ciclo_grupo || cf.grupo || null,
+              area_formativa: c.area_formativa || cf.area_formativa || null,
+              tema1: c.tema1 || cf.tema1 || null,
+              tema2: c.tema2 || cf.tema2 || null,
+              tema3: c.tema3 || cf.tema3 || null,
+              tema4: c.tema4 || cf.tema4 || null,
+              organizador_nombre: c.organizador_nombre || ac.nombre || null,
+              organizador_telefono: c.organizador_telefono || ac.telefono || null,
+              organizador_lugar: c.organizador_lugar || ac.lugar || null,
+              organizador_maps: c.organizador_maps || ac.link_maps || null,
+              organizador_descripcion: c.organizador_descripcion || ac.descripcion || null,
+              organizador_semaforo: c.organizador_semaforo || ac.estado_semaforo || null,
+              organizador_color: c.organizador_color || ac.color || null,
+            };
+          });
+        }
+      }
+
+      if (cursosRaw) {
+        const mapped = cursosRaw.map((c) => {
           const countVal = c.inscripcion_ciclo?.[0]?.count ?? 0;
           return {
             ...c,
@@ -272,10 +341,6 @@ function HomePage() {
         });
         setCursos(mapped as Curso[]);
       }
-      if (tecRes.data) setTecnicos(tecRes.data as Tecnico[]);
-      if (facRes.data) setFacilitadores(facRes.data as Facilitador[]);
-      if (cicRes.data) setCiclos(cicRes.data as CicloFormativo[]);
-      if (agendaRes.data) setAgenda(agendaRes.data as AgendaContacto[]);
 
       // Load review data (validation + payment stats per course)
       try {
