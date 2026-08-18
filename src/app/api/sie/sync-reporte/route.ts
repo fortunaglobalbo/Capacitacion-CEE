@@ -279,8 +279,8 @@ export async function POST(request: Request) {
           const deadline = endDate ? new Date(endDate.getTime() + 5 * 24 * 3600 * 1000) : null;
           const afterDeadline = deadline ? new Date() > deadline : false;
 
-          // Check grades and evaluations from /inscription/${cid}
-          let totalStd = 0, failed = 0, responded = 0, totalVal = 0, valPct = 0;
+          // 1. Check grades (Informe Evaluación / Notas Docente) from /inscription/${cid}
+          let totalStd = 0, failed = 0, evalNotasResp = 0;
           try {
             const gRes = await fetch(`${BASE_URL}/inscription/${cid}`, { headers: { 'Cookie': cookieHeader } });
             const gHtml = await gRes.text();
@@ -315,24 +315,31 @@ export async function POST(request: Request) {
 
               totalStd = totalParticipants;
               failed = failCount;
-              totalVal = totalParticipants;
-              responded = evaluatedCount;
-              valPct = totalVal > 0 ? Math.round((responded / totalVal) * 1000) / 10 : 0;
+              evalNotasResp = evaluatedCount;
             }
           } catch (e) {}
 
-          // Fallback check on /events/ficha-valoracion/${cid} if /inscription parsing had no participants
-          if (totalVal === 0) {
-            try {
-              const vRes = await fetch(`${BASE_URL}/events/ficha-valoracion/${cid}`, { headers: { 'Cookie': cookieHeader } });
-              const vHtml = await vRes.text();
+          // 2. Check Valoración (Encuesta de Valoración de Estudiantes en SIE) from /events/ficha-valoracion/${cid}
+          let responded = 0, totalVal = totalStd, valPct = 0, valDisabled = false;
+          try {
+            const vRes = await fetch(`${BASE_URL}/events/ficha-valoracion/${cid}`, { headers: { 'Cookie': cookieHeader } });
+            const vHtml = await vRes.text();
+            
+            if (vHtml.includes('EVALUACIÓN DESHABILITADA') || vHtml.includes('NO HABILITADA')) {
+              valDisabled = true;
+              responded = 0;
+              valPct = 0;
+            } else {
               const pCards = (vHtml.match(/class=["']participant-card["']/gi) || []).length;
               const sinVal = (vHtml.match(/Sin valoraci/gi) || []).length;
-              totalVal = pCards;
-              responded = totalVal > 0 ? totalVal - sinVal : 0;
-              valPct = totalVal > 0 ? Math.round((responded / totalVal) * 1000) / 10 : 0;
-            } catch (e) {}
-          }
+              const tv = pCards > 0 ? pCards : totalStd;
+              if (tv > 0) {
+                totalVal = tv;
+                responded = Math.max(0, totalVal - sinVal);
+                valPct = Math.round((responded / totalVal) * 1000) / 10;
+              }
+            }
+          } catch (e) {}
 
           // Check Plan & Report Docs
           let hasPlan = false, hasReport = false, docid = '';
@@ -370,7 +377,7 @@ export async function POST(request: Request) {
           const conformOk = conform;
           const conformPend = !conformOk && !!informeDateStr;
 
-          const todoOk = hasPlan && responded >= 1 && hasReport && planifOk && informeOk && conformOk;
+          const todoOk = hasPlan && evalNotasResp >= 1 && hasReport && planifOk && informeOk && conformOk;
 
           evCourses.push({
             cid,
@@ -380,9 +387,12 @@ export async function POST(request: Request) {
             fecha_fin: cFin,
             deadline: deadline ? `${deadline.getDate().toString().padStart(2, '0')}/${(deadline.getMonth() + 1).toString().padStart(2, '0')}/${deadline.getFullYear()}` : '',
             plan: hasPlan ? 'SI' : 'NO',
+            eval_notas_resp: evalNotasResp,
+            eval_notas_total: totalStd,
             val_pct: valPct,
             val_resp: responded,
             val_total: totalVal,
+            val_disabled: valDisabled,
             repr: failed,
             rep: hasReport ? 'SI' : 'NO',
             planif_date: formatDtShort(planifDate),
@@ -490,8 +500,8 @@ export async function POST(request: Request) {
         paso(cr.planif_ok, 'Planificación Fecha', cr.planif_date || '—', 'Fecha de planificación: válida entre inicio−5d y el día de inicio'),
         paso(true, 'Fecha de inicio', inicioShort || '—', '', true),
         paso(true, 'Socialización', finShort, 'Última fecha de socialización', true),
-        paso(cr.val_resp >= 1, 'Informe Evaluación', `${cr.val_resp}/${cr.val_total}`, 'Estudiantes que respondieron la valoración / total'),
-        paso(cr.val_resp >= 1, 'Valoración', `${cr.val_pct}%`, 'Porcentaje de valoraciones completadas'),
+        paso(cr.eval_notas_resp >= 1, 'Informe Evaluación', `${cr.eval_notas_resp}/${cr.eval_notas_total || cr.val_total}`, 'Estudiantes evaluados con notas por el facilitador / total'),
+        paso(!cr.val_disabled && cr.val_pct > 0, 'Valoración', cr.val_disabled ? 'DESHABILITADA' : `${cr.val_pct}%`, 'Porcentaje de encuesta de valoración completada por estudiantes en SIE'),
         paso(cr.informe_ok, 'Informe Final', cr.informe_date || '—', 'Informe Final: fecha de cierre entre socialización y +5d'),
         paso(cr.todo_ok, 'Fecha límite', limiteShort, 'Socialización + 5 días. Verde solo si todos los pasos están OK')
       ];
