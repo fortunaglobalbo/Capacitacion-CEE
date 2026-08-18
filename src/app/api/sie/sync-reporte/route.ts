@@ -279,38 +279,60 @@ export async function POST(request: Request) {
           const deadline = endDate ? new Date(endDate.getTime() + 5 * 24 * 3600 * 1000) : null;
           const afterDeadline = deadline ? new Date() > deadline : false;
 
-          // Check grades
-          let totalStd = 0, failed = 0;
+          // Check grades and evaluations from /inscription/${cid}
+          let totalStd = 0, failed = 0, responded = 0, totalVal = 0, valPct = 0;
           try {
             const gRes = await fetch(`${BASE_URL}/inscription/${cid}`, { headers: { 'Cookie': cookieHeader } });
             const gHtml = await gRes.text();
             const gTableMatch = gHtml.match(/<table[^>]*>[\s\S]*?<\/table>/i);
             if (gTableMatch) {
               const gRows = gTableMatch[0].match(/<tr[^>]*>[\s\S]*?<\/tr>/gi) || [];
-              const scores: number[] = [];
+              let evaluatedCount = 0;
+              let failCount = 0;
+              let totalParticipants = 0;
+
               for (const r of gRows) {
                 const c = (r.match(/<td[^>]*>[\s\S]*?<\/td>/gi) || []).map(td => td.replace(/<[^>]+>/g, '').trim());
-                if (c.length >= 12 && /^\d+$/.test(c[0])) {
-                  const val = parseFloat(c[c.length - 1]);
-                  if (!isNaN(val)) scores.push(val);
+                if (c.length >= 10 && /^\d+$/.test(c[0])) {
+                  totalParticipants++;
+
+                  const pPresencial = parseFloat(c[7]) || 0;
+                  const pConcrecion = parseFloat(c[8]) || 0;
+                  const pSocializacion = parseFloat(c[9]) || 0;
+                  const pApropiacionMatch = (c[10] || '').match(/(\d+(?:[.,]\d+)?)\s*pts/i);
+                  const pApropiacion = pApropiacionMatch ? parseFloat(pApropiacionMatch[1].replace(',', '.')) : 0;
+                  const notaFinal = parseFloat(c[11]) || (pPresencial + pConcrecion + pSocializacion + pApropiacion);
+
+                  const isEvaluated = pPresencial > 0 || pConcrecion > 0 || pSocializacion > 0 || pApropiacion > 0 || notaFinal > 0;
+                  if (isEvaluated) {
+                    evaluatedCount++;
+                    if (notaFinal > 0 && notaFinal < 70) {
+                      failCount++;
+                    }
+                  }
                 }
               }
-              totalStd = scores.length;
-              failed = scores.filter(s => s < 70).length;
+
+              totalStd = totalParticipants;
+              failed = failCount;
+              totalVal = totalParticipants;
+              responded = evaluatedCount;
+              valPct = totalVal > 0 ? Math.round((responded / totalVal) * 1000) / 10 : 0;
             }
           } catch (e) {}
 
-          // Check Valoracion
-          let responded = 0, totalVal = 0, valPct = 0;
-          try {
-            const vRes = await fetch(`${BASE_URL}/events/ficha-valoracion/${cid}`, { headers: { 'Cookie': cookieHeader } });
-            const vHtml = await vRes.text();
-            const pCards = (vHtml.match(/class=["']participant-card["']/gi) || []).length;
-            const sinVal = (vHtml.match(/Sin valoraci/gi) || []).length;
-            totalVal = pCards;
-            responded = totalVal > 0 ? totalVal - sinVal : 0;
-            valPct = totalVal > 0 ? Math.round((responded / totalVal) * 1000) / 10 : 0;
-          } catch (e) {}
+          // Fallback check on /events/ficha-valoracion/${cid} if /inscription parsing had no participants
+          if (totalVal === 0) {
+            try {
+              const vRes = await fetch(`${BASE_URL}/events/ficha-valoracion/${cid}`, { headers: { 'Cookie': cookieHeader } });
+              const vHtml = await vRes.text();
+              const pCards = (vHtml.match(/class=["']participant-card["']/gi) || []).length;
+              const sinVal = (vHtml.match(/Sin valoraci/gi) || []).length;
+              totalVal = pCards;
+              responded = totalVal > 0 ? totalVal - sinVal : 0;
+              valPct = totalVal > 0 ? Math.round((responded / totalVal) * 1000) / 10 : 0;
+            } catch (e) {}
+          }
 
           // Check Plan & Report Docs
           let hasPlan = false, hasReport = false, docid = '';
