@@ -23,6 +23,7 @@ export default function ReporteDiarioModal({
   const [isSieConnected, setIsSieConnected] = useState<boolean>(false);
   const [sieUser, setSieUser] = useState<string>('');
   const [siePass, setSiePass] = useState<string>('');
+  const [iframeKey, setIframeKey] = useState<number>(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Comprobar si el usuario actual es el técnico Gilmar Felix Chavarria Choque
@@ -336,13 +337,8 @@ function marcarPrioritarios() {
     }
   }, [isOpen]);
 
-  // Conectar al SIE y realizar sincronización completa
+  // Paso 1: ÚNICAMENTE conectar al SIE y verificar credenciales
   const handleConnectSie = async (userToUse?: string, passToUse?: string) => {
-    return handleSyncSieData(userToUse, passToUse);
-  };
-
-  // Paso 2: Analizar y sincronizar todos los datos del SIE en tiempo real
-  const handleSyncSieData = async (userToUse?: string, passToUse?: string) => {
     const username = (userToUse || sieUser || '').trim();
     const password = passToUse || siePass;
 
@@ -359,12 +355,92 @@ function marcarPrioritarios() {
     setSyncingSie(true);
 
     Swal.fire({
-      title: '📊 Analizando Datos del SIE...',
+      title: '🔌 Conectando al SIE UNEFCO...',
       html: `
         <div style="font-size:0.9rem;color:#334155;margin-top:6px;">
-          <p style="margin-bottom:8px;">🟢 <b>Conectado al portal SIE UNEFCO</b> (${username})</p>
+          <p style="color:#0284c7;font-weight:600;margin-bottom:4px;">Verificando credenciales con el portal SIE (${username})...</p>
+          <p style="font-size:0.8rem;color:#64748b;">Por favor espera unos segundos mientras se valida el acceso.</p>
+        </div>
+      `,
+      allowOutsideClick: false,
+      didOpen: () => {
+        Swal.showLoading();
+      },
+    });
+
+    try {
+      const res = await fetch('/api/sie/sync-reporte', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password, action: 'verify' }),
+      });
+
+      const data = await res.json().catch(() => ({}));
+
+      if (res.ok && data.success) {
+        setIsSieConnected(true);
+        Swal.fire({
+          icon: 'success',
+          title: '🟢 Conexión Exitosa',
+          html: `<b>¡Te has conectado correctamente al portal SIE UNEFCO!</b><br><br>Credenciales verificadas para <b>${username}</b>.<br>Ahora puedes hacer clic en <b>"🚀 Analizar y Sincronizar"</b> para procesar la información en tiempo real.`,
+          confirmButtonColor: '#0d3b66',
+        });
+      } else {
+        setIsSieConnected(false);
+        Swal.fire({
+          icon: 'error',
+          title: 'Fallo de Conexión',
+          text: data.error || 'No se pudo conectar al SIE. Revisa tu usuario y contraseña.',
+          confirmButtonColor: '#0d3b66',
+        });
+      }
+    } catch (e: any) {
+      setIsSieConnected(false);
+      Swal.fire({
+        icon: 'error',
+        title: 'Error de Servidor',
+        text: 'Ocurrió un error al verificar la conexión con el SIE.',
+        confirmButtonColor: '#0d3b66',
+      });
+    } finally {
+      setSyncingSie(false);
+    }
+  };
+
+  // Paso 2: Analizar y sincronizar todos los datos del SIE en tiempo real (requiere estar conectado)
+  const handleSyncSieData = async (userToUse?: string, passToUse?: string) => {
+    const username = (userToUse || sieUser || '').trim();
+    const password = passToUse || siePass;
+
+    if (!username || !password) {
+      Swal.fire({
+        title: 'Credenciales Requeridas',
+        text: 'Ingresa tu usuario y contraseña del SIE UNEFCO.',
+        icon: 'warning',
+        confirmButtonColor: '#0d3b66',
+      });
+      return;
+    }
+
+    if (!isSieConnected) {
+      Swal.fire({
+        title: '⚠️ Conexión Requerida',
+        html: 'Por favor haz clic primero en <b>"🔌 Conectar SIE"</b> para verificar tus credenciales antes de iniciar el análisis y la sincronización.',
+        icon: 'warning',
+        confirmButtonColor: '#0d3b66',
+      });
+      return;
+    }
+
+    setSyncingSie(true);
+
+    Swal.fire({
+      title: '📊 Analizando Datos del SIE en Tiempo Real...',
+      html: `
+        <div style="font-size:0.9rem;color:#334155;margin-top:6px;">
+          <p style="margin-bottom:8px;">🟢 <b>Sesión Activa en el SIE UNEFCO</b> (${username})</p>
           <p style="color:#0284c7;font-weight:600;margin-bottom:4px;">Procesando participantes, eventos, planificaciones e informes finales en tiempo real...</p>
-          <p style="font-size:0.8rem;color:#64748b;">Por favor espera unos momentos mientras se actualizan las baterías de monitoreo.</p>
+          <p style="font-size:0.8rem;color:#64748b;">Por favor espera unos momentos mientras se genera y guarda el nuevo reporte.</p>
         </div>
       `,
       allowOutsideClick: false,
@@ -385,10 +461,11 @@ function marcarPrioritarios() {
       if (res.ok && data.success) {
         setIsSieConnected(true);
         await loadHtmlReport();
+        setIframeKey((prev) => prev + 1);
         Swal.fire({
           icon: 'success',
           title: '✅ Monitoreo Realizado',
-          html: '<b>¡Análisis y Monitoreo completados con éxito!</b><br>Los datos del SIE fueron actualizados y guardados en Supabase.',
+          html: '<b>¡Análisis y Sincronización completados con éxito!</b><br>Los datos del SIE se actualizaron en tiempo real y el nuevo reporte fue guardado en Supabase.',
           confirmButtonColor: '#0d3b66',
           timer: 3500,
           timerProgressBar: true,
@@ -593,7 +670,10 @@ function marcarPrioritarios() {
                   <input
                     type="text"
                     value={sieUser}
-                    onChange={(e) => setSieUser(e.target.value)}
+                    onChange={(e) => {
+                      setSieUser(e.target.value);
+                      setIsSieConnected(false);
+                    }}
                     placeholder="Usuario / Correo SIE"
                     autoComplete="off"
                     style={{
@@ -612,7 +692,10 @@ function marcarPrioritarios() {
                   <input
                     type="password"
                     value={siePass}
-                    onChange={(e) => setSiePass(e.target.value)}
+                    onChange={(e) => {
+                      setSiePass(e.target.value);
+                      setIsSieConnected(false);
+                    }}
                     placeholder="Contraseña SIE"
                     autoComplete="new-password"
                     style={{
@@ -800,6 +883,7 @@ function marcarPrioritarios() {
             </div>
           ) : (
             <iframe
+              key={iframeKey}
               srcDoc={processedHtml}
               style={{
                 width: '100%',
