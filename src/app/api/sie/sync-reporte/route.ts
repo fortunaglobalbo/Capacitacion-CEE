@@ -489,11 +489,22 @@ export async function POST(request: Request) {
         return `<div class="paso ${cls}"${titleAttr}><span class="ico">${ico}</span><span class="lbl">${label}</span><span class="val">${value}</span></div>`;
       }
 
+      const MONTH_NAMES_LITERAL: Record<number, string> = {
+        1: 'Enero', 2: 'Febrero', 3: 'Marzo', 4: 'Abril', 5: 'Mayo', 6: 'Junio',
+        7: 'Julio', 8: 'Agosto', 9: 'Septiembre', 10: 'Octubre', 11: 'Noviembre', 12: 'Diciembre'
+      };
+
       const inicioShort = cr.fecha_inicio;
       const finParts = cr.fecha_fin ? cr.fecha_fin.split('/') : [];
       const finShort = finParts.length >= 2 ? `${finParts[0]}/${finParts[1]}` : (cr.fecha_fin || '—');
       const dp = cr.deadline ? cr.deadline.split('/') : [];
-      const limiteShort = dp.length >= 2 ? `${dp[0]}/${dp[1]}` : cr.deadline;
+      let limiteShort = cr.deadline || '—';
+      if (dp.length >= 2) {
+        const dayNum = dp[0];
+        const mNum = parseInt(dp[1], 10);
+        const literalMonth = MONTH_NAMES_LITERAL[mNum] || dp[1];
+        limiteShort = `${dayNum}/${literalMonth}`;
+      }
 
       const pasos = [
         paso(cr.plan === 'SI', 'Planificación', cr.plan, 'Planificación (plan de trabajo): SI = existe'),
@@ -538,10 +549,20 @@ export async function POST(request: Request) {
       const bgColor = facilitatorColorMap[ev.facilitador] || '#ffffff';
 
       let tec = '8639300';
-      for (const cr of ev.courses) {
-        if (courseMap[cr.cid]) {
-          tec = courseMap[cr.cid];
-          break;
+      const idMatch = ev.sede ? ev.sede.match(/ID\s*(\d+)/i) : null;
+      if (idMatch) {
+        const dbCourse = (cursosDb || []).find(c => String(c.id) === String(idMatch[1]));
+        if (dbCourse && dbCourse.tecnico_carnet) {
+          tec = dbCourse.tecnico_carnet;
+        }
+      }
+
+      if (tec === '8639300') {
+        for (const cr of ev.courses) {
+          if (courseMap[cr.cid]) {
+            tec = courseMap[cr.cid];
+            break;
+          }
         }
       }
 
@@ -552,10 +573,13 @@ export async function POST(request: Request) {
           if (dbNorm && dbNorm !== 'por confirmar') {
             const facWords = facNorm.split(/\s+/).filter(w => w.length >= 2);
             const dbWords = dbNorm.split(/\s+/).filter(w => w.length >= 2);
-            const overlap = facWords.filter(w => dbWords.includes(w)).length;
-            if (overlap >= 2 && facToTecnico[f.carnet]) {
-              tec = facToTecnico[f.carnet];
-              break;
+            const isFirstNameCompatible = facWords.some(w => dbWords.includes(w) && !['nina', 'ortiz', 'vidal', 'chavez', 'alave', 'flores', 'garcia', 'mamani', 'quispe', 'rodriguez'].includes(w));
+            if (isFirstNameCompatible) {
+              const overlap = facWords.filter(w => dbWords.includes(w)).length;
+              if (overlap >= 2 && facToTecnico[f.carnet]) {
+                tec = facToTecnico[f.carnet];
+                break;
+              }
             }
           }
         }
@@ -572,9 +596,15 @@ export async function POST(request: Request) {
 
       const dataOk = ev.all_ok ? '1' : '0';
       htmlRows += `<tr style="background:${bgColor}" data-ok="${dataOk}" data-tecnico="${tec}">
+        <td style="text-align:center; vertical-align:middle; white-space:nowrap;">
+          <span class="badge-mes-box">📅 ${ev.mes ? ev.mes.toUpperCase() : 'MES'}</span>
+          <div style="font-size:10px; font-weight:700; color:#0369a1; margin-top:3px;">
+            ${ev.courses.length} ${ev.courses.length === 1 ? 'curso' : 'cursos'}
+          </div>
+        </td>
         <td class="toggle-ciclo" title="${ev.ciclo}">${ev.ciclo ? ev.ciclo.substring(0, 60) : ''}</td>
         <td title="${ev.sede}">${ev.sede ? ev.sede.substring(0, 40) : ''}</td>
-        <td title="${ev.facilitador}">${ev.facilitador ? ev.facilitador.substring(0, 40) : ''}</td>
+        <td title="${ev.facilitador}"><strong>${ev.facilitador ? ev.facilitador.substring(0, 40) : ''}</strong></td>
         ${courseCells}
         <td style="text-align:center"><a href="${ev.url_evento}" target="_blank" title="Ver evento en SIE">👁️</a></td>
     </tr>`;
@@ -647,7 +677,26 @@ tbody tr:hover { filter: brightness(.96); }
 .cell-green { background: #dcfce7 !important; }
 .cell-yellow { background: #fef9c3 !important; }
 .cell-red { background: #fee2e2 !important; }
-.curso { min-width: 170px; max-width: 300px; }
+.badge-mes-box {
+    background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%);
+    color: #ffffff;
+    font-size: 11px;
+    font-weight: 800;
+    padding: 4px 10px;
+    border-radius: 8px;
+    display: inline-block;
+    box-shadow: 0 2px 6px rgba(2, 132, 199, 0.25);
+    letter-spacing: 0.5px;
+}
+.curso {
+    min-width: 175px;
+    max-width: 300px;
+    border: 2px solid #0284c7 !important;
+    border-radius: 12px !important;
+    padding: 8px !important;
+    background: #ffffff !important;
+    box-shadow: 0 3px 10px rgba(2, 132, 199, 0.12) !important;
+}
 .curso.curso-prioritario {
     border: 2.5px solid #e11d48 !important;
     box-shadow: 0 4px 12px rgba(225, 29, 72, 0.25) !important;
@@ -763,7 +812,7 @@ a:hover { opacity: .75; }
 <table id="reportTable">
 <thead>
 <tr>
-    <th class="toggle-ciclo">Ciclo Formativo</th><th>Sede</th><th>Facilitador</th>
+    <th style="text-align:center;">Mes</th><th class="toggle-ciclo">Ciclo Formativo</th><th>Sede</th><th>Facilitador</th>
     <th>Curso 1</th><th>Curso 2</th><th>Curso 3</th><th>Curso 4</th>
     <th style="width:40px;text-align:center">🔗</th>
 </tr>
