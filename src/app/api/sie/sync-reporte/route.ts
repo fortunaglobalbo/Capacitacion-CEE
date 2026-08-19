@@ -598,7 +598,7 @@ export async function POST(request: Request) {
       }
 
       // Group courses by their actual start month
-      const monthCounts: Record<string, number> = {};
+      const coursesByMonth: Record<string, any[]> = {};
       for (const cr of ev.courses) {
         const dt = parseStartDate(cr.dates);
         let mName = ev.mes || 'MES';
@@ -607,31 +607,36 @@ export async function POST(request: Request) {
           mName = MONTH_NAMES[mNum] || ev.mes || 'MES';
         }
         cr.start_month = mName;
-        monthCounts[mName] = (monthCounts[mName] || 0) + 1;
+        if (!coursesByMonth[mName]) coursesByMonth[mName] = [];
+        coursesByMonth[mName].push(cr);
       }
 
-      const monthSummaryHtml = Object.entries(monthCounts)
-        .map(([mName, count]) => `<div style="margin-bottom:3px;"><span class="badge-mes-box">📅 ${mName.toUpperCase()}</span><div style="font-size:10px; font-weight:700; color:#0369a1;">${count} ${count === 1 ? 'curso' : 'cursos'}</div></div>`)
-        .join('');
+      let monthGroupsHtml = '';
+      for (const [mName, mCourses] of Object.entries(coursesByMonth)) {
+        const courseCardsHtml = mCourses.map((cr: any) => {
+          const status = cellTemp(cr);
+          return `<div class="curso-wrap ${status}">${courseCellHtml(cr)}</div>`;
+        }).join('');
 
-      let courseCells = '';
-      for (const cr of ev.courses) {
-        const status = cellTemp(cr);
-        courseCells += `<td class="${status}">${courseCellHtml(cr)}</td>`;
-      }
-      for (let i = ev.courses.length; i < 4; i++) {
-        courseCells += '<td></td>';
+        monthGroupsHtml += `<div class="month-group-container">
+          <div class="month-group-header">
+            <span>📅 MES DE ${mName.toUpperCase()}</span>
+            <span class="month-group-count">${mCourses.length} ${mCourses.length === 1 ? 'curso programado' : 'cursos programados'}</span>
+          </div>
+          <div class="month-group-courses">
+            ${courseCardsHtml}
+          </div>
+        </div>`;
       }
 
       const dataOk = ev.all_ok ? '1' : '0';
       htmlRows += `<tr style="background:${bgColor}" data-ok="${dataOk}" data-tecnico="${tec}">
-        <td style="text-align:center; vertical-align:middle; white-space:nowrap;">
-          ${monthSummaryHtml || `<span class="badge-mes-box">📅 MES</span>`}
-        </td>
         <td class="toggle-ciclo" title="${ev.ciclo}">${ev.ciclo ? ev.ciclo.substring(0, 60) : ''}</td>
         <td title="${ev.sede}">${ev.sede ? ev.sede.substring(0, 40) : ''}</td>
         <td title="${ev.facilitador}"><strong>${ev.facilitador ? ev.facilitador.substring(0, 40) : ''}</strong></td>
-        ${courseCells}
+        <td colspan="4" style="padding: 8px;">
+          ${monthGroupsHtml}
+        </td>
         <td style="text-align:center"><a href="${ev.url_evento}" target="_blank" title="Ver evento en SIE">👁️</a></td>
     </tr>`;
     }
@@ -702,29 +707,45 @@ tbody tr:hover { filter: brightness(.96); }
 .cell-blue { background: #dbeafe !important; }
 .cell-green { background: #dcfce7 !important; }
 .cell-yellow { background: #fef9c3 !important; }
-.cell-red { background: #fee2e2 !important; }
-.badge-mes-box {
+.month-group-container {
+    border: 2.5px solid #0284c7 !important;
+    border-radius: 14px !important;
+    padding: 10px 12px !important;
+    background: #f0f9ff !important;
+    box-shadow: 0 4px 12px rgba(2, 132, 199, 0.15) !important;
+    margin-bottom: 8px !important;
+}
+.month-group-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
     background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%);
     color: #ffffff;
+    padding: 6px 14px;
+    border-radius: 8px;
     font-size: 11px;
     font-weight: 800;
-    padding: 4px 10px;
-    border-radius: 8px;
-    display: inline-block;
-    box-shadow: 0 2px 6px rgba(2, 132, 199, 0.25);
+    margin-bottom: 10px;
     letter-spacing: 0.5px;
+    box-shadow: 0 2px 6px rgba(2, 132, 199, 0.2);
 }
-.curso-start-month-header {
-    background: #e0f2fe;
-    color: #0369a1;
-    border: 1px solid #bae6fd;
+.month-group-count {
+    background: rgba(255, 255, 255, 0.22);
+    padding: 2px 9px;
+    border-radius: 12px;
     font-size: 10px;
-    font-weight: 800;
-    padding: 3px 6px;
-    border-radius: 6px;
-    margin-bottom: 6px;
-    text-align: center;
-    letter-spacing: 0.4px;
+    font-weight: 700;
+}
+.month-group-courses {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    align-items: stretch;
+}
+.curso-wrap {
+    border-radius: 12px;
+    padding: 3px;
+    display: flex;
 }
 .curso {
     min-width: 175px;
@@ -850,8 +871,8 @@ a:hover { opacity: .75; }
 <table id="reportTable">
 <thead>
 <tr>
-    <th style="text-align:center;">Mes</th><th class="toggle-ciclo">Ciclo Formativo</th><th>Sede</th><th>Facilitador</th>
-    <th>Curso 1</th><th>Curso 2</th><th>Curso 3</th><th>Curso 4</th>
+    <th class="toggle-ciclo">Ciclo Formativo</th><th>Sede</th><th>Facilitador</th>
+    <th colspan="4" style="text-align:center;">Cursos Programados por Mes</th>
     <th style="width:40px;text-align:center">🔗</th>
 </tr>
 </thead>
