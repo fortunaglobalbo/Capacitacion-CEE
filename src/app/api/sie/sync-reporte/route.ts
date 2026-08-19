@@ -597,36 +597,24 @@ export async function POST(request: Request) {
         }
       }
 
-      // Group courses by their actual start month
-      const coursesByMonth: Record<string, any[]> = {};
+      // Determine start month for each course
       for (const cr of ev.courses) {
         const dt = parseStartDate(cr.dates);
-        let mName = ev.mes || 'MES';
         if (dt) {
           const mNum = dt.getMonth() + 1;
-          mName = MONTH_NAMES[mNum] || ev.mes || 'MES';
+          cr.start_month = MONTH_NAMES[mNum] || ev.mes || 'MES';
+        } else {
+          cr.start_month = ev.mes || 'MES';
         }
-        cr.start_month = mName;
-        if (!coursesByMonth[mName]) coursesByMonth[mName] = [];
-        coursesByMonth[mName].push(cr);
       }
 
-      let monthGroupsHtml = '';
-      for (const [mName, mCourses] of Object.entries(coursesByMonth)) {
-        const courseCardsHtml = mCourses.map((cr: any) => {
-          const status = cellTemp(cr);
-          return `<div class="curso-wrap ${status}">${courseCellHtml(cr)}</div>`;
-        }).join('');
-
-        monthGroupsHtml += `<div class="month-group-container">
-          <div class="month-group-header">
-            <span>📅 MES DE ${mName.toUpperCase()}</span>
-            <span class="month-group-count">${mCourses.length} ${mCourses.length === 1 ? 'curso programado' : 'cursos programados'}</span>
-          </div>
-          <div class="month-group-courses">
-            ${courseCardsHtml}
-          </div>
-        </div>`;
+      let courseCells = '';
+      for (const cr of ev.courses) {
+        const status = cellTemp(cr);
+        courseCells += `<td class="${status}">${courseCellHtml(cr)}</td>`;
+      }
+      for (let i = ev.courses.length; i < 4; i++) {
+        courseCells += '<td></td>';
       }
 
       const dataOk = ev.all_ok ? '1' : '0';
@@ -634,9 +622,7 @@ export async function POST(request: Request) {
         <td class="toggle-ciclo" title="${ev.ciclo}">${ev.ciclo ? ev.ciclo.substring(0, 60) : ''}</td>
         <td title="${ev.sede}">${ev.sede ? ev.sede.substring(0, 40) : ''}</td>
         <td title="${ev.facilitador}"><strong>${ev.facilitador ? ev.facilitador.substring(0, 40) : ''}</strong></td>
-        <td colspan="4" style="padding: 8px;">
-          ${monthGroupsHtml}
-        </td>
+        ${courseCells}
         <td style="text-align:center"><a href="${ev.url_evento}" target="_blank" title="Ver evento en SIE">👁️</a></td>
     </tr>`;
     }
@@ -872,7 +858,7 @@ a:hover { opacity: .75; }
 <thead>
 <tr>
     <th class="toggle-ciclo">Ciclo Formativo</th><th>Sede</th><th>Facilitador</th>
-    <th colspan="4" style="text-align:center;">Cursos Programados por Mes</th>
+    <th>Curso 1</th><th>Curso 2</th><th>Curso 3</th><th>Curso 4</th>
     <th style="width:40px;text-align:center">🔗</th>
 </tr>
 </thead>
