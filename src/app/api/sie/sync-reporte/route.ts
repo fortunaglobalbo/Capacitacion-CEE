@@ -445,7 +445,17 @@ export async function POST(request: Request) {
         eventsById[key] = ev;
       }
     }
-    const deduplicatedEvents = Object.values(eventsById);
+    const deduplicatedEvents: any[] = Object.values(eventsById);
+
+    // Sort deduplicatedEvents by facilitator name so all rows/events for the same facilitator are grouped together
+    deduplicatedEvents.sort((a: any, b: any) => {
+      const facA = normalizeText(a.facilitador);
+      const facB = normalizeText(b.facilitador);
+      if (facA !== facB) return facA.localeCompare(facB);
+      const cicloA = normalizeText(a.ciclo);
+      const cicloB = normalizeText(b.ciclo);
+      return cicloA.localeCompare(cicloB);
+    });
 
     // Fetch technicians & course mappings from Supabase
     const [{ data: cursosDb }, { data: facsDb }] = await Promise.all([
@@ -519,8 +529,10 @@ export async function POST(request: Request) {
 
       const conformAlert = cr.conform_pend ? '<span class="badge conform-alert">⚠️ Generar Conformidad</span>' : '';
       const safeName = cr.name ? cr.name.substring(0, 70) : '';
+      const monthBadgeHeader = cr.start_month ? `<div class="curso-start-month-header">🗓️ INICIO: ${cr.start_month.toUpperCase()}</div>` : '';
 
       return `<div class="curso">
+        ${monthBadgeHeader}
         <span class="nombre" title="${cr.name}">${safeName}</span>
         <div class="bateria">${pasos.join('')}</div>
         ${conformAlert}
@@ -585,6 +597,23 @@ export async function POST(request: Request) {
         }
       }
 
+      // Group courses by their actual start month
+      const monthCounts: Record<string, number> = {};
+      for (const cr of ev.courses) {
+        const dt = parseStartDate(cr.dates);
+        let mName = ev.mes || 'MES';
+        if (dt) {
+          const mNum = dt.getMonth() + 1;
+          mName = MONTH_NAMES[mNum] || ev.mes || 'MES';
+        }
+        cr.start_month = mName;
+        monthCounts[mName] = (monthCounts[mName] || 0) + 1;
+      }
+
+      const monthSummaryHtml = Object.entries(monthCounts)
+        .map(([mName, count]) => `<div style="margin-bottom:3px;"><span class="badge-mes-box">📅 ${mName.toUpperCase()}</span><div style="font-size:10px; font-weight:700; color:#0369a1;">${count} ${count === 1 ? 'curso' : 'cursos'}</div></div>`)
+        .join('');
+
       let courseCells = '';
       for (const cr of ev.courses) {
         const status = cellTemp(cr);
@@ -597,10 +626,7 @@ export async function POST(request: Request) {
       const dataOk = ev.all_ok ? '1' : '0';
       htmlRows += `<tr style="background:${bgColor}" data-ok="${dataOk}" data-tecnico="${tec}">
         <td style="text-align:center; vertical-align:middle; white-space:nowrap;">
-          <span class="badge-mes-box">📅 ${ev.mes ? ev.mes.toUpperCase() : 'MES'}</span>
-          <div style="font-size:10px; font-weight:700; color:#0369a1; margin-top:3px;">
-            ${ev.courses.length} ${ev.courses.length === 1 ? 'curso' : 'cursos'}
-          </div>
+          ${monthSummaryHtml || `<span class="badge-mes-box">📅 MES</span>`}
         </td>
         <td class="toggle-ciclo" title="${ev.ciclo}">${ev.ciclo ? ev.ciclo.substring(0, 60) : ''}</td>
         <td title="${ev.sede}">${ev.sede ? ev.sede.substring(0, 40) : ''}</td>
@@ -687,6 +713,18 @@ tbody tr:hover { filter: brightness(.96); }
     display: inline-block;
     box-shadow: 0 2px 6px rgba(2, 132, 199, 0.25);
     letter-spacing: 0.5px;
+}
+.curso-start-month-header {
+    background: #e0f2fe;
+    color: #0369a1;
+    border: 1px solid #bae6fd;
+    font-size: 10px;
+    font-weight: 800;
+    padding: 3px 6px;
+    border-radius: 6px;
+    margin-bottom: 6px;
+    text-align: center;
+    letter-spacing: 0.4px;
 }
 .curso {
     min-width: 175px;
