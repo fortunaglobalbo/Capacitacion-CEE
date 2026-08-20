@@ -369,44 +369,46 @@ export default function ParticipanteRegistroPage() {
             </div>
           </div>
 
-          {/* Botón directo para unirse al Grupo de WhatsApp (afuera del formulario) */}
-          {whatsappUrl ? (
-            <div style={{ marginTop: '4px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', width: '100%' }}>
-              <a
-                href={whatsappUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                style={{
-                  width: '100%',
-                  background: 'linear-gradient(135deg, #25D366 0%, #128C7E 100%)',
-                  color: '#ffffff',
-                  textDecoration: 'none',
-                  borderRadius: '10px',
-                  padding: '12px 16px',
-                  fontSize: '0.95rem',
-                  fontWeight: 800,
-                  textAlign: 'center',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '10px',
-                  boxShadow: '0 4px 14px rgba(37, 211, 102, 0.35)',
-                  transition: 'transform 0.15s ease, box-shadow 0.15s ease'
-                }}
-                onMouseOver={(e) => (e.currentTarget.style.transform = 'scale(1.02)')}
-                onMouseOut={(e) => (e.currentTarget.style.transform = 'scale(1)')}
-              >
-                <MessageCircle size={22} />
-                Unirme al Grupo de WhatsApp
-              </a>
-              <span style={{ fontSize: '0.76rem', color: 'var(--primary-700)', fontWeight: 600, textAlign: 'center' }}>
-                👉 Haz clic aquí para unirte al grupo oficial de comunicación en WhatsApp
-              </span>
-            </div>
-          ) : (
-            <div style={{ marginTop: '4px', textAlign: 'center', fontSize: '0.78rem', color: 'var(--gray-500)', fontStyle: 'italic' }}>
-              (El enlace del grupo de WhatsApp será proporcionado por el técnico responsable)
-            </div>
+          {/* Botón directo para unirse al Grupo de WhatsApp (afuera del formulario, oculto si inscripciones cerradas) */}
+          {curso.form_habilitado !== false && (
+            whatsappUrl ? (
+              <div style={{ marginTop: '4px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', width: '100%' }}>
+                <a
+                  href={whatsappUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{
+                    width: '100%',
+                    background: 'linear-gradient(135deg, #25D366 0%, #128C7E 100%)',
+                    color: '#ffffff',
+                    textDecoration: 'none',
+                    borderRadius: '10px',
+                    padding: '12px 16px',
+                    fontSize: '0.95rem',
+                    fontWeight: 800,
+                    textAlign: 'center',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '10px',
+                    boxShadow: '0 4px 14px rgba(37, 211, 102, 0.35)',
+                    transition: 'transform 0.15s ease, box-shadow 0.15s ease'
+                  }}
+                  onMouseOver={(e) => (e.currentTarget.style.transform = 'scale(1.02)')}
+                  onMouseOut={(e) => (e.currentTarget.style.transform = 'scale(1)')}
+                >
+                  <MessageCircle size={22} />
+                  Unirme al Grupo de WhatsApp
+                </a>
+                <span style={{ fontSize: '0.76rem', color: 'var(--primary-700)', fontWeight: 600, textAlign: 'center' }}>
+                  👉 Haz clic aquí para unirte al grupo oficial de comunicación en WhatsApp
+                </span>
+              </div>
+            ) : (
+              <div style={{ marginTop: '4px', textAlign: 'center', fontSize: '0.78rem', color: 'var(--gray-500)', fontStyle: 'italic' }}>
+                (El enlace del grupo de WhatsApp será proporcionado por el técnico responsable)
+              </div>
+            )
           )}
 
           {/* Advertencia Importante de Depósito y Grupo de WhatsApp */}
