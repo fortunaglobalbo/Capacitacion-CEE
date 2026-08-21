@@ -520,26 +520,181 @@ export function InscripcionesPublicComponent() {
   };
 
   return (
-    <div style={{
-      maxWidth: '1240px',
-      margin: '0 auto',
-      padding: '24px 16px',
-      fontFamily: "'Segoe UI', system-ui, -apple-system, sans-serif"
-    }}>
+    <div className="inscripciones-container">
+      {/* Mobile Responsive Global CSS Styles */}
+      <style>{`
+        .inscripciones-container {
+          max-width: 1240px;
+          margin: 0 auto;
+          padding: 24px 16px;
+          font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+          box-sizing: border-box;
+        }
+        .banner-header {
+          background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #334155 100%);
+          color: #ffffff;
+          border-radius: 24px;
+          padding: 36px 28px;
+          text-align: center;
+          box-shadow: 0 12px 30px rgba(15, 23, 42, 0.25);
+          border: 3px solid #bfa05e;
+          margin-bottom: 32px;
+          position: relative;
+          overflow: hidden;
+        }
+        .banner-title {
+          margin: 0;
+          font-size: clamp(1.4rem, 4.5vw, 2.4rem);
+          font-weight: 900;
+          color: #ffffff;
+          letter-spacing: 0.5px;
+          line-height: 1.25;
+        }
+        .banner-subtitle {
+          margin: 14px auto 0;
+          max-width: 840px;
+          font-size: clamp(0.98rem, 2.8vw, 1.18rem);
+          color: #cbd5e1;
+          line-height: 1.6;
+          font-weight: 600;
+        }
+        .step-card {
+          background: #ffffff;
+          border-radius: 24px;
+          padding: 32px 28px;
+          box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+          border: 3.5px solid #bfa05e;
+          margin-bottom: 32px;
+          box-sizing: border-box;
+        }
+        .step-card-blue {
+          border: 3.5px solid #0284c7;
+          box-shadow: 0 10px 28px rgba(2, 132, 199, 0.12);
+        }
+        .step-card-regular {
+          border: 2.5px solid #cbd5e1;
+          box-shadow: 0 10px 24px rgba(0, 0, 0, 0.07);
+        }
+        .search-form-row {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 12px;
+          align-items: center;
+          margin-top: 20px;
+        }
+        .search-input-field {
+          flex: 1 1 280px;
+          min-width: 200px;
+          width: 100%;
+          box-sizing: border-box;
+          padding: 16px 20px;
+          font-size: 1.2rem;
+          font-weight: 800;
+          border-radius: 14px;
+          border: 2.5px solid #cbd5e1;
+          outline: none;
+          color: #0f172a;
+        }
+        .search-btn {
+          flex: 0 0 auto;
+          background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+          color: #ffffff;
+          border: none;
+          border-radius: 14px;
+          padding: 16px 32px;
+          font-size: 1.15rem;
+          font-weight: 900;
+          cursor: pointer;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 10px;
+          box-shadow: 0 4px 14px rgba(15, 23, 42, 0.25);
+        }
+        .action-buttons-group {
+          display: flex;
+          gap: 10px;
+          flex-wrap: wrap;
+          align-items: center;
+        }
+        .steps-grid {
+          display: grid;
+          grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+          gap: 28px;
+          align-items: stretch;
+          margin-bottom: 36px;
+        }
+        .paso4-req-grid {
+          display: grid;
+          grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+          gap: 16px;
+          margin-top: 20px;
+        }
+
+        @media (max-width: 768px) {
+          .inscripciones-container {
+            padding: 12px 8px;
+          }
+          .banner-header {
+            padding: 24px 14px;
+            border-radius: 18px;
+            margin-bottom: 20px;
+          }
+          .step-card {
+            padding: 20px 14px;
+            border-radius: 18px;
+            margin-bottom: 20px;
+          }
+          .search-form-row {
+            flex-direction: column;
+            align-items: stretch;
+          }
+          .search-input-field {
+            padding: 14px 14px;
+            font-size: 1.05rem;
+          }
+          .search-btn {
+            width: 100%;
+            padding: 14px 20px;
+            font-size: 1.05rem;
+          }
+          .action-buttons-group {
+            width: 100%;
+            flex-direction: column;
+            align-items: stretch;
+          }
+          .action-buttons-group > button,
+          .action-buttons-group > a {
+            width: 100% !important;
+            box-sizing: border-box;
+            justify-content: center;
+            padding: 14px 16px !important;
+            font-size: 1rem !important;
+            text-align: center;
+          }
+          .course-item-mobile {
+            flex-direction: column;
+            align-items: stretch !important;
+          }
+          .steps-grid {
+            grid-template-columns: 1fr;
+            gap: 20px;
+            margin-bottom: 20px;
+          }
+          .paso4-req-grid {
+            grid-template-columns: 1fr;
+          }
+          .warning-box-mobile {
+            padding: 20px 14px !important;
+            flex-direction: column;
+            align-items: center !important;
+            text-align: center;
+          }
+        }
+      `}</style>
 
       {/* Main Banner Header */}
-      <div style={{
-        background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #334155 100%)',
-        color: '#ffffff',
-        borderRadius: '24px',
-        padding: '36px 28px',
-        textAlign: 'center',
-        boxShadow: '0 12px 30px rgba(15, 23, 42, 0.25)',
-        border: '3px solid #bfa05e',
-        marginBottom: '36px',
-        position: 'relative',
-        overflow: 'hidden'
-      }}>
+      <div className="banner-header">
         <div style={{
           position: 'absolute',
           top: '-20px',
@@ -559,47 +714,26 @@ export function InscripcionesPublicComponent() {
           color: '#f59e0b',
           padding: '8px 22px',
           borderRadius: '24px',
-          fontSize: '1.05rem',
+          fontSize: '0.95rem',
           fontWeight: 900,
           textTransform: 'uppercase',
           letterSpacing: '1px',
           marginBottom: '16px'
         }}>
-          <Sparkles size={20} /> Guía Paso a Paso para la Inscripción UNEFCO
+          <Sparkles size={18} /> Guía Paso a Paso para la Inscripción UNEFCO
         </div>
 
-        <h1 style={{
-          margin: 0,
-          fontSize: '2.4rem',
-          fontWeight: 900,
-          color: '#ffffff',
-          letterSpacing: '0.5px',
-          lineHeight: 1.25
-        }}>
+        <h1 className="banner-title">
           PASOS Y FICHA OFICIAL DE INSCRIPCIÓN DE PARTICIPANTES
         </h1>
 
-        <p style={{
-          margin: '14px auto 0',
-          maxWidth: '840px',
-          fontSize: '1.18rem',
-          color: '#cbd5e1',
-          lineHeight: 1.6,
-          fontWeight: 600
-        }}>
+        <p className="banner-subtitle">
           Sigue atentamente los 4 pasos para completar exitosamente tu inscripción a nuestros programas formativos.
         </p>
       </div>
 
       {/* PASO 1: SEARCH CI & FICHA DOWNLOAD */}
-      <div style={{
-        background: '#ffffff',
-        borderRadius: '24px',
-        padding: '32px 28px',
-        boxShadow: '0 8px 24px rgba(0, 0, 0, 0.08)',
-        border: '3.5px solid #bfa05e',
-        marginBottom: '36px'
-      }}>
+      <div className="step-card">
         <div style={{
           display: 'flex',
           alignItems: 'center',
@@ -622,11 +756,11 @@ export function InscripcionesPublicComponent() {
             1
           </span>
           <span style={{
-            fontSize: '0.9rem',
+            fontSize: '0.88rem',
             fontWeight: 900,
             color: '#9a7b38',
             background: '#fefce8',
-            padding: '6px 16px',
+            padding: '6px 14px',
             borderRadius: '16px',
             border: '1.5px solid #fef08a'
           }}>
@@ -634,61 +768,27 @@ export function InscripcionesPublicComponent() {
           </span>
         </div>
 
-        <h2 style={{ margin: '0 0 10px 0', fontSize: '1.6rem', fontWeight: 900, color: '#0f172a' }}>
+        <h2 style={{ margin: '0 0 10px 0', fontSize: 'clamp(1.25rem, 3.5vw, 1.6rem)', fontWeight: 900, color: '#0f172a' }}>
           PASO 1: INGRESAR CARNET (CI) Y OBTENER FICHA DE INSCRIPCIÓN
         </h2>
-        <p style={{ margin: 0, fontSize: '1.12rem', color: '#475569', fontWeight: 600, lineHeight: 1.6 }}>
+        <p style={{ margin: 0, fontSize: 'clamp(0.98rem, 2.5vw, 1.12rem)', color: '#475569', fontWeight: 600, lineHeight: 1.6 }}>
           <strong>Instrucciones:</strong> Escribe tu número de Carnet de Identidad en el siguiente campo. El sistema verificará tu pre-inscripción, te mostrará el <strong>botón directo a tu grupo de WhatsApp</strong>, y te dará las opciones para <strong>imprimir, descargar en PDF o compartir por WhatsApp</strong> tu Ficha Oficial de Inscripción.
         </p>
 
         {/* Responsive search input container */}
-        <form onSubmit={handleSearchCI} style={{ marginTop: '20px' }}>
-          <div style={{
-            display: 'flex',
-            flexWrap: 'wrap',
-            gap: '12px',
-            alignItems: 'center'
-          }}>
-            <div style={{ flex: '1 1 280px', minWidth: '240px' }}>
+        <form onSubmit={handleSearchCI}>
+          <div className="search-form-row">
+            <div style={{ flex: '1 1 280px', width: '100%' }}>
               <input
                 type="text"
+                className="search-input-field"
                 placeholder="Escribe tu número de Carnet de Identidad (CI)..."
                 value={ciSearch}
                 onChange={(e) => setCiSearch(e.target.value)}
-                style={{
-                  width: '100%',
-                  boxSizing: 'border-box',
-                  padding: '16px 20px',
-                  fontSize: '1.25rem',
-                  fontWeight: 800,
-                  borderRadius: '14px',
-                  border: '2.5px solid #cbd5e1',
-                  outline: 'none',
-                  color: '#0f172a'
-                }}
               />
             </div>
 
-            <button
-              type="submit"
-              disabled={searching}
-              style={{
-                flex: '0 0 auto',
-                background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)',
-                color: '#ffffff',
-                border: 'none',
-                borderRadius: '14px',
-                padding: '16px 32px',
-                fontSize: '1.18rem',
-                fontWeight: 900,
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '10px',
-                boxShadow: '0 4px 14px rgba(15, 23, 42, 0.25)'
-              }}
-            >
+            <button type="submit" disabled={searching} className="search-btn">
               <Search size={22} /> {searching ? 'Buscando...' : 'Consultar Carnet'}
             </button>
           </div>
@@ -702,43 +802,43 @@ export function InscripcionesPublicComponent() {
               <div style={{
                 background: '#ffffff',
                 borderRadius: '20px',
-                padding: '24px',
+                padding: '20px 16px',
                 boxShadow: '0 8px 24px rgba(22, 163, 74, 0.12)',
                 border: '3px solid #16a34a'
               }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
                   <CheckCircle2 size={36} style={{ color: '#16a34a', flexShrink: 0 }} />
                   <div>
-                    <h3 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 900, color: '#15803d' }}>
+                    <h3 style={{ margin: 0, fontSize: 'clamp(1.15rem, 3vw, 1.5rem)', fontWeight: 900, color: '#15803d' }}>
                       ¡REGISTRO ENCONTRADO EN LA BASE DE DATOS!
                     </h3>
-                    <span style={{ fontSize: '1.05rem', color: '#166534', fontWeight: 700 }}>
+                    <span style={{ fontSize: '1rem', color: '#166534', fontWeight: 700 }}>
                       Maestro(a): {participant.apellidos} {participant.nombres} | CI: {participant.ci}
                     </span>
                   </div>
                 </div>
 
                 {/* List of enrolled cycles with WhatsApp button, price and ficha options */}
-                <h4 style={{ margin: '18px 0 12px 0', fontSize: '1.25rem', fontWeight: 900, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <h4 style={{ margin: '18px 0 12px 0', fontSize: '1.2rem', fontWeight: 900, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <Layers size={22} style={{ color: '#bfa05e' }} /> TUS CICLOS Y CURSOS REGISTRADOS ({participant.cursos.length}):
                 </h4>
 
                 {participant.cursos.length > 0 ? (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                     {participant.cursos.map((c, idx) => (
-                      <div key={c.id || idx} style={{
+                      <div key={c.id || idx} className="course-item-mobile" style={{
                         background: '#f8fafc',
                         border: '2px solid #cbd5e1',
                         borderRadius: '16px',
-                        padding: '20px',
+                        padding: '18px 14px',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'space-between',
                         flexWrap: 'wrap',
                         gap: '16px'
                       }}>
-                        <div style={{ flex: '1 1 300px' }}>
-                          <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '6px' }}>
+                        <div style={{ flex: '1 1 260px' }}>
+                          <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '6px', flexWrap: 'wrap' }}>
                             <span style={{
                               background: '#0f172a',
                               color: '#ffffff',
@@ -757,25 +857,25 @@ export function InscripcionesPublicComponent() {
                               color: '#b45309',
                               padding: '4px 12px',
                               borderRadius: '10px',
-                              fontSize: '0.95rem',
+                              fontSize: '0.92rem',
                               fontWeight: 900
                             }}>
                               💰 Precio a Depositar: Bs. {c.costo || 150}
                             </span>
                           </div>
 
-                          <h5 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 900, color: '#0f172a' }}>
+                          <h5 style={{ margin: 0, fontSize: '1.18rem', fontWeight: 900, color: '#0f172a', lineHeight: 1.35 }}>
                             {c.ciclo_nombre || c.area_formativa || 'Programa Formativo UNEFCO'}
                           </h5>
 
-                          <p style={{ margin: '6px 0 0 0', fontSize: '1.02rem', color: '#475569', fontWeight: 600 }}>
+                          <p style={{ margin: '6px 0 0 0', fontSize: '0.98rem', color: '#475569', fontWeight: 600 }}>
                             {c.grupo_nombre ? `Grupo: ${c.grupo_nombre} | ` : ''}
                             Distrito: {c.distrito || participant.distrito || 'Santa Cruz'}
                           </p>
                         </div>
 
                         {/* Options: WhatsApp Group Button + Print/PDF + Share WhatsApp */}
-                        <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'center' }}>
+                        <div className="action-buttons-group">
                           {c.link_whatsapp && (
                             <a
                               href={c.link_whatsapp}
@@ -786,8 +886,8 @@ export function InscripcionesPublicComponent() {
                                 color: '#ffffff',
                                 textDecoration: 'none',
                                 borderRadius: '12px',
-                                padding: '14px 20px',
-                                fontSize: '1.05rem',
+                                padding: '14px 18px',
+                                fontSize: '1.02rem',
                                 fontWeight: 900,
                                 display: 'inline-flex',
                                 alignItems: 'center',
@@ -807,8 +907,8 @@ export function InscripcionesPublicComponent() {
                               color: '#ffffff',
                               border: 'none',
                               borderRadius: '12px',
-                              padding: '14px 20px',
-                              fontSize: '1.05rem',
+                              padding: '14px 18px',
+                              fontSize: '1.02rem',
                               fontWeight: 900,
                               cursor: 'pointer',
                               display: 'flex',
@@ -828,8 +928,8 @@ export function InscripcionesPublicComponent() {
                               color: '#ffffff',
                               border: 'none',
                               borderRadius: '12px',
-                              padding: '14px 20px',
-                              fontSize: '1.05rem',
+                              padding: '14px 18px',
+                              fontSize: '1.02rem',
                               fontWeight: 900,
                               cursor: 'pointer',
                               display: 'flex',
@@ -857,13 +957,13 @@ export function InscripcionesPublicComponent() {
                     gap: '14px'
                   }}>
                     <div>
-                      <h5 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 900, color: '#0f172a' }}>
+                      <h5 style={{ margin: 0, fontSize: '1.18rem', fontWeight: 900, color: '#0f172a' }}>
                         Pre-Inscripción Confirmada
                       </h5>
-                      <span style={{ fontSize: '1.05rem', color: '#b45309', fontWeight: 800 }}>💰 Precio del Ciclo: Bs. 150</span>
+                      <span style={{ fontSize: '1.02rem', color: '#b45309', fontWeight: 800 }}>💰 Precio del Ciclo: Bs. 150</span>
                     </div>
 
-                    <div style={{ display: 'flex', gap: '10px' }}>
+                    <div className="action-buttons-group">
                       <button
                         type="button"
                         onClick={() => handlePrintOfficialFicha()}
@@ -872,8 +972,8 @@ export function InscripcionesPublicComponent() {
                           color: '#ffffff',
                           border: 'none',
                           borderRadius: '12px',
-                          padding: '14px 20px',
-                          fontSize: '1.05rem',
+                          padding: '14px 18px',
+                          fontSize: '1.02rem',
                           fontWeight: 900,
                           cursor: 'pointer',
                           display: 'flex',
@@ -892,8 +992,8 @@ export function InscripcionesPublicComponent() {
                           color: '#ffffff',
                           border: 'none',
                           borderRadius: '12px',
-                          padding: '14px 20px',
-                          fontSize: '1.05rem',
+                          padding: '14px 18px',
+                          fontSize: '1.02rem',
                           fontWeight: 900,
                           cursor: 'pointer',
                           display: 'flex',
@@ -913,17 +1013,17 @@ export function InscripcionesPublicComponent() {
                 background: '#fff1f2',
                 border: '3px solid #e11d48',
                 borderRadius: '20px',
-                padding: '24px',
+                padding: '20px 16px',
                 color: '#9f1239',
                 boxShadow: '0 8px 24px rgba(225, 29, 72, 0.15)'
               }}>
-                <div style={{ display: 'flex', alignItems: 'flex-start', gap: '14px', marginBottom: '14px' }}>
+                <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', marginBottom: '14px' }}>
                   <AlertTriangle size={36} style={{ color: '#e11d48', flexShrink: 0, marginTop: '2px' }} />
                   <div>
-                    <h3 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 900, color: '#be123c' }}>
+                    <h3 style={{ margin: 0, fontSize: 'clamp(1.2rem, 3.2vw, 1.5rem)', fontWeight: 900, color: '#be123c' }}>
                       ⚠️ NO TE ENCUENTRAS EN NUESTRA BASE DE DATOS
                     </h3>
-                    <p style={{ margin: '6px 0 0 0', fontSize: '1.12rem', color: '#881337', fontWeight: 700, lineHeight: 1.55 }}>
+                    <p style={{ margin: '6px 0 0 0', fontSize: '1.05rem', color: '#881337', fontWeight: 700, lineHeight: 1.55 }}>
                       Es muy posible que aún <strong>no hayas llenado el formulario de pre-inscripción</strong> o tu carnet fue escrito con algún error.
                     </p>
                   </div>
@@ -933,14 +1033,14 @@ export function InscripcionesPublicComponent() {
                   background: '#ffffff',
                   border: '2px solid #fda4af',
                   borderRadius: '16px',
-                  padding: '18px',
+                  padding: '16px 12px',
                   color: '#4c0519',
                   marginTop: '14px'
                 }}>
-                  <h4 style={{ margin: '0 0 10px 0', fontSize: '1.2rem', fontWeight: 900, color: '#9f1239' }}>
+                  <h4 style={{ margin: '0 0 10px 0', fontSize: '1.15rem', fontWeight: 900, color: '#9f1239' }}>
                     📞 POR FAVOR CONTÁCTATE CON NOSOTROS PARA AYUDARTE:
                   </h4>
-                  <p style={{ margin: '0 0 14px 0', fontSize: '1.05rem', fontWeight: 600, color: '#881337' }}>
+                  <p style={{ margin: '0 0 14px 0', fontSize: '1rem', fontWeight: 600, color: '#881337' }}>
                     Escríbenos por WhatsApp a cualquiera de nuestros números de atención para verificar tu formulario:
                   </p>
 
@@ -1019,25 +1119,10 @@ export function InscripcionesPublicComponent() {
       </div>
 
       {/* PASO 2 & PASO 3 GRID */}
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(350px, 1fr))',
-        gap: '28px',
-        alignItems: 'stretch',
-        marginBottom: '36px'
-      }}>
+      <div className="steps-grid">
 
         {/* PASO 2: DOCUMENTACIÓN NECESARIA */}
-        <div style={{
-          background: '#ffffff',
-          borderRadius: '24px',
-          padding: '32px 26px',
-          boxShadow: '0 10px 24px rgba(0, 0, 0, 0.07)',
-          border: '2.5px solid #cbd5e1',
-          display: 'flex',
-          flexDirection: 'column',
-          justifyContent: 'space-between'
-        }}>
+        <div className="step-card step-card-regular" style={{ marginBottom: 0 }}>
           <div>
             <div style={{
               display: 'flex',
@@ -1075,7 +1160,7 @@ export function InscripcionesPublicComponent() {
 
             <h3 style={{
               margin: '0 0 12px 0',
-              fontSize: '1.45rem',
+              fontSize: 'clamp(1.25rem, 3.2vw, 1.45rem)',
               fontWeight: 900,
               color: '#0f172a',
               lineHeight: 1.3
@@ -1085,7 +1170,7 @@ export function InscripcionesPublicComponent() {
 
             <p style={{
               margin: 0,
-              fontSize: '1.1rem',
+              fontSize: '1.05rem',
               color: '#475569',
               lineHeight: 1.6,
               fontWeight: 600
@@ -1103,17 +1188,17 @@ export function InscripcionesPublicComponent() {
                 background: '#f8fafc',
                 border: '2px solid #cbd5e1',
                 borderRadius: '16px',
-                padding: '16px',
+                padding: '16px 14px',
                 display: 'flex',
                 alignItems: 'flex-start',
                 gap: '14px'
               }}>
                 <FileCheck size={32} style={{ color: '#0f172a', flexShrink: 0, marginTop: '2px' }} />
                 <div>
-                  <span style={{ fontWeight: 900, fontSize: '1.15rem', color: '#0f172a', display: 'block' }}>
+                  <span style={{ fontWeight: 900, fontSize: '1.1rem', color: '#0f172a', display: 'block' }}>
                     1. Fotocopia de RDA
                   </span>
-                  <span style={{ fontSize: '1.02rem', color: '#475569', fontWeight: 600 }}>
+                  <span style={{ fontSize: '0.98rem', color: '#475569', fontWeight: 600 }}>
                     Fotocopia legible de tu Registro Docente de Aprendizaje (RDA) actualizado.
                   </span>
                 </div>
@@ -1123,17 +1208,17 @@ export function InscripcionesPublicComponent() {
                 background: '#f8fafc',
                 border: '2px solid #cbd5e1',
                 borderRadius: '16px',
-                padding: '16px',
+                padding: '16px 14px',
                 display: 'flex',
                 alignItems: 'flex-start',
                 gap: '14px'
               }}>
                 <UserCheck size={32} style={{ color: '#0f172a', flexShrink: 0, marginTop: '2px' }} />
                 <div>
-                  <span style={{ fontWeight: 900, fontSize: '1.15rem', color: '#0f172a', display: 'block' }}>
+                  <span style={{ fontWeight: 900, fontSize: '1.1rem', color: '#0f172a', display: 'block' }}>
                     2. Para Personal Administrativo
                   </span>
-                  <span style={{ fontSize: '1.02rem', color: '#475569', fontWeight: 600 }}>
+                  <span style={{ fontSize: '0.98rem', color: '#475569', fontWeight: 600 }}>
                     Certificado de Trabajo original firmado que demuestre que trabajas en la Unidad Educativa.
                   </span>
                 </div>
@@ -1143,16 +1228,7 @@ export function InscripcionesPublicComponent() {
         </div>
 
         {/* PASO 3: DEPÓSITO BANCARIO & SUBIR COMPROBANTE (OPCIONAL) */}
-        <div style={{
-          background: '#ffffff',
-          borderRadius: '24px',
-          padding: '32px 26px',
-          boxShadow: '0 10px 24px rgba(0, 0, 0, 0.07)',
-          border: '2.5px solid #cbd5e1',
-          display: 'flex',
-          flexDirection: 'column',
-          justifyContent: 'space-between'
-        }}>
+        <div className="step-card step-card-regular" style={{ marginBottom: 0 }}>
           <div>
             <div style={{
               display: 'flex',
@@ -1190,17 +1266,17 @@ export function InscripcionesPublicComponent() {
 
             <h3 style={{
               margin: '0 0 12px 0',
-              fontSize: '1.45rem',
+              fontSize: 'clamp(1.25rem, 3.2vw, 1.45rem)',
               fontWeight: 900,
               color: '#0f172a',
               lineHeight: 1.3
             }}>
-              PASO 3: DEPÓSITO BANCARIO Y COMPROBANTE DIGITAL <span style={{ fontSize: '0.9rem', color: '#b45309', background: '#fefce8', border: '1.5px solid #fef08a', padding: '3px 10px', borderRadius: '12px', verticalAlign: 'middle' }}>(OPCIONAL)</span>
+              PASO 3: DEPÓSITO BANCARIO Y COMPROBANTE DIGITAL <span style={{ fontSize: '0.85rem', color: '#b45309', background: '#fefce8', border: '1.5px solid #fef08a', padding: '3px 8px', borderRadius: '12px', verticalAlign: 'middle' }}>(OPCIONAL)</span>
             </h3>
 
             <p style={{
               margin: '0 0 16px 0',
-              fontSize: '1.1rem',
+              fontSize: '1.05rem',
               color: '#475569',
               lineHeight: 1.6,
               fontWeight: 600
@@ -1213,16 +1289,16 @@ export function InscripcionesPublicComponent() {
               background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)',
               color: '#ffffff',
               borderRadius: '20px',
-              padding: '22px',
+              padding: '18px 16px',
               boxShadow: '0 6px 16px rgba(15, 23, 42, 0.2)',
               border: '2px solid #bfa05e',
               marginBottom: '20px'
             }}>
-              <div style={{ fontSize: '1.1rem', fontWeight: 900, color: '#f59e0b', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <div style={{ fontSize: '1.05rem', fontWeight: 900, color: '#f59e0b', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <CreditCard size={22} /> CUENTA BANCARIA OFICIAL:
               </div>
 
-              <div style={{ fontSize: '1.3rem', fontWeight: 900, color: '#ffffff', marginBottom: '6px' }}>
+              <div style={{ fontSize: '1.25rem', fontWeight: 900, color: '#ffffff', marginBottom: '6px' }}>
                 🏛️ BANCO UNIÓN
               </div>
 
@@ -1230,7 +1306,7 @@ export function InscripcionesPublicComponent() {
                 background: 'rgba(255, 255, 255, 0.12)',
                 border: '1.5px solid rgba(255, 255, 255, 0.25)',
                 borderRadius: '14px',
-                padding: '14px 18px',
+                padding: '12px 14px',
                 marginTop: '10px',
                 display: 'flex',
                 alignItems: 'center',
@@ -1238,8 +1314,8 @@ export function InscripcionesPublicComponent() {
                 flexWrap: 'wrap',
                 gap: '8px'
               }}>
-                <span style={{ fontSize: '1.1rem', color: '#cbd5e1', fontWeight: 700 }}>Nº de Cuenta Oficial:</span>
-                <span style={{ fontSize: '1.5rem', fontWeight: 900, color: '#ffffff', letterSpacing: '1px' }}>
+                <span style={{ fontSize: '1rem', color: '#cbd5e1', fontWeight: 700 }}>Nº de Cuenta Oficial:</span>
+                <span style={{ fontSize: '1.4rem', fontWeight: 900, color: '#ffffff', letterSpacing: '1px' }}>
                   1-28754013
                 </span>
               </div>
@@ -1251,12 +1327,12 @@ export function InscripcionesPublicComponent() {
                 background: '#f0fdf4',
                 border: '2px solid #16a34a',
                 borderRadius: '18px',
-                padding: '18px'
+                padding: '16px 14px'
               }}>
-                <h4 style={{ margin: '0 0 10px 0', fontSize: '1.2rem', fontWeight: 900, color: '#15803d', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <Upload size={22} /> REGISTRAR COMPROBANTE DIGITAL <span style={{ fontSize: '0.85rem', color: '#15803d', background: '#dcfce7', padding: '2px 8px', borderRadius: '8px' }}>(OPCIONAL)</span>
+                <h4 style={{ margin: '0 0 10px 0', fontSize: '1.15rem', fontWeight: 900, color: '#15803d', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                  <Upload size={20} /> REGISTRAR COMPROBANTE DIGITAL <span style={{ fontSize: '0.82rem', color: '#15803d', background: '#dcfce7', padding: '2px 8px', borderRadius: '8px' }}>(OPCIONAL)</span>
                 </h4>
-                <p style={{ margin: '0 0 14px 0', fontSize: '1rem', color: '#166534', fontWeight: 600 }}>
+                <p style={{ margin: '0 0 14px 0', fontSize: '0.95rem', color: '#166534', fontWeight: 600 }}>
                   Si deseas, adjunta la foto o archivo de tu voucher de depósito:
                 </p>
 
@@ -1265,15 +1341,15 @@ export function InscripcionesPublicComponent() {
                     background: '#ffffff',
                     border: '1.5px solid #86efac',
                     borderRadius: '14px',
-                    padding: '14px',
+                    padding: '12px',
                     marginBottom: '12px'
                   }}>
-                    <div style={{ fontWeight: 800, fontSize: '1.05rem', color: '#0f172a', marginBottom: '4px' }}>
+                    <div style={{ fontWeight: 800, fontSize: '1rem', color: '#0f172a', marginBottom: '4px' }}>
                       {course.ciclo_nombre || course.grupo_nombre || 'Curso Registrado'} (Bs. {course.costo || 150})
                     </div>
 
                     {course.comprobante_url ? (
-                      <div style={{ color: '#166534', fontWeight: 800, fontSize: '0.95rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <div style={{ color: '#166534', fontWeight: 800, fontSize: '0.92rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
                         <Check size={18} /> ¡Comprobante registrado exitosamente!
                       </div>
                     ) : (
@@ -1288,10 +1364,11 @@ export function InscripcionesPublicComponent() {
                         style={{
                           width: '100%',
                           padding: '8px',
-                          fontSize: '0.95rem',
+                          fontSize: '0.9rem',
                           borderRadius: '8px',
                           border: '1px solid #cbd5e1',
-                          background: '#f8fafc'
+                          background: '#f8fafc',
+                          boxSizing: 'border-box'
                         }}
                       />
                     )}
@@ -1303,8 +1380,8 @@ export function InscripcionesPublicComponent() {
                 background: '#f8fafc',
                 border: '2px solid #cbd5e1',
                 borderRadius: '16px',
-                padding: '18px',
-                fontSize: '1.08rem',
+                padding: '16px',
+                fontSize: '1rem',
                 color: '#334155',
                 fontWeight: 600,
                 lineHeight: 1.6
@@ -1317,15 +1394,8 @@ export function InscripcionesPublicComponent() {
 
       </div>
 
-      {/* PASO 4: ENTREGA FINAL EN OFICINAS DE UNEFCO CON ICONOS BONITOS */}
-      <div style={{
-        background: '#ffffff',
-        borderRadius: '24px',
-        padding: '32px 28px',
-        boxShadow: '0 10px 28px rgba(2, 132, 199, 0.12)',
-        border: '3.5px solid #0284c7',
-        marginBottom: '36px'
-      }}>
+      {/* PASO 4: ENTREGA FINAL EN OFICINAS DE UNEFCO CON ICONOS BONITOS Y DISEÑO MÓVIL SIMÉTRICO */}
+      <div className="step-card step-card-blue">
         <div style={{
           display: 'flex',
           alignItems: 'center',
@@ -1348,11 +1418,11 @@ export function InscripcionesPublicComponent() {
             4
           </span>
           <span style={{
-            fontSize: '0.9rem',
+            fontSize: '0.88rem',
             fontWeight: 900,
             color: '#0369a1',
             background: '#f0f9ff',
-            padding: '6px 16px',
+            padding: '6px 14px',
             borderRadius: '16px',
             border: '1.5px solid #bae6fd'
           }}>
@@ -1360,36 +1430,31 @@ export function InscripcionesPublicComponent() {
           </span>
         </div>
 
-        <h2 style={{ margin: '0 0 12px 0', fontSize: '1.6rem', fontWeight: 900, color: '#0f172a' }}>
+        <h2 style={{ margin: '0 0 12px 0', fontSize: 'clamp(1.3rem, 3.8vw, 1.6rem)', fontWeight: 900, color: '#0f172a' }}>
           PASO 4: ENTREGA FINAL DE REQUISITOS EN OFICINAS
         </h2>
-        <p style={{ margin: 0, fontSize: '1.12rem', color: '#334155', fontWeight: 600, lineHeight: 1.6 }}>
+        <p style={{ margin: 0, fontSize: 'clamp(0.98rem, 2.5vw, 1.12rem)', color: '#334155', fontWeight: 600, lineHeight: 1.6 }}>
           Una vez cumplidos los tres pasos anteriores, apersónate a nuestras oficinas a entregar los 3 documentos completos para finalizar tu inscripción:
         </p>
 
         {/* Requirements cards with attractive icons & gradients */}
-        <div style={{
-          marginTop: '20px',
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
-          gap: '16px'
-        }}>
+        <div className="paso4-req-grid">
           <div style={{
             background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
             border: '2px solid #cbd5e1',
             borderRadius: '18px',
-            padding: '20px',
+            padding: '18px 14px',
             display: 'flex',
             alignItems: 'flex-start',
             gap: '14px',
             boxShadow: '0 4px 12px rgba(0,0,0,0.04)'
           }}>
-            <FileText size={38} style={{ color: '#0284c7', flexShrink: 0, marginTop: '2px' }} />
+            <FileText size={36} style={{ color: '#0284c7', flexShrink: 0, marginTop: '2px' }} />
             <div>
-              <span style={{ fontWeight: 900, fontSize: '1.15rem', color: '#0f172a', display: 'block', marginBottom: '4px' }}>
+              <span style={{ fontWeight: 900, fontSize: '1.1rem', color: '#0f172a', display: 'block', marginBottom: '4px' }}>
                 1. Ficha de Inscripción
               </span>
-              <span style={{ fontSize: '1rem', color: '#475569', fontWeight: 600, lineHeight: 1.5 }}>
+              <span style={{ fontSize: '0.98rem', color: '#475569', fontWeight: 600, lineHeight: 1.5 }}>
                 La Ficha de Inscripción impresa y completada con tus datos llenados a mano y firmada.
               </span>
             </div>
@@ -1399,18 +1464,18 @@ export function InscripcionesPublicComponent() {
             background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
             border: '2px solid #cbd5e1',
             borderRadius: '18px',
-            padding: '20px',
+            padding: '18px 14px',
             display: 'flex',
             alignItems: 'flex-start',
             gap: '14px',
             boxShadow: '0 4px 12px rgba(0,0,0,0.04)'
           }}>
-            <FileCheck size={38} style={{ color: '#16a34a', flexShrink: 0, marginTop: '2px' }} />
+            <FileCheck size={36} style={{ color: '#16a34a', flexShrink: 0, marginTop: '2px' }} />
             <div>
-              <span style={{ fontWeight: 900, fontSize: '1.15rem', color: '#0f172a', display: 'block', marginBottom: '4px' }}>
+              <span style={{ fontWeight: 900, fontSize: '1.1rem', color: '#0f172a', display: 'block', marginBottom: '4px' }}>
                 2. Fotocopia de RDA o Certificado
               </span>
-              <span style={{ fontSize: '1rem', color: '#475569', fontWeight: 600, lineHeight: 1.5 }}>
+              <span style={{ fontSize: '0.98rem', color: '#475569', fontWeight: 600, lineHeight: 1.5 }}>
                 Fotocopia de tu RDA actualizado (o Certificado de Trabajo si eres personal Administrativo).
               </span>
             </div>
@@ -1420,18 +1485,18 @@ export function InscripcionesPublicComponent() {
             background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
             border: '2px solid #cbd5e1',
             borderRadius: '18px',
-            padding: '20px',
+            padding: '18px 14px',
             display: 'flex',
             alignItems: 'flex-start',
             gap: '14px',
             boxShadow: '0 4px 12px rgba(0,0,0,0.04)'
           }}>
-            <CreditCard size={38} style={{ color: '#bfa05e', flexShrink: 0, marginTop: '2px' }} />
+            <CreditCard size={36} style={{ color: '#bfa05e', flexShrink: 0, marginTop: '2px' }} />
             <div>
-              <span style={{ fontWeight: 900, fontSize: '1.15rem', color: '#0f172a', display: 'block', marginBottom: '4px' }}>
+              <span style={{ fontWeight: 900, fontSize: '1.1rem', color: '#0f172a', display: 'block', marginBottom: '4px' }}>
                 3. Comprobante de Depósito
               </span>
-              <span style={{ fontSize: '1rem', color: '#475569', fontWeight: 600, lineHeight: 1.5 }}>
+              <span style={{ fontSize: '0.98rem', color: '#475569', fontWeight: 600, lineHeight: 1.5 }}>
                 El comprobante bancario original de depósito realizado a la cuenta del Banco Unión.
               </span>
             </div>
@@ -1444,21 +1509,21 @@ export function InscripcionesPublicComponent() {
           background: 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)',
           color: '#ffffff',
           borderRadius: '20px',
-          padding: '24px',
+          padding: '20px 16px',
           boxShadow: '0 8px 20px rgba(2, 132, 199, 0.3)'
         }}>
-          <div style={{ fontWeight: 900, fontSize: '1.3rem', color: '#ffffff', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <Building2 size={28} /> LUGAR Y HORARIO DE PRESENTACIÓN EN OFICINAS:
+          <div style={{ fontWeight: 900, fontSize: 'clamp(1.1rem, 3vw, 1.3rem)', color: '#ffffff', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+            <Building2 size={26} /> LUGAR Y HORARIO DE PRESENTACIÓN EN OFICINAS:
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '1.15rem', fontWeight: 800, color: '#f0f9ff' }}>
-              <MapPin size={24} style={{ color: '#38bdf8', flexShrink: 0 }} />
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', fontSize: '1.05rem', fontWeight: 800, color: '#f0f9ff' }}>
+              <MapPin size={22} style={{ color: '#38bdf8', flexShrink: 0, marginTop: '2px' }} />
               <span><strong>Dirección:</strong> Oficinas de UNEFCO Santa Cruz (Av. San Martín s/n Equipetrol, ESFM Enrique Finot).</span>
             </div>
 
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '1.15rem', fontWeight: 800, color: '#f0f9ff' }}>
-              <Clock size={24} style={{ color: '#38bdf8', flexShrink: 0 }} />
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', fontSize: '1.05rem', fontWeight: 800, color: '#f0f9ff' }}>
+              <Clock size={22} style={{ color: '#38bdf8', flexShrink: 0, marginTop: '2px' }} />
               <span><strong>Horario de Atención:</strong> Horario continuo de <strong>08:00 a 16:00</strong>.</span>
             </div>
           </div>
@@ -1466,7 +1531,7 @@ export function InscripcionesPublicComponent() {
       </div>
 
       {/* ADVERTENCIA DE DEPÓSITOS & CONFIRMACIÓN TÉCNICA DEPARTAMENTAL */}
-      <div style={{
+      <div className="warning-box-mobile" style={{
         background: 'linear-gradient(135deg, #fff1f2 0%, #ffe4e6 100%)',
         border: '3.5px solid #e11d48',
         borderRadius: '24px',
@@ -1478,16 +1543,16 @@ export function InscripcionesPublicComponent() {
       }}>
         <AlertTriangle size={42} style={{ color: '#e11d48', flexShrink: 0, marginTop: '4px' }} />
         <div>
-          <h3 style={{ margin: '0 0 8px 0', fontSize: '1.45rem', fontWeight: 900, color: '#9f1239', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+          <h3 style={{ margin: '0 0 8px 0', fontSize: 'clamp(1.2rem, 3.5vw, 1.45rem)', fontWeight: 900, color: '#9f1239', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
             🚨 ADVERTENCIA IMPORTANTE SOBRE DEPÓSITOS BANCARIOS
           </h3>
-          <p style={{ margin: 0, fontSize: '1.18rem', fontWeight: 900, color: '#be123c', lineHeight: 1.6 }}>
+          <p style={{ margin: 0, fontSize: 'clamp(1rem, 2.8vw, 1.18rem)', fontWeight: 900, color: '#be123c', lineHeight: 1.6 }}>
             <strong>NO REALIZAR NINGÚN DEPÓSITO</strong> hasta contar con la <strong>confirmación directa del técnico departamental asignado</strong>.
           </p>
-          <p style={{ margin: '10px 0 0 0', fontSize: '1.12rem', color: '#881337', lineHeight: 1.6, fontWeight: 800 }}>
+          <p style={{ margin: '10px 0 0 0', fontSize: '1.08rem', color: '#881337', lineHeight: 1.6, fontWeight: 800 }}>
             📲 <em>Cualquier comunicado oficial se dará únicamente a través del <strong>grupo de WhatsApp oficial</strong> del curso.</em>
           </p>
-          <p style={{ margin: '8px 0 0 0', fontSize: '1.05rem', color: '#9f1239', lineHeight: 1.55, fontWeight: 700 }}>
+          <p style={{ margin: '8px 0 0 0', fontSize: '1.02rem', color: '#9f1239', lineHeight: 1.55, fontWeight: 700 }}>
             ⚠️ <em>Toma en cuenta que los depósitos bancarios son válidos <strong>ÚNICAMENTE DENTRO DEL MES EN EL QUE SE REALIZAN</strong>.</em>
           </p>
         </div>
