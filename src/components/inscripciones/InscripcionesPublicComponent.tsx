@@ -5,7 +5,7 @@ import { supabase } from '@/lib/supabase/client';
 import { 
   Search, Download, FileText, Building2, CreditCard, Upload, 
   AlertTriangle, CheckCircle2, MapPin, Clock, FileCheck, UserCheck, 
-  Printer, Sparkles, PhoneCall, MessageCircle, ExternalLink, Layers, Check 
+  Printer, Sparkles, PhoneCall, MessageCircle, ExternalLink, Layers, Check, Share2, Send
 } from 'lucide-react';
 import Swal from 'sweetalert2';
 
@@ -188,7 +188,6 @@ export function InscripcionesPublicComponent() {
         if (urlData) filePublicUrl = urlData.publicUrl;
       }
 
-      // Update DB record in inscripcion_ciclo
       if (course.inscripcion_id) {
         await supabase
           .from('inscripcion_ciclo')
@@ -223,7 +222,25 @@ export function InscripcionesPublicComponent() {
     }
   };
 
-  // Print Official 2-up Letter Ficha de Inscripción (Only Area, Ciclo, Costo and Cursos pre-filled; participant details blank)
+  // Share Ficha Link / Text via WhatsApp or Native Web Share
+  const handleShareFicha = (targetCourse?: EnrolledCourse) => {
+    if (!participant) return;
+    const courseTitle = targetCourse?.ciclo_nombre || 'Programa Formativo UNEFCO';
+    const text = `📄 *FICHA DE INSCRIPCIÓN UNEFCO SANTA CRUZ*\n👤 Maestro(a): ${participant.apellidos} ${participant.nombres}\n💳 CI: ${participant.ci}\n📚 Ciclo: ${courseTitle}\n💰 Precio: Bs. ${targetCourse?.costo || 150}\n\nIngresa a nuestra plataforma para consultar tus datos: ${window.location.href}`;
+
+    if (navigator.share) {
+      navigator.share({
+        title: 'Ficha de Inscripción UNEFCO',
+        text: text,
+        url: window.location.href
+      }).catch(() => {});
+    } else {
+      const waUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`;
+      window.open(waUrl, '_blank');
+    }
+  };
+
+  // Print Official 2-up Letter Ficha de Inscripción (Only Area, Ciclo, Costo and Cursos pre-filled)
   const handlePrintOfficialFicha = (targetCourse?: EnrolledCourse) => {
     if (!participant) return;
 
@@ -237,7 +254,7 @@ export function InscripcionesPublicComponent() {
 
     const printWindow = window.open('', '_blank');
     if (!printWindow) {
-      Swal.fire('Bloqueador', 'Habilita las ventanas flotantes para imprimir la ficha.', 'warning');
+      Swal.fire('Bloqueador', 'Habilita las ventanas flotantes para imprimir o guardar como PDF la ficha.', 'warning');
       return;
     }
 
@@ -546,7 +563,7 @@ export function InscripcionesPublicComponent() {
           letterSpacing: '1px',
           marginBottom: '16px'
         }}>
-          <Sparkles size={20} /> Proceso Oficial de Inscripción UNEFCO
+          <Sparkles size={20} /> Guía Paso a Paso para la Inscripción UNEFCO
         </div>
 
         <h1 style={{
@@ -557,18 +574,18 @@ export function InscripcionesPublicComponent() {
           letterSpacing: '0.5px',
           lineHeight: 1.25
         }}>
-          REQUISITOS Y FICHA DE INSCRIPCIÓN PARA MAESTRAS Y MAESTROS
+          PASOS Y FICHA OFICIAL DE INSCRIPCIÓN DE PARTICIPANTES
         </h1>
 
         <p style={{
           margin: '14px auto 0',
-          maxWidth: '820px',
+          maxWidth: '840px',
           fontSize: '1.18rem',
           color: '#cbd5e1',
           lineHeight: 1.6,
           fontWeight: 600
         }}>
-          Ingresa tu Carnet (CI) para consultar el nombre de tus ciclos, el precio a depositar, descargar tu Ficha Oficial y subir tu comprobante de pago.
+          Sigue atentamente los 4 pasos para completar exitosamente tu inscripción a nuestros programas formativos.
         </p>
       </div>
 
@@ -616,10 +633,10 @@ export function InscripcionesPublicComponent() {
         </div>
 
         <h2 style={{ margin: '0 0 10px 0', fontSize: '1.6rem', fontWeight: 900, color: '#0f172a' }}>
-          PASO 1: INGRESAR CARNET (CI) Y FICHA DE INSCRIPCIÓN
+          PASO 1: INGRESAR CARNET (CI) Y OBTENER FICHA DE INSCRIPCIÓN
         </h2>
-        <p style={{ margin: 0, fontSize: '1.12rem', color: '#475569', fontWeight: 600 }}>
-          Escribe tu número de Carnet de Identidad para ver tus ciclos registrados, el costo a depositar y descargar tu Ficha:
+        <p style={{ margin: 0, fontSize: '1.12rem', color: '#475569', fontWeight: 600, lineHeight: 1.6 }}>
+          <strong>Instrucciones:</strong> Escribe tu número de Carnet de Identidad en el siguiente campo. El sistema verificará tu pre-inscripción y te dará las opciones para <strong>imprimir, descargar en PDF o compartir por WhatsApp</strong> tu Ficha Oficial de Inscripción.
         </p>
 
         {/* Responsive search input container */}
@@ -633,7 +650,7 @@ export function InscripcionesPublicComponent() {
             <div style={{ flex: '1 1 280px', minWidth: '240px' }}>
               <input
                 type="text"
-                placeholder="Ingresa tu Carnet de Identidad (CI)..."
+                placeholder="Escribe tu número de Carnet de Identidad (CI)..."
                 value={ciSearch}
                 onChange={(e) => setCiSearch(e.target.value)}
                 style={{
@@ -699,7 +716,7 @@ export function InscripcionesPublicComponent() {
                   </div>
                 </div>
 
-                {/* List of enrolled cycles with price and ficha download */}
+                {/* List of enrolled cycles with price and ficha options */}
                 <h4 style={{ margin: '18px 0 12px 0', fontSize: '1.25rem', fontWeight: 900, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <Layers size={22} style={{ color: '#bfa05e' }} /> TUS CICLOS Y CURSOS REGISTRADOS ({participant.cursos.length}):
                 </h4>
@@ -741,7 +758,7 @@ export function InscripcionesPublicComponent() {
                               fontSize: '0.95rem',
                               fontWeight: 900
                             }}>
-                              💰 Precio: Bs. {c.costo || 150}
+                              💰 Precio a Depositar: Bs. {c.costo || 150}
                             </span>
                           </div>
 
@@ -755,26 +772,50 @@ export function InscripcionesPublicComponent() {
                           </p>
                         </div>
 
-                        <button
-                          type="button"
-                          onClick={() => handlePrintOfficialFicha(c)}
-                          style={{
-                            background: 'linear-gradient(135deg, #16a34a 0%, #15803d 100%)',
-                            color: '#ffffff',
-                            border: 'none',
-                            borderRadius: '12px',
-                            padding: '14px 22px',
-                            fontSize: '1.08rem',
-                            fontWeight: 900,
-                            cursor: 'pointer',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '8px',
-                            boxShadow: '0 4px 12px rgba(22, 163, 74, 0.25)'
-                          }}
-                        >
-                          <Printer size={20} /> Descargar Ficha del Ciclo {idx + 1}
-                        </button>
+                        {/* Options: Print/PDF + Share WhatsApp */}
+                        <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+                          <button
+                            type="button"
+                            onClick={() => handlePrintOfficialFicha(c)}
+                            style={{
+                              background: 'linear-gradient(135deg, #16a34a 0%, #15803d 100%)',
+                              color: '#ffffff',
+                              border: 'none',
+                              borderRadius: '12px',
+                              padding: '14px 20px',
+                              fontSize: '1.05rem',
+                              fontWeight: 900,
+                              cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '8px',
+                              boxShadow: '0 4px 12px rgba(22, 163, 74, 0.25)'
+                            }}
+                          >
+                            <Printer size={20} /> Imprimir / PDF
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => handleShareFicha(c)}
+                            style={{
+                              background: 'linear-gradient(135deg, #25D366 0%, #128C7E 100%)',
+                              color: '#ffffff',
+                              border: 'none',
+                              borderRadius: '12px',
+                              padding: '14px 20px',
+                              fontSize: '1.05rem',
+                              fontWeight: 900,
+                              cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '8px',
+                              boxShadow: '0 4px 12px rgba(37, 211, 102, 0.25)'
+                            }}
+                          >
+                            <Share2 size={20} /> Compartir Ficha
+                          </button>
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -796,26 +837,48 @@ export function InscripcionesPublicComponent() {
                       </h5>
                       <span style={{ fontSize: '1.05rem', color: '#b45309', fontWeight: 800 }}>💰 Precio del Ciclo: Bs. 150</span>
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => handlePrintOfficialFicha()}
-                      style={{
-                        background: 'linear-gradient(135deg, #16a34a 0%, #15803d 100%)',
-                        color: '#ffffff',
-                        border: 'none',
-                        borderRadius: '12px',
-                        padding: '14px 22px',
-                        fontSize: '1.08rem',
-                        fontWeight: 900,
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '8px',
-                        boxShadow: '0 4px 12px rgba(22, 163, 74, 0.25)'
-                      }}
-                    >
-                      <Printer size={20} /> Imprimir Ficha Oficial
-                    </button>
+
+                    <div style={{ display: 'flex', gap: '10px' }}>
+                      <button
+                        type="button"
+                        onClick={() => handlePrintOfficialFicha()}
+                        style={{
+                          background: 'linear-gradient(135deg, #16a34a 0%, #15803d 100%)',
+                          color: '#ffffff',
+                          border: 'none',
+                          borderRadius: '12px',
+                          padding: '14px 20px',
+                          fontSize: '1.05rem',
+                          fontWeight: 900,
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '8px'
+                        }}
+                      >
+                        <Printer size={20} /> Imprimir / PDF
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => handleShareFicha()}
+                        style={{
+                          background: 'linear-gradient(135deg, #25D366 0%, #128C7E 100%)',
+                          color: '#ffffff',
+                          border: 'none',
+                          borderRadius: '12px',
+                          padding: '14px 20px',
+                          fontSize: '1.05rem',
+                          fontWeight: 900,
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '8px'
+                        }}
+                      >
+                        <Share2 size={20} /> Compartir Ficha
+                      </button>
+                    </div>
                   </div>
                 )}
               </div>
@@ -853,7 +916,7 @@ export function InscripcionesPublicComponent() {
                     📞 POR FAVOR CONTÁCTATE CON NOSOTROS PARA AYUDARTE:
                   </h4>
                   <p style={{ margin: '0 0 14px 0', fontSize: '1.05rem', fontWeight: 600, color: '#881337' }}>
-                    Escríbenos por WhatsApp a cualquiera de nuestros números de atención:
+                    Escríbenos por WhatsApp a cualquiera de nuestros números de atención para verificar tu formulario:
                   </p>
 
                   <div style={{
@@ -935,10 +998,11 @@ export function InscripcionesPublicComponent() {
         display: 'grid',
         gridTemplateColumns: 'repeat(auto-fit, minmax(350px, 1fr))',
         gap: '28px',
-        alignItems: 'stretch'
+        alignItems: 'stretch',
+        marginBottom: '36px'
       }}>
 
-        {/* PASO 2: DOCUMENTACIÓN EN OFICINAS */}
+        {/* PASO 2: DOCUMENTACIÓN NECESARIA */}
         <div style={{
           background: '#ffffff',
           borderRadius: '24px',
@@ -991,7 +1055,7 @@ export function InscripcionesPublicComponent() {
               color: '#0f172a',
               lineHeight: 1.3
             }}>
-              PASO 2: PRESENTAR DOCUMENTACIÓN EN OFICINAS
+              PASO 2: REUNIR LA DOCUMENTACIÓN REQUERIDA
             </h3>
 
             <p style={{
@@ -1001,7 +1065,7 @@ export function InscripcionesPublicComponent() {
               lineHeight: 1.6,
               fontWeight: 600
             }}>
-              Presenta en nuestras oficinas la Ficha de Inscripción impresa y llenada a mano junto con los siguientes documentos requeridos:
+              <strong>Instrucciones:</strong> Reúne la documentación física correspondiente según tu función desempeñada:
             </p>
 
             <div style={{
@@ -1049,23 +1113,6 @@ export function InscripcionesPublicComponent() {
                   </span>
                 </div>
               </div>
-            </div>
-
-            <div style={{
-              marginTop: '20px',
-              background: '#f0f9ff',
-              border: '2px solid #0284c7',
-              borderRadius: '16px',
-              padding: '16px',
-              color: '#0369a1',
-              fontSize: '1.05rem',
-              lineHeight: 1.5,
-              fontWeight: 700
-            }}>
-              <div style={{ fontWeight: 900, fontSize: '1.1rem', color: '#0284c7', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <Building2 size={20} /> LUGAR DE PRESENTACIÓN:
-              </div>
-              Oficinas de <strong>UNEFCO Santa Cruz</strong> (Av. San Martín s/n Equipetrol, ESFM Enrique Finot).
             </div>
           </div>
         </div>
@@ -1123,8 +1170,18 @@ export function InscripcionesPublicComponent() {
               color: '#0f172a',
               lineHeight: 1.3
             }}>
-              PASO 3: DEPÓSITO BANCARIO Y COMPROBANTE
+              PASO 3: DEPÓSITO BANCARIO Y REGISTRO DIGITAL
             </h3>
+
+            <p style={{
+              margin: '0 0 16px 0',
+              fontSize: '1.1rem',
+              color: '#475569',
+              lineHeight: 1.6,
+              fontWeight: 600
+            }}>
+              <strong>Instrucciones:</strong> Realiza el depósito correspondiente a la cuenta bancaria oficial de UNEFCO y registra tu comprobante digitalmente:
+            </p>
 
             {/* Bank Account Details Card */}
             <div style={{
@@ -1137,7 +1194,7 @@ export function InscripcionesPublicComponent() {
               marginBottom: '20px'
             }}>
               <div style={{ fontSize: '1.1rem', fontWeight: 900, color: '#f59e0b', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <CreditCard size={22} /> DATOS PARA EL DEPÓSITO BANCARIO:
+                <CreditCard size={22} /> CUENTA BANCARIA OFICIAL:
               </div>
 
               <div style={{ fontSize: '1.3rem', fontWeight: 900, color: '#ffffff', marginBottom: '6px' }}>
@@ -1172,10 +1229,10 @@ export function InscripcionesPublicComponent() {
                 padding: '18px'
               }}>
                 <h4 style={{ margin: '0 0 10px 0', fontSize: '1.2rem', fontWeight: 900, color: '#15803d' }}>
-                  📤 SUBIR TU COMPROBANTE DE DEPÓSITO DIGITAL
+                  📤 REGISTRAR TU COMPROBANTE DIGITAL
                 </h4>
                 <p style={{ margin: '0 0 14px 0', fontSize: '1rem', color: '#166534', fontWeight: 600 }}>
-                  Selecciona la foto o imagen de tu comprobante de pago para adjuntarlo a tu pre-inscripción:
+                  Adjunta el archivo o foto de tu voucher de depósito para tu ciclo:
                 </p>
 
                 {participant.cursos.map((course) => (
@@ -1192,7 +1249,7 @@ export function InscripcionesPublicComponent() {
 
                     {course.comprobante_url ? (
                       <div style={{ color: '#166534', fontWeight: 800, fontSize: '0.95rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <Check size={18} /> ¡Comprobante ya subido al sistema!
+                        <Check size={18} /> ¡Comprobante registrado exitosamente!
                       </div>
                     ) : (
                       <input
@@ -1227,7 +1284,7 @@ export function InscripcionesPublicComponent() {
                 fontWeight: 600,
                 lineHeight: 1.6
               }}>
-                💳 <strong>Monto a Depositar:</strong> Consulta tu Carnet en el <strong>Paso 1</strong> para ver el costo de cada ciclo (Bs. 150) y habilitar la opción de subir tu comprobante de depósito.
+                💳 <strong>Monto a Depositar:</strong> Ingresa tu Carnet en el <strong>Paso 1</strong> para habilitar la subida del comprobante digital.
               </div>
             )}
           </div>
@@ -1235,11 +1292,113 @@ export function InscripcionesPublicComponent() {
 
       </div>
 
-      {/* ADVERTENCIA DE DEPÓSITOS & DIRECCIÓN OFICINAS */}
+      {/* PASO 4: ENTREGA FINAL EN OFICINAS DE UNEFCO */}
       <div style={{
-        marginTop: '36px',
+        background: '#ffffff',
+        borderRadius: '24px',
+        padding: '32px 28px',
+        boxShadow: '0 10px 28px rgba(2, 132, 199, 0.12)',
+        border: '3.5px solid #0284c7',
+        marginBottom: '36px'
+      }}>
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          marginBottom: '16px'
+        }}>
+          <span style={{
+            width: '54px',
+            height: '54px',
+            borderRadius: '50%',
+            background: 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)',
+            color: '#ffffff',
+            fontWeight: 900,
+            fontSize: '1.6rem',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            boxShadow: '0 4px 12px rgba(2, 132, 199, 0.35)'
+          }}>
+            4
+          </span>
+          <span style={{
+            fontSize: '0.9rem',
+            fontWeight: 900,
+            color: '#0369a1',
+            background: '#f0f9ff',
+            padding: '6px 16px',
+            borderRadius: '16px',
+            border: '1.5px solid #bae6fd'
+          }}>
+            Paso 4: Entrega Final
+          </span>
+        </div>
+
+        <h2 style={{ margin: '0 0 12px 0', fontSize: '1.6rem', fontWeight: 900, color: '#0f172a' }}>
+          PASO 4: ENTREGA FINAL DE REQUISITOS EN OFICINAS
+        </h2>
+        <p style={{ margin: 0, fontSize: '1.12rem', color: '#334155', fontWeight: 600, lineHeight: 1.6 }}>
+          Una vez cumplidos los tres pasos anteriores, apersónate a nuestras oficinas a entregar los 3 documentos completos para finalizar tu inscripción:
+        </p>
+
+        <div style={{
+          marginTop: '20px',
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
+          gap: '16px'
+        }}>
+          <div style={{ background: '#f8fafc', border: '1.5px solid #cbd5e1', borderRadius: '16px', padding: '16px' }}>
+            <span style={{ fontWeight: 900, fontSize: '1.1rem', color: '#0f172a', display: 'block', marginBottom: '4px' }}>
+              1. Ficha de Inscripción
+            </span>
+            <span style={{ fontSize: '1rem', color: '#475569', fontWeight: 600 }}>
+              La Ficha de Inscripción impresa y completada con tus datos llenados a mano y firmada.
+            </span>
+          </div>
+
+          <div style={{ background: '#f8fafc', border: '1.5px solid #cbd5e1', borderRadius: '16px', padding: '16px' }}>
+            <span style={{ fontWeight: 900, fontSize: '1.1rem', color: '#0f172a', display: 'block', marginBottom: '4px' }}>
+              2. Fotocopia de RDA o Certificado
+            </span>
+            <span style={{ fontSize: '1rem', color: '#475569', fontWeight: 600 }}>
+              Fotocopia de tu RDA actualizado (o Certificado de Trabajo si eres personal Administrativo).
+            </span>
+          </div>
+
+          <div style={{ background: '#f8fafc', border: '1.5px solid #cbd5e1', borderRadius: '16px', padding: '16px' }}>
+            <span style={{ fontWeight: 900, fontSize: '1.1rem', color: '#0f172a', display: 'block', marginBottom: '4px' }}>
+              3. Comprobante de Depósito
+            </span>
+            <span style={{ fontSize: '1rem', color: '#475569', fontWeight: 600 }}>
+              El comprobante bancario original de depósito realizado a la cuenta del Banco Unión.
+            </span>
+          </div>
+        </div>
+
+        {/* LUGAR DE PRESENTACION */}
+        <div style={{
+          marginTop: '24px',
+          background: 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)',
+          color: '#ffffff',
+          borderRadius: '18px',
+          padding: '22px 24px',
+          boxShadow: '0 6px 18px rgba(2, 132, 199, 0.25)'
+        }}>
+          <div style={{ fontWeight: 900, fontSize: '1.25rem', color: '#ffffff', marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <Building2 size={24} /> LUGAR DE PRESENTACIÓN EN OFICINAS:
+          </div>
+          <div style={{ fontSize: '1.15rem', fontWeight: 800, color: '#f0f9ff', lineHeight: 1.6 }}>
+            📍 <strong>Dirección:</strong> Oficinas de UNEFCO Santa Cruz (Av. San Martín s/n Equipetrol, ESFM Enrique Finot).<br />
+            ⏰ <strong>Horario de Atención:</strong> Horario continuo de <strong>08:00 a 16:00</strong>.
+          </div>
+        </div>
+      </div>
+
+      {/* ADVERTENCIA DE DEPÓSITOS & CONFIRMACIÓN TÉCNICA DEPARTAMENTAL */}
+      <div style={{
         background: 'linear-gradient(135deg, #fff1f2 0%, #ffe4e6 100%)',
-        border: '3px solid #e11d48',
+        border: '3.5px solid #e11d48',
         borderRadius: '24px',
         padding: '28px 30px',
         boxShadow: '0 10px 30px rgba(225, 29, 72, 0.22)',
@@ -1253,28 +1412,14 @@ export function InscripcionesPublicComponent() {
             🚨 ADVERTENCIA IMPORTANTE SOBRE DEPÓSITOS BANCARIOS
           </h3>
           <p style={{ margin: 0, fontSize: '1.18rem', fontWeight: 900, color: '#be123c', lineHeight: 1.6 }}>
-            <strong>NO REALIZAR NINGÚN DEPÓSITO</strong> hasta contar con la <strong>confirmación directa del técnico asignado</strong>.
+            <strong>NO REALIZAR NINGÚN DEPÓSITO</strong> hasta contar con la <strong>confirmación directa del técnico departamental asignado</strong>.
           </p>
-          <p style={{ margin: '10px 0 0 0', fontSize: '1.1rem', color: '#881337', lineHeight: 1.6, fontWeight: 700 }}>
+          <p style={{ margin: '10px 0 0 0', fontSize: '1.12rem', color: '#881337', lineHeight: 1.6, fontWeight: 800 }}>
+            📲 <em>Cualquier comunicado oficial se dará únicamente a través del <strong>grupo de WhatsApp oficial</strong> del curso.</em>
+          </p>
+          <p style={{ margin: '8px 0 0 0', fontSize: '1.05rem', color: '#9f1239', lineHeight: 1.55, fontWeight: 700 }}>
             ⚠️ <em>Toma en cuenta que los depósitos bancarios son válidos <strong>ÚNICAMENTE DENTRO DEL MES EN EL QUE SE REALIZAN</strong>.</em>
           </p>
-
-          <div style={{
-            marginTop: '16px',
-            background: '#ffffff',
-            border: '2px solid #f43f5e',
-            borderRadius: '16px',
-            padding: '16px 20px',
-            color: '#4c0519',
-            fontSize: '1.1rem',
-            lineHeight: 1.6
-          }}>
-            <div style={{ fontWeight: 900, fontSize: '1.2rem', color: '#be123c', marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <MapPin size={22} style={{ color: '#e11d48' }} /> DIRECCIÓN Y ATENCIÓN EN OFICINAS UNEFCO:
-            </div>
-            📍 <strong>Dirección:</strong> Av. San Martín s/n Equipetrol, ESFM Enrique Finot.<br />
-            ⏰ <strong>Horario de Atención:</strong> Horario continuo de <strong>08:00 a 16:00</strong>.
-          </div>
         </div>
       </div>
 
