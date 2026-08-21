@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { Download, FileSpreadsheet, MessageCircle, Users, Sparkles, PhoneCall, ExternalLink, CheckCircle } from 'lucide-react';
+import { Download, FileSpreadsheet, MessageCircle, Users, Sparkles, PhoneCall, ExternalLink, AlertTriangle, CheckCircle2 } from 'lucide-react';
 
 export function GuiaPasosSubtab() {
   const [copied, setCopied] = React.useState<string | null>(null);
@@ -13,15 +13,15 @@ export function GuiaPasosSubtab() {
   };
 
   const contacts = [
-    { num: '77476059', label: 'Atención 1' },
-    { num: '68405551', label: 'Atención 2' },
-    { num: '72174446', label: 'Atención 3' },
-    { num: '76200708', label: 'Atención 4' }
+    { num: '77476059', label: 'Línea de Atención 1' },
+    { num: '68405551', label: 'Línea de Atención 2' },
+    { num: '72174446', label: 'Línea de Atención 3' },
+    { num: '76200708', label: 'Línea de Atención 4' }
   ];
 
   return (
     <div style={{
-      maxWidth: '1200px',
+      maxWidth: '1240px',
       margin: '0 auto',
       padding: '24px 16px',
       fontFamily: "'Segoe UI', system-ui, -apple-system, sans-serif"
@@ -30,12 +30,12 @@ export function GuiaPasosSubtab() {
       <div style={{
         background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #334155 100%)',
         color: '#ffffff',
-        borderRadius: '20px',
-        padding: '32px 24px',
+        borderRadius: '24px',
+        padding: '36px 28px',
         textAlign: 'center',
-        boxShadow: '0 10px 25px rgba(15, 23, 42, 0.25)',
-        border: '2px solid #bfa05e',
-        marginBottom: '32px',
+        boxShadow: '0 12px 30px rgba(15, 23, 42, 0.25)',
+        border: '3px solid #bfa05e',
+        marginBottom: '36px',
         position: 'relative',
         overflow: 'hidden'
       }}>
@@ -43,61 +43,62 @@ export function GuiaPasosSubtab() {
           position: 'absolute',
           top: '-20px',
           right: '-20px',
-          width: '150px',
-          height: '150px',
-          background: 'radial-gradient(circle, rgba(191, 160, 94, 0.25) 0%, transparent 70%)',
+          width: '180px',
+          height: '180px',
+          background: 'radial-gradient(circle, rgba(191, 160, 94, 0.3) 0%, transparent 70%)',
           borderRadius: '50%'
         }} />
 
         <div style={{
           display: 'inline-flex',
           alignItems: 'center',
-          gap: '8px',
-          background: 'rgba(191, 160, 94, 0.2)',
-          border: '1px solid #bfa05e',
+          gap: '10px',
+          background: 'rgba(191, 160, 94, 0.22)',
+          border: '1.5px solid #bfa05e',
           color: '#f59e0b',
-          padding: '6px 16px',
-          borderRadius: '20px',
-          fontSize: '0.85rem',
-          fontWeight: 800,
+          padding: '8px 20px',
+          borderRadius: '24px',
+          fontSize: '1rem',
+          fontWeight: 900,
           textTransform: 'uppercase',
           letterSpacing: '1px',
-          marginBottom: '14px'
+          marginBottom: '16px'
         }}>
-          <Sparkles size={16} /> Pasos para la Pre-Inscripción por Grupos
+          <Sparkles size={20} /> Pasos para la Pre-Inscripción de Grupos
         </div>
 
         <h1 style={{
           margin: 0,
-          fontSize: '2rem',
+          fontSize: '2.3rem',
           fontWeight: 900,
           color: '#ffffff',
           letterSpacing: '0.5px',
-          lineHeight: 1.2
+          lineHeight: 1.25
         }}>
           GUÍA PASO A PASO PARA MAESTRAS Y MAESTROS
         </h1>
 
         <p style={{
-          margin: '12px auto 0',
-          maxWidth: '680px',
-          fontSize: '0.98rem',
+          margin: '14px auto 0',
+          maxWidth: '780px',
+          fontSize: '1.15rem',
           color: '#cbd5e1',
-          lineHeight: 1.5
+          lineHeight: 1.6,
+          fontWeight: 600
         }}>
-          Descarga la convocatoria oficial, organiza a tu equipo de trabajo y envía tu lista para registrar a tu grupo de participantes.
+          Descarga la convocatoria oficial, organiza a tu equipo de docentes y envía tu lista para habilitar tu grupo de formación.
         </p>
 
         <div style={{
-          marginTop: '20px',
+          marginTop: '22px',
           display: 'inline-block',
           background: 'linear-gradient(135deg, #bfa05e 0%, #9a7b38 100%)',
           color: '#ffffff',
-          padding: '8px 22px',
+          padding: '10px 26px',
           borderRadius: '30px',
           fontWeight: 900,
-          fontSize: '0.9rem',
-          boxShadow: '0 4px 12px rgba(191, 160, 94, 0.35)',
+          fontSize: '1.05rem',
+          boxShadow: '0 4px 14px rgba(191, 160, 94, 0.4)',
           letterSpacing: '0.5px'
         }}>
           📣 ¡PARTICIPA Y SÉ PARTE DEL CAMBIO EDUCATIVO!
@@ -107,22 +108,21 @@ export function GuiaPasosSubtab() {
       {/* Grid of 3 Steps */}
       <div style={{
         display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))',
-        gap: '24px',
+        gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))',
+        gap: '28px',
         alignItems: 'stretch'
       }}>
 
         {/* PASO 1 */}
         <div style={{
           background: '#ffffff',
-          borderRadius: '20px',
-          padding: '28px 24px',
-          boxShadow: '0 8px 20px rgba(0, 0, 0, 0.06)',
-          border: '2px solid #e2e8f0',
+          borderRadius: '24px',
+          padding: '32px 26px',
+          boxShadow: '0 10px 24px rgba(0, 0, 0, 0.07)',
+          border: '2.5px solid #cbd5e1',
           display: 'flex',
           flexDirection: 'column',
           justifyContent: 'space-between',
-          transition: 'transform 0.2s ease, box-shadow 0.2s ease',
           position: 'relative'
         }}>
           <div>
@@ -130,39 +130,39 @@ export function GuiaPasosSubtab() {
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
-              marginBottom: '16px'
+              marginBottom: '18px'
             }}>
               <span style={{
-                width: '48px',
-                height: '48px',
+                width: '54px',
+                height: '54px',
                 borderRadius: '50%',
                 background: 'linear-gradient(135deg, #bfa05e 0%, #9a7b38 100%)',
                 color: '#ffffff',
                 fontWeight: 900,
-                fontSize: '1.4rem',
+                fontSize: '1.6rem',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                boxShadow: '0 4px 10px rgba(191, 160, 94, 0.3)'
+                boxShadow: '0 4px 12px rgba(191, 160, 94, 0.35)'
               }}>
                 1
               </span>
               <span style={{
-                fontSize: '0.75rem',
-                fontWeight: 800,
+                fontSize: '0.85rem',
+                fontWeight: 900,
                 color: '#9a7b38',
                 background: '#fefce8',
-                padding: '4px 10px',
-                borderRadius: '12px',
-                border: '1px solid #fef08a'
+                padding: '6px 14px',
+                borderRadius: '16px',
+                border: '1.5px solid #fef08a'
               }}>
                 Paso Inicial
               </span>
             </div>
 
             <h3 style={{
-              margin: '0 0 10px 0',
-              fontSize: '1.25rem',
+              margin: '0 0 12px 0',
+              fontSize: '1.4rem',
               fontWeight: 900,
               color: '#0f172a',
               lineHeight: 1.3
@@ -172,29 +172,33 @@ export function GuiaPasosSubtab() {
 
             <p style={{
               margin: 0,
-              fontSize: '0.88rem',
-              color: '#64748b',
-              lineHeight: 1.55
+              fontSize: '1.08rem',
+              color: '#475569',
+              lineHeight: 1.6,
+              fontWeight: 600
             }}>
               Consulta los requisitos oficiales, fechas de inicio, carga horaria y detalles normativos para la inscripción de maestros.
             </p>
 
             <div style={{
-              marginTop: '20px',
-              padding: '16px',
+              marginTop: '22px',
+              padding: '20px',
               background: '#f8fafc',
-              borderRadius: '12px',
-              border: '1px dashed #cbd5e1',
+              borderRadius: '16px',
+              border: '2px dashed #cbd5e1',
               textAlign: 'center'
             }}>
-              <div style={{ fontSize: '2.5rem', marginBottom: '8px' }}>📄</div>
-              <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#475569' }}>
-                Documento oficial en PDF (Google Drive)
+              <div style={{ fontSize: '3rem', marginBottom: '8px' }}>📄</div>
+              <span style={{ fontSize: '0.95rem', fontWeight: 800, color: '#334155', display: 'block' }}>
+                Documento Oficial en PDF
+              </span>
+              <span style={{ fontSize: '0.82rem', color: '#64748b', fontWeight: 600 }}>
+                Google Drive
               </span>
             </div>
           </div>
 
-          <div style={{ marginTop: '24px' }}>
+          <div style={{ marginTop: '28px' }}>
             <a
               href="https://drive.google.com/file/d/1xLv07-cLHRhSQOzw4pNiC5tA7FpL-ZEL/view?usp=sharing"
               target="_blank"
@@ -204,19 +208,19 @@ export function GuiaPasosSubtab() {
                 background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)',
                 color: '#ffffff',
                 textDecoration: 'none',
-                padding: '14px 20px',
-                borderRadius: '12px',
-                fontWeight: 800,
-                fontSize: '0.92rem',
+                padding: '16px 20px',
+                borderRadius: '14px',
+                fontWeight: 900,
+                fontSize: '1.08rem',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 gap: '10px',
-                boxShadow: '0 4px 12px rgba(15, 23, 42, 0.2)',
+                boxShadow: '0 4px 14px rgba(15, 23, 42, 0.25)',
                 transition: 'transform 0.15s ease'
               }}
             >
-              <Download size={18} /> Descargar Convocatoria <ExternalLink size={14} />
+              <Download size={22} /> Descargar Convocatoria <ExternalLink size={16} />
             </a>
           </div>
         </div>
@@ -224,14 +228,13 @@ export function GuiaPasosSubtab() {
         {/* PASO 2 */}
         <div style={{
           background: '#ffffff',
-          borderRadius: '20px',
-          padding: '28px 24px',
-          boxShadow: '0 8px 20px rgba(0, 0, 0, 0.06)',
-          border: '2px solid #e2e8f0',
+          borderRadius: '24px',
+          padding: '32px 26px',
+          boxShadow: '0 10px 24px rgba(0, 0, 0, 0.07)',
+          border: '2.5px solid #cbd5e1',
           display: 'flex',
           flexDirection: 'column',
           justifyContent: 'space-between',
-          transition: 'transform 0.2s ease, box-shadow 0.2s ease',
           position: 'relative'
         }}>
           <div>
@@ -239,39 +242,39 @@ export function GuiaPasosSubtab() {
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
-              marginBottom: '16px'
+              marginBottom: '18px'
             }}>
               <span style={{
-                width: '48px',
-                height: '48px',
+                width: '54px',
+                height: '54px',
                 borderRadius: '50%',
                 background: 'linear-gradient(135deg, #bfa05e 0%, #9a7b38 100%)',
                 color: '#ffffff',
                 fontWeight: 900,
-                fontSize: '1.4rem',
+                fontSize: '1.6rem',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                boxShadow: '0 4px 10px rgba(191, 160, 94, 0.3)'
+                boxShadow: '0 4px 12px rgba(191, 160, 94, 0.35)'
               }}>
                 2
               </span>
               <span style={{
-                fontSize: '0.75rem',
-                fontWeight: 800,
+                fontSize: '0.85rem',
+                fontWeight: 900,
                 color: '#9a7b38',
                 background: '#fefce8',
-                padding: '4px 10px',
-                borderRadius: '12px',
-                border: '1px solid #fef08a'
+                padding: '6px 14px',
+                borderRadius: '16px',
+                border: '1.5px solid #fef08a'
               }}>
                 Trabajo en Equipo
               </span>
             </div>
 
             <h3 style={{
-              margin: '0 0 10px 0',
-              fontSize: '1.25rem',
+              margin: '0 0 12px 0',
+              fontSize: '1.4rem',
               fontWeight: 900,
               color: '#0f172a',
               lineHeight: 1.3
@@ -281,29 +284,54 @@ export function GuiaPasosSubtab() {
 
             <p style={{
               margin: 0,
-              fontSize: '0.88rem',
-              color: '#64748b',
-              lineHeight: 1.55
+              fontSize: '1.08rem',
+              color: '#475569',
+              lineHeight: 1.6,
+              fontWeight: 600
             }}>
-              Organízate con tus colegas y descarga la planilla oficial en Excel para registrar los nombres, carnets y datos del grupo.
+              Organízate con tus colegas y descarga la planilla oficial en Excel para registrar los datos del grupo.
             </p>
 
+            {/* Requisito mínimo de 20 participantes */}
             <div style={{
-              marginTop: '20px',
+              background: '#fff7ed',
+              border: '2.5px solid #ea580c',
+              borderRadius: '14px',
+              padding: '14px 16px',
+              color: '#9a3412',
+              fontSize: '1.05rem',
+              fontWeight: 800,
+              marginTop: '16px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '12px',
+              boxShadow: '0 2px 8px rgba(234, 88, 12, 0.12)'
+            }}>
+              <Users size={28} style={{ color: '#ea580c', flexShrink: 0 }} />
+              <div style={{ lineHeight: 1.45 }}>
+                <span style={{ color: '#c2410c', textTransform: 'uppercase', display: 'block', fontSize: '0.88rem', fontWeight: 900 }}>
+                  👥 REQUISITO DE PARTICIPANTES:
+                </span>
+                El grupo debe contar con un <strong>MÍNIMO DE 20 PARTICIPANTES (maestras y maestros)</strong> para ser habilitado.
+              </div>
+            </div>
+
+            <div style={{
+              marginTop: '16px',
               padding: '16px',
               background: '#f0fdf4',
-              borderRadius: '12px',
-              border: '1px dashed #86efac',
+              borderRadius: '16px',
+              border: '2px dashed #86efac',
               textAlign: 'center'
             }}>
-              <div style={{ fontSize: '2.5rem', marginBottom: '8px' }}>📊</div>
-              <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#166534' }}>
+              <div style={{ fontSize: '2.8rem', marginBottom: '6px' }}>📊</div>
+              <span style={{ fontSize: '0.95rem', fontWeight: 800, color: '#166534', display: 'block' }}>
                 Plantilla Oficial Excel (Google Sheets)
               </span>
             </div>
           </div>
 
-          <div style={{ marginTop: '24px' }}>
+          <div style={{ marginTop: '28px' }}>
             <a
               href="https://docs.google.com/spreadsheets/d/1dSqj3I2f8PGm0MYpib9FZ0FuIGC7rqaS/edit?usp=sharing&ouid=113363672352349214932&rtpof=true&sd=true"
               target="_blank"
@@ -313,19 +341,19 @@ export function GuiaPasosSubtab() {
                 background: 'linear-gradient(135deg, #16a34a 0%, #15803d 100%)',
                 color: '#ffffff',
                 textDecoration: 'none',
-                padding: '14px 20px',
-                borderRadius: '12px',
-                fontWeight: 800,
-                fontSize: '0.92rem',
+                padding: '16px 20px',
+                borderRadius: '14px',
+                fontWeight: 900,
+                fontSize: '1.08rem',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 gap: '10px',
-                boxShadow: '0 4px 12px rgba(22, 163, 74, 0.25)',
+                boxShadow: '0 4px 14px rgba(22, 163, 74, 0.3)',
                 transition: 'transform 0.15s ease'
               }}
             >
-              <FileSpreadsheet size={18} /> Descargar Plantilla Excel <ExternalLink size={14} />
+              <FileSpreadsheet size={22} /> Descargar Plantilla Excel <ExternalLink size={16} />
             </a>
           </div>
         </div>
@@ -333,14 +361,13 @@ export function GuiaPasosSubtab() {
         {/* PASO 3 */}
         <div style={{
           background: '#ffffff',
-          borderRadius: '20px',
-          padding: '28px 24px',
-          boxShadow: '0 8px 20px rgba(0, 0, 0, 0.06)',
-          border: '2px solid #e2e8f0',
+          borderRadius: '24px',
+          padding: '32px 26px',
+          boxShadow: '0 10px 24px rgba(0, 0, 0, 0.07)',
+          border: '2.5px solid #cbd5e1',
           display: 'flex',
           flexDirection: 'column',
           justifyContent: 'space-between',
-          transition: 'transform 0.2s ease, box-shadow 0.2s ease',
           position: 'relative'
         }}>
           <div>
@@ -348,39 +375,39 @@ export function GuiaPasosSubtab() {
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
-              marginBottom: '16px'
+              marginBottom: '18px'
             }}>
               <span style={{
-                width: '48px',
-                height: '48px',
+                width: '54px',
+                height: '54px',
                 borderRadius: '50%',
                 background: 'linear-gradient(135deg, #bfa05e 0%, #9a7b38 100%)',
                 color: '#ffffff',
                 fontWeight: 900,
-                fontSize: '1.4rem',
+                fontSize: '1.6rem',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                boxShadow: '0 4px 10px rgba(191, 160, 94, 0.3)'
+                boxShadow: '0 4px 12px rgba(191, 160, 94, 0.35)'
               }}>
                 3
               </span>
               <span style={{
-                fontSize: '0.75rem',
-                fontWeight: 800,
+                fontSize: '0.85rem',
+                fontWeight: 900,
                 color: '#9a7b38',
                 background: '#fefce8',
-                padding: '4px 10px',
-                borderRadius: '12px',
-                border: '1px solid #fef08a'
+                padding: '6px 14px',
+                borderRadius: '16px',
+                border: '1.5px solid #fef08a'
               }}>
                 Envío por WhatsApp
               </span>
             </div>
 
             <h3 style={{
-              margin: '0 0 10px 0',
-              fontSize: '1.25rem',
+              margin: '0 0 12px 0',
+              fontSize: '1.4rem',
               fontWeight: 900,
               color: '#0f172a',
               lineHeight: 1.3
@@ -390,20 +417,21 @@ export function GuiaPasosSubtab() {
 
             <p style={{
               margin: 0,
-              fontSize: '0.88rem',
-              color: '#64748b',
-              lineHeight: 1.55
+              fontSize: '1.08rem',
+              color: '#475569',
+              lineHeight: 1.6,
+              fontWeight: 600
             }}>
-              Envía tu plantilla completada directamente a cualquiera de nuestras líneas habilitadas por WhatsApp:
+              Envía tu plantilla completada por WhatsApp a cualquiera de nuestras líneas habilitadas:
             </p>
 
             <div style={{
-              marginTop: '16px',
+              marginTop: '18px',
               display: 'flex',
               flexDirection: 'column',
-              gap: '10px'
+              gap: '12px'
             }}>
-              {contacts.map((c, i) => {
+              {contacts.map((c) => {
                 const walink = `https://wa.me/591${c.num}?text=Hola,%20adjunto%20mi%20archivo%20de%20grupo%20de%20maestras%20y%20maestros%20para%20la%20inscripci%C3%B3n.`;
                 const isCopied = copied === c.num;
                 return (
@@ -412,29 +440,29 @@ export function GuiaPasosSubtab() {
                     alignItems: 'center',
                     justifyContent: 'space-between',
                     background: '#f8fafc',
-                    border: '1px solid #e2e8f0',
-                    borderRadius: '10px',
-                    padding: '8px 12px'
+                    border: '1.5px solid #e2e8f0',
+                    borderRadius: '14px',
+                    padding: '10px 14px'
                   }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <PhoneCall size={15} style={{ color: '#25D366' }} />
-                      <span style={{ fontWeight: 800, fontSize: '0.9rem', color: '#1e293b' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <PhoneCall size={18} style={{ color: '#25D366' }} />
+                      <span style={{ fontWeight: 900, fontSize: '1.12rem', color: '#0f172a' }}>
                         {c.num}
                       </span>
                     </div>
 
-                    <div style={{ display: 'flex', gap: '6px' }}>
+                    <div style={{ display: 'flex', gap: '8px' }}>
                       <button
                         type="button"
                         onClick={() => handleCopy(c.num)}
                         style={{
                           background: isCopied ? '#dcfce7' : '#ffffff',
-                          border: '1px solid #cbd5e1',
-                          color: isCopied ? '#166534' : '#475569',
-                          padding: '4px 8px',
-                          borderRadius: '6px',
-                          fontSize: '0.72rem',
-                          fontWeight: 700,
+                          border: '1.5px solid #cbd5e1',
+                          color: isCopied ? '#166534' : '#334155',
+                          padding: '6px 12px',
+                          borderRadius: '8px',
+                          fontSize: '0.85rem',
+                          fontWeight: 800,
                           cursor: 'pointer'
                         }}
                       >
@@ -449,25 +477,71 @@ export function GuiaPasosSubtab() {
                           background: 'linear-gradient(135deg, #25D366 0%, #128C7E 100%)',
                           color: '#ffffff',
                           textDecoration: 'none',
-                          padding: '4px 10px',
-                          borderRadius: '6px',
-                          fontSize: '0.75rem',
-                          fontWeight: 800,
+                          padding: '6px 14px',
+                          borderRadius: '8px',
+                          fontSize: '0.88rem',
+                          fontWeight: 900,
                           display: 'flex',
                           alignItems: 'center',
-                          gap: '4px'
+                          gap: '6px',
+                          boxShadow: '0 2px 6px rgba(37, 211, 102, 0.3)'
                         }}
                       >
-                        <MessageCircle size={13} /> Chat <ExternalLink size={10} />
+                        <MessageCircle size={15} /> Chat <ExternalLink size={12} />
                       </a>
                     </div>
                   </div>
                 );
               })}
             </div>
+
+            {/* Aumento de información sobre el seguimiento del técnico */}
+            <div style={{
+              background: '#f0fdf4',
+              border: '2px solid #16a34a',
+              borderRadius: '16px',
+              padding: '16px',
+              color: '#14532d',
+              fontSize: '1.05rem',
+              fontWeight: 700,
+              lineHeight: 1.55,
+              marginTop: '18px',
+              boxShadow: '0 2px 8px rgba(22, 163, 74, 0.1)'
+            }}>
+              <div style={{ fontWeight: 900, fontSize: '1.12rem', color: '#15803d', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <CheckCircle2 size={18} /> PASO SIGUIENTE TRAS EL ENVÍO:
+              </div>
+              Una vez que envíes tu archivo, <strong>el técnico asignado se pondrá en contacto contigo</strong> y procederá a <strong>armar el grupo oficial de WhatsApp</strong> para coordinar las clases y enviar los requisitos correspondientes.
+            </div>
           </div>
         </div>
 
+      </div>
+
+      {/* ADVERTENCIA DE DEPÓSITOS */}
+      <div style={{
+        marginTop: '36px',
+        background: 'linear-gradient(135deg, #fff1f2 0%, #ffe4e6 100%)',
+        border: '3px solid #e11d48',
+        borderRadius: '24px',
+        padding: '28px 30px',
+        boxShadow: '0 10px 30px rgba(225, 29, 72, 0.22)',
+        display: 'flex',
+        alignItems: 'flex-start',
+        gap: '20px'
+      }}>
+        <AlertTriangle size={42} style={{ color: '#e11d48', flexShrink: 0, marginTop: '4px' }} />
+        <div>
+          <h3 style={{ margin: '0 0 8px 0', fontSize: '1.45rem', fontWeight: 900, color: '#9f1239', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+            🚨 ADVERTENCIA IMPORTANTE SOBRE DEPÓSITOS BANCARIOS
+          </h3>
+          <p style={{ margin: 0, fontSize: '1.18rem', fontWeight: 900, color: '#be123c', lineHeight: 1.6 }}>
+            <strong>NO REALIZAR NINGÚN DEPÓSITO</strong> hasta contar con la <strong>confirmación directa del técnico asignado</strong>.
+          </p>
+          <p style={{ margin: '10px 0 0 0', fontSize: '1.1rem', color: '#881337', lineHeight: 1.6, fontWeight: 700 }}>
+            ⚠️ <em>Toma en cuenta que los depósitos bancarios son válidos <strong>ÚNICAMENTE DENTRO DEL MES EN EL QUE SE REALIZAN</strong>. Evita inconvenientes esperando la confirmación de apertura del grupo.</em>
+          </p>
+        </div>
       </div>
     </div>
   );
