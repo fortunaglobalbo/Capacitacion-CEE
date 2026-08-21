@@ -45,6 +45,59 @@ interface ParticipantData {
   cursos: EnrolledCourse[];
 }
 
+const cycleThemes = [
+  {
+    bg: 'linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%)',
+    border: '2.5px solid #3b82f6',
+    badgeBg: '#1d4ed8',
+    badgeColor: '#ffffff',
+    titleColor: '#1e3a8a',
+    priceBg: '#ffffff',
+    priceBorder: '#bfdbfe',
+    priceColor: '#1d4ed8'
+  },
+  {
+    bg: 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)',
+    border: '2.5px solid #22c55e',
+    badgeBg: '#15803d',
+    badgeColor: '#ffffff',
+    titleColor: '#14532d',
+    priceBg: '#ffffff',
+    priceBorder: '#bbf7d0',
+    priceColor: '#15803d'
+  },
+  {
+    bg: 'linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%)',
+    border: '2.5px solid #f59e0b',
+    badgeBg: '#b45309',
+    badgeColor: '#ffffff',
+    titleColor: '#78350f',
+    priceBg: '#ffffff',
+    priceBorder: '#fde68a',
+    priceColor: '#b45309'
+  },
+  {
+    bg: 'linear-gradient(135deg, #faf5ff 0%, #f3e8ff 100%)',
+    border: '2.5px solid #a855f7',
+    badgeBg: '#7e22ce',
+    badgeColor: '#ffffff',
+    titleColor: '#581c87',
+    priceBg: '#ffffff',
+    priceBorder: '#e9d5ff',
+    priceColor: '#7e22ce'
+  },
+  {
+    bg: 'linear-gradient(135deg, #fff1f2 0%, #ffe4e6 100%)',
+    border: '2.5px solid #f43f5e',
+    badgeBg: '#be123c',
+    badgeColor: '#ffffff',
+    titleColor: '#881337',
+    priceBg: '#ffffff',
+    priceBorder: '#fecdd3',
+    priceColor: '#be123c'
+  }
+];
+
 export function InscripcionesPublicComponent() {
   const [ciSearch, setCiSearch] = useState('');
   const [searching, setSearching] = useState(false);
@@ -66,6 +119,12 @@ export function InscripcionesPublicComponent() {
     { num: '76200708', label: 'Atención 4' }
   ];
 
+  // Filter input to numbers only
+  const handleCiChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const onlyNums = e.target.value.replace(/\D/g, '');
+    setCiSearch(onlyNums);
+  };
+
   // Search participant by CI in Supabase with catalog enrichment
   const handleSearchCI = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
@@ -74,7 +133,7 @@ export function InscripcionesPublicComponent() {
       Swal.fire({
         icon: 'warning',
         title: 'Ingresa tu Carnet',
-        text: 'Por favor escribe tu número de Carnet de Identidad (CI) para consultar tus datos.',
+        text: 'Por favor escribe únicamente los números de tu Carnet de Identidad (sin extensión ni letras).',
         confirmButtonColor: '#0f172a'
       });
       return;
@@ -575,33 +634,40 @@ export function InscripcionesPublicComponent() {
           border: 2.5px solid #cbd5e1;
           box-shadow: 0 10px 24px rgba(0, 0, 0, 0.07);
         }
-        .search-form-row {
+
+        /* Seamless Unified Search Input Group */
+        .search-input-group {
           display: flex;
-          flex-wrap: wrap;
-          gap: 12px;
-          align-items: center;
-          margin-top: 20px;
+          align-items: stretch;
+          border-radius: 16px;
+          box-shadow: 0 4px 14px rgba(15, 23, 42, 0.12);
+          overflow: hidden;
+          border: 2.5px solid #cbd5e1;
+          background: #ffffff;
+          margin-top: 16px;
+          transition: border-color 0.2s ease;
+        }
+        .search-input-group:focus-within {
+          border-color: #0f172a;
         }
         .search-input-field {
-          flex: 1 1 280px;
-          min-width: 200px;
-          width: 100%;
-          box-sizing: border-box;
+          flex: 1 1 auto;
+          border: none !important;
+          outline: none !important;
           padding: 16px 20px;
           font-size: 1.2rem;
           font-weight: 800;
-          border-radius: 14px;
-          border: 2.5px solid #cbd5e1;
-          outline: none;
           color: #0f172a;
+          background: transparent;
+          width: 100%;
+          box-sizing: border-box;
         }
         .search-btn {
           flex: 0 0 auto;
           background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
           color: #ffffff;
-          border: none;
-          border-radius: 14px;
-          padding: 16px 32px;
+          border: none !important;
+          padding: 16px 30px;
           font-size: 1.15rem;
           font-weight: 900;
           cursor: pointer;
@@ -609,8 +675,9 @@ export function InscripcionesPublicComponent() {
           align-items: center;
           justify-content: center;
           gap: 10px;
-          box-shadow: 0 4px 14px rgba(15, 23, 42, 0.25);
+          white-space: nowrap;
         }
+
         .action-buttons-group {
           display: flex;
           gap: 10px;
@@ -631,7 +698,7 @@ export function InscripcionesPublicComponent() {
           margin-top: 20px;
         }
 
-        @media (max-width: 768px) {
+        @media (max-width: 640px) {
           .inscripciones-container {
             padding: 12px 8px;
           }
@@ -645,13 +712,14 @@ export function InscripcionesPublicComponent() {
             border-radius: 18px;
             margin-bottom: 20px;
           }
-          .search-form-row {
+          .search-input-group {
             flex-direction: column;
-            align-items: stretch;
+            border-radius: 16px;
           }
           .search-input-field {
-            padding: 14px 14px;
-            font-size: 1.05rem;
+            padding: 14px 16px;
+            font-size: 1.1rem;
+            border-bottom: 2px solid #e2e8f0 !important;
           }
           .search-btn {
             width: 100%;
@@ -772,26 +840,28 @@ export function InscripcionesPublicComponent() {
           PASO 1: INGRESAR CARNET (CI) Y OBTENER FICHA DE INSCRIPCIÓN
         </h2>
         <p style={{ margin: 0, fontSize: 'clamp(0.98rem, 2.5vw, 1.12rem)', color: '#475569', fontWeight: 600, lineHeight: 1.6 }}>
-          <strong>Instrucciones:</strong> Escribe tu número de Carnet de Identidad en el siguiente campo. El sistema verificará tu pre-inscripción, te mostrará el <strong>botón directo a tu grupo de WhatsApp</strong>, y te dará las opciones para <strong>imprimir, descargar en PDF o compartir por WhatsApp</strong> tu Ficha Oficial de Inscripción.
+          <strong>Instrucciones:</strong> Escribe tu número de Carnet de Identidad (solo números). El sistema verificará tu pre-inscripción, te mostrará el <strong>botón directo a tu grupo de WhatsApp</strong>, y te dará las opciones para <strong>imprimir, descargar en PDF o compartir por WhatsApp</strong> tu Ficha Oficial de Inscripción.
         </p>
 
-        {/* Responsive search input container */}
+        {/* Seamless Unified Search Input Group */}
         <form onSubmit={handleSearchCI}>
-          <div className="search-form-row">
-            <div style={{ flex: '1 1 280px', width: '100%' }}>
-              <input
-                type="text"
-                className="search-input-field"
-                placeholder="Escribe tu número de Carnet de Identidad (CI)..."
-                value={ciSearch}
-                onChange={(e) => setCiSearch(e.target.value)}
-              />
-            </div>
-
+          <div className="search-input-group">
+            <input
+              type="text"
+              inputMode="numeric"
+              pattern="[0-9]*"
+              className="search-input-field"
+              placeholder="Ingresa tu Carnet de Identidad (Solo números)..."
+              value={ciSearch}
+              onChange={handleCiChange}
+            />
             <button type="submit" disabled={searching} className="search-btn">
               <Search size={22} /> {searching ? 'Buscando...' : 'Consultar Carnet'}
             </button>
           </div>
+          <p style={{ margin: '8px 0 0 0', fontSize: '0.88rem', color: '#64748b', fontWeight: 600 }}>
+            ℹ️ <em>Escribe únicamente tu número de carnet sin números de extensión ni letras (ej. 8639300).</em>
+          </p>
         </form>
 
         {/* SEARCH RESULTS */}
@@ -818,131 +888,135 @@ export function InscripcionesPublicComponent() {
                   </div>
                 </div>
 
-                {/* List of enrolled cycles with WhatsApp button, price and ficha options */}
+                {/* List of enrolled cycles with distinctive color backgrounds and price */}
                 <h4 style={{ margin: '18px 0 12px 0', fontSize: '1.2rem', fontWeight: 900, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <Layers size={22} style={{ color: '#bfa05e' }} /> TUS CICLOS Y CURSOS REGISTRADOS ({participant.cursos.length}):
                 </h4>
 
                 {participant.cursos.length > 0 ? (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                    {participant.cursos.map((c, idx) => (
-                      <div key={c.id || idx} className="course-item-mobile" style={{
-                        background: '#f8fafc',
-                        border: '2px solid #cbd5e1',
-                        borderRadius: '16px',
-                        padding: '18px 14px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        flexWrap: 'wrap',
-                        gap: '16px'
-                      }}>
-                        <div style={{ flex: '1 1 260px' }}>
-                          <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '6px', flexWrap: 'wrap' }}>
-                            <span style={{
-                              background: '#0f172a',
-                              color: '#ffffff',
-                              padding: '4px 12px',
-                              borderRadius: '10px',
-                              fontSize: '0.85rem',
-                              fontWeight: 900
-                            }}>
-                              CICLO {idx + 1}
-                            </span>
+                    {participant.cursos.map((c, idx) => {
+                      const theme = cycleThemes[idx % cycleThemes.length];
+                      return (
+                        <div key={c.id || idx} className="course-item-mobile" style={{
+                          background: theme.bg,
+                          border: theme.border,
+                          borderRadius: '18px',
+                          padding: '20px 16px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          flexWrap: 'wrap',
+                          gap: '16px',
+                          boxShadow: '0 4px 14px rgba(0, 0, 0, 0.05)'
+                        }}>
+                          <div style={{ flex: '1 1 260px' }}>
+                            <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '8px', flexWrap: 'wrap' }}>
+                              <span style={{
+                                background: theme.badgeBg,
+                                color: theme.badgeColor,
+                                padding: '4px 14px',
+                                borderRadius: '10px',
+                                fontSize: '0.88rem',
+                                fontWeight: 900
+                              }}>
+                                CICLO {idx + 1}
+                              </span>
 
-                            {/* COST / PRECIO DEL CICLO */}
-                            <span style={{
-                              background: '#fefce8',
-                              border: '1.5px solid #fef08a',
-                              color: '#b45309',
-                              padding: '4px 12px',
-                              borderRadius: '10px',
-                              fontSize: '0.92rem',
-                              fontWeight: 900
-                            }}>
-                              💰 Precio a Depositar: Bs. {c.costo || 150}
-                            </span>
+                              {/* COST / PRECIO DEL CICLO */}
+                              <span style={{
+                                background: theme.priceBg,
+                                border: `1.5px solid ${theme.priceBorder}`,
+                                color: theme.priceColor,
+                                padding: '4px 14px',
+                                borderRadius: '10px',
+                                fontSize: '0.95rem',
+                                fontWeight: 900
+                              }}>
+                                💰 Precio a Depositar: Bs. {c.costo || 150}
+                              </span>
+                            </div>
+
+                            <h5 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 900, color: theme.titleColor, lineHeight: 1.35 }}>
+                              {c.ciclo_nombre || c.area_formativa || 'Programa Formativo UNEFCO'}
+                            </h5>
+
+                            <p style={{ margin: '6px 0 0 0', fontSize: '0.98rem', color: '#334155', fontWeight: 700 }}>
+                              {c.grupo_nombre ? `Grupo: ${c.grupo_nombre} | ` : ''}
+                              Distrito: {c.distrito || participant.distrito || 'Santa Cruz'}
+                            </p>
                           </div>
 
-                          <h5 style={{ margin: 0, fontSize: '1.18rem', fontWeight: 900, color: '#0f172a', lineHeight: 1.35 }}>
-                            {c.ciclo_nombre || c.area_formativa || 'Programa Formativo UNEFCO'}
-                          </h5>
+                          {/* Options: WhatsApp Group Button + Print/PDF + Share WhatsApp */}
+                          <div className="action-buttons-group">
+                            {c.link_whatsapp && (
+                              <a
+                                href={c.link_whatsapp}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                style={{
+                                  background: 'linear-gradient(135deg, #25D366 0%, #128C7E 100%)',
+                                  color: '#ffffff',
+                                  textDecoration: 'none',
+                                  borderRadius: '12px',
+                                  padding: '14px 18px',
+                                  fontSize: '1.02rem',
+                                  fontWeight: 900,
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '8px',
+                                  boxShadow: '0 4px 14px rgba(37, 211, 102, 0.35)'
+                                }}
+                              >
+                                <MessageCircle size={20} /> Unirse al Grupo de WhatsApp
+                              </a>
+                            )}
 
-                          <p style={{ margin: '6px 0 0 0', fontSize: '0.98rem', color: '#475569', fontWeight: 600 }}>
-                            {c.grupo_nombre ? `Grupo: ${c.grupo_nombre} | ` : ''}
-                            Distrito: {c.distrito || participant.distrito || 'Santa Cruz'}
-                          </p>
-                        </div>
-
-                        {/* Options: WhatsApp Group Button + Print/PDF + Share WhatsApp */}
-                        <div className="action-buttons-group">
-                          {c.link_whatsapp && (
-                            <a
-                              href={c.link_whatsapp}
-                              target="_blank"
-                              rel="noopener noreferrer"
+                            <button
+                              type="button"
+                              onClick={() => handlePrintOfficialFicha(c)}
                               style={{
-                                background: 'linear-gradient(135deg, #25D366 0%, #128C7E 100%)',
+                                background: 'linear-gradient(135deg, #16a34a 0%, #15803d 100%)',
                                 color: '#ffffff',
-                                textDecoration: 'none',
+                                border: 'none',
                                 borderRadius: '12px',
                                 padding: '14px 18px',
                                 fontSize: '1.02rem',
                                 fontWeight: 900,
-                                display: 'inline-flex',
+                                cursor: 'pointer',
+                                display: 'flex',
                                 alignItems: 'center',
                                 gap: '8px',
-                                boxShadow: '0 4px 14px rgba(37, 211, 102, 0.35)'
+                                boxShadow: '0 4px 12px rgba(22, 163, 74, 0.25)'
                               }}
                             >
-                              <MessageCircle size={20} /> Unirse al Grupo de WhatsApp
-                            </a>
-                          )}
+                              <Printer size={20} /> Imprimir / PDF
+                            </button>
 
-                          <button
-                            type="button"
-                            onClick={() => handlePrintOfficialFicha(c)}
-                            style={{
-                              background: 'linear-gradient(135deg, #16a34a 0%, #15803d 100%)',
-                              color: '#ffffff',
-                              border: 'none',
-                              borderRadius: '12px',
-                              padding: '14px 18px',
-                              fontSize: '1.02rem',
-                              fontWeight: 900,
-                              cursor: 'pointer',
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: '8px',
-                              boxShadow: '0 4px 12px rgba(22, 163, 74, 0.25)'
-                            }}
-                          >
-                            <Printer size={20} /> Imprimir / PDF
-                          </button>
-
-                          <button
-                            type="button"
-                            onClick={() => handleShareFicha(c)}
-                            style={{
-                              background: 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)',
-                              color: '#ffffff',
-                              border: 'none',
-                              borderRadius: '12px',
-                              padding: '14px 18px',
-                              fontSize: '1.02rem',
-                              fontWeight: 900,
-                              cursor: 'pointer',
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: '8px',
-                              boxShadow: '0 4px 12px rgba(2, 132, 199, 0.25)'
-                            }}
-                          >
-                            <Share2 size={20} /> Compartir Ficha
-                          </button>
+                            <button
+                              type="button"
+                              onClick={() => handleShareFicha(c)}
+                              style={{
+                                background: 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)',
+                                color: '#ffffff',
+                                border: 'none',
+                                borderRadius: '12px',
+                                padding: '14px 18px',
+                                fontSize: '1.02rem',
+                                fontWeight: 900,
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '8px',
+                                boxShadow: '0 4px 12px rgba(2, 132, 199, 0.25)'
+                              }}
+                            >
+                              <Share2 size={20} /> Compartir Ficha
+                            </button>
+                          </div>
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 ) : (
                   <div style={{
