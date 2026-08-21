@@ -3,9 +3,9 @@
 import React, { useState } from 'react';
 import { supabase } from '@/lib/supabase/client';
 import { 
-  Search, Download, FileText, Building2, CreditCard, Upload,
+  Search, Download, FileText, Building2, CreditCard, Upload, 
   AlertTriangle, CheckCircle2, MapPin, Clock, FileCheck, UserCheck, 
-  Printer, Sparkles, PhoneCall, MessageCircle, ExternalLink, BookOpen, Layers, Check
+  Printer, Sparkles, PhoneCall, MessageCircle, ExternalLink, Layers, Check 
 } from 'lucide-react';
 import Swal from 'sweetalert2';
 
@@ -50,8 +50,6 @@ export function InscripcionesPublicComponent() {
   const [participant, setParticipant] = useState<ParticipantData | null>(null);
   const [searched, setSearched] = useState(false);
   const [copied, setCopied] = useState<string | null>(null);
-
-  // Upload receipt states per course
   const [uploadingCourseId, setUploadingCourseId] = useState<string | number | null>(null);
 
   const handleCopy = (num: string) => {
@@ -86,7 +84,7 @@ export function InscripcionesPublicComponent() {
     setParticipant(null);
 
     try {
-      // 1. Fetch participant info
+      // 1. Query participantes table
       const { data: partData } = await supabase
         .from('participantes')
         .select('*')
@@ -99,7 +97,7 @@ export function InscripcionesPublicComponent() {
         .select('*, cursos(*)')
         .eq('ci_participante', ci);
 
-      // 3. Fetch regular enrollments from inscripciones
+      // 3. Fetch enrollments from inscripciones
       const { data: regularData } = await supabase
         .from('inscripciones')
         .select('*, cursos(*)')
@@ -162,7 +160,7 @@ export function InscripcionesPublicComponent() {
     }
   };
 
-  // Upload deposit receipt to Supabase for specific course
+  // Upload deposit receipt to Supabase
   const handleUploadVoucher = async (course: EnrolledCourse, file: File) => {
     if (!participant || !file) return;
 
@@ -182,7 +180,7 @@ export function InscripcionesPublicComponent() {
         if (urlData) filePublicUrl = urlData.publicUrl;
       }
 
-      // Update inscripcion_ciclo or inscripciones record
+      // Update DB record in inscripcion_ciclo or inscripciones
       if (course.inscripcion_id) {
         await supabase
           .from('inscripcion_ciclo')
@@ -190,7 +188,6 @@ export function InscripcionesPublicComponent() {
           .eq('id', course.inscripcion_id);
       }
 
-      // Update local state
       setParticipant(prev => {
         if (!prev) return null;
         return {
@@ -201,8 +198,8 @@ export function InscripcionesPublicComponent() {
 
       Swal.fire({
         icon: 'success',
-        title: '¡Comprobante Subido!',
-        text: 'Tu comprobante de pago ha sido guardado exitosamente en el sistema para la revisión del técnico.',
+        title: '¡Comprobante Registrado!',
+        text: 'Tu comprobante de pago ha sido guardado exitosamente en el sistema de maestros.',
         confirmButtonColor: '#16a34a'
       });
     } catch (err: any) {
@@ -218,13 +215,13 @@ export function InscripcionesPublicComponent() {
     }
   };
 
-  // Print Official Ficha de Inscripción matching system template
+  // Print Official 2-up Letter Ficha de Inscripción identical to Sistema de Maestros
   const handlePrintOfficialFicha = (targetCourse?: EnrolledCourse) => {
     if (!participant) return;
 
     const courseToPrint: EnrolledCourse = targetCourse || participant.cursos[0] || {
       id: 'default',
-      ciclo_nombre: 'PROGRAMA DE FORMACIÓN CONTINUA UNEFCO',
+      ciclo_nombre: 'PROGRAMA FORMATIVO CONTINUA UNEFCO',
       area_formativa: 'TECNOLOGÍA EDUCATIVA',
       costo: 40,
       distrito: participant.distrito || 'SANTA CRUZ'
@@ -232,15 +229,12 @@ export function InscripcionesPublicComponent() {
 
     const printWindow = window.open('', '_blank');
     if (!printWindow) {
-      Swal.fire('Bloqueador', 'Habilita las ventanas emergentes en tu navegador para imprimir la Ficha.', 'warning');
+      Swal.fire('Bloqueador', 'Habilita las ventanas flotantes para imprimir la ficha.', 'warning');
       return;
     }
 
-    const todayStr = new Date().toLocaleDateString('es-BO', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric'
-    });
+    const logoMineduUrl = window.location.origin + '/logo-minedu.jpg';
+    const logoUnefcoUrl = window.location.origin + '/logo-unefco.jpg';
 
     const isUrbano = (courseToPrint.area_urbano_rural || '').toUpperCase().includes('URBANO');
     const isRural = (courseToPrint.area_urbano_rural || '').toUpperCase().includes('RURAL');
@@ -250,68 +244,30 @@ export function InscripcionesPublicComponent() {
     const isPrimaria = groupText.includes('PRIMARIA');
     const isSecundaria = groupText.includes('SECUNDARIA');
 
-    const html = `
-      <!DOCTYPE html>
-      <html lang="es">
-      <head>
-        <meta charset="UTF-8">
-        <title>Ficha de Inscripción - ${participant.ci}</title>
-        <style>
-          @page { size: letter portrait; margin: 0.3in 0.25in; }
-          body { font-family: Arial, sans-serif; margin: 0; padding: 0; background: #fff; color: #000; }
-          .no-print { text-align: right; padding: 12px; background: #0f172a; color: white; }
-          .no-print button { background: #16a34a; color: white; border: none; padding: 10px 22px; font-weight: bold; border-radius: 6px; cursor: pointer; font-size: 14px; }
-          .ficha { border: 2px solid #000; border-radius: 4px; padding: 14px 18px; background: #fff; margin-bottom: 20px; }
-          table { width: 100%; border-collapse: collapse; }
-          .header-table { margin-bottom: 10px; border-bottom: 2px solid #000; padding-bottom: 6px; }
-          .bolivia-pill { height: 8px; width: 70px; background: linear-gradient(to right, #e8112d 33.3%, #f7e112 33.3%, #f7e112 66.6%, #009e49 66.6%); margin-bottom: 4px; }
-          .m-title { font-size: 8pt; font-weight: 800; }
-          .m-sub { font-size: 6pt; color: #555; font-weight: bold; }
-          .title-main { font-size: 15pt; font-weight: bold; text-align: center; }
-          .title-sub { font-size: 8.5pt; font-weight: bold; text-align: center; color: #333; }
-          .unefco-title { font-size: 14pt; font-weight: 900; color: #0c2340; text-align: right; }
-          .unefco-sub { font-size: 6pt; color: #444; font-weight: 600; text-align: right; }
-          .lbl { font-size: 8.5pt; font-weight: bold; background: #f2f2f2; text-align: right; padding-right: 8px; }
-          .val { font-size: 9pt; }
-          .data-table td, .personal-table td { border: 1px solid #000; padding: 4px 6px; vertical-align: middle; }
-          .checks-section { margin-top: 10px; font-size: 8pt; }
-          .check-row { margin-bottom: 6px; display: flex; align-items: center; gap: 12px; }
-          .chk-box-label { font-size: 8pt; font-weight: 600; }
-          .chk { display: inline-block; width: 14px; height: 14px; border: 1px solid #000; text-align: center; line-height: 14px; font-weight: bold; margin-left: 3px; }
-          .footer-table { margin-top: 24px; }
-          .signature-line { border-top: 1px solid #000; width: 200px; margin: 0 auto; }
-          .signature-lbl { font-size: 8.5pt; font-weight: bold; text-align: center; margin-top: 4px; }
-          @media print { .no-print { display: none; } }
-        </style>
-      </head>
-      <body>
-        <div class="no-print">
-          <button onclick="window.print()">🖨️ IMPRIMIR FICHA OFICIAL</button>
-        </div>
-
+    const buildFichaHtml = () => {
+      return `
         <div class="ficha">
+          <!-- Header Logos & Title -->
           <table class="header-table">
             <tr>
-              <td width="25%" align="left">
-                <div class="bolivia-pill"></div>
-                <div class="m-title">MINISTERIO DE EDUCACIÓN</div>
-                <div class="m-sub">ESTADO PLURINACIONAL DE BOLIVIA</div>
+              <td width="35%" align="left" valign="middle">
+                <img src="${logoMineduUrl}" class="logo-img" alt="Ministerio de Educación" />
               </td>
-              <td width="50%" align="center">
+              <td width="30%" align="center" valign="middle">
                 <div class="title-main">FICHA DE INSCRIPCIÓN</div>
                 <div class="title-sub">ITINERARIOS FORMATIVOS - MODALIDAD SEMIPRESENCIAL</div>
               </td>
-              <td width="25%" align="right">
-                <div class="unefco-title">UNEFCO</div>
-                <div class="unefco-sub">Unidad Especializada de Formación Continua</div>
+              <td width="35%" align="right" valign="middle">
+                <img src="${logoUnefcoUrl}" class="logo-img" alt="UNEFCO" />
               </td>
             </tr>
           </table>
 
-          <table class="data-table" style="margin-bottom: 8px;">
+          <!-- 1. Table for Course Details -->
+          <table class="data-table">
             <tr>
-              <td class="lbl" width="20%">Área Formativa</td>
-              <td class="val"><b>${courseToPrint.area_formativa || courseToPrint.ciclo_grupo || 'EDUCACIÓN CONTINUA'}</b></td>
+              <td class="lbl" width="18%">Área</td>
+              <td class="val">${courseToPrint.area_formativa || courseToPrint.ciclo_grupo || 'EDUCACIÓN CONTINUA'}</td>
             </tr>
             <tr>
               <td class="lbl">Ciclo Formativo</td>
@@ -327,85 +283,210 @@ export function InscripcionesPublicComponent() {
             </tr>
             <tr>
               <td class="lbl">Curso Nº 2</td>
-              <td class="val">${courseToPrint.tema2 || '—'}</td>
+              <td class="val">${courseToPrint.tema2 || ''}</td>
             </tr>
             <tr>
               <td class="lbl">Curso Nº 3</td>
-              <td class="val">${courseToPrint.tema3 || '—'}</td>
+              <td class="val">${courseToPrint.tema3 || ''}</td>
             </tr>
             <tr>
               <td class="lbl">Curso Nº 4</td>
-              <td class="val">${courseToPrint.tema4 || '—'}</td>
+              <td class="val">${courseToPrint.tema4 || ''}</td>
             </tr>
           </table>
 
-          <table class="personal-table" style="margin-bottom: 8px;">
+          <!-- 2. Personal Info Section -->
+          <table class="personal-table">
             <tr>
-              <td class="lbl" width="22%">Apellido(s) y Nombre(s):</td>
+              <td class="lbl" width="20%">Apellido(s) y Nombre(s):</td>
               <td class="val" colspan="3"><b>${participant.apellidos} ${participant.nombres}</b></td>
               <td class="lbl" width="12%">Telf/Cel:</td>
-              <td class="val" width="15%">${participant.celular || '—'}</td>
+              <td class="val" width="15%">${participant.celular || ''}</td>
             </tr>
             <tr>
               <td class="lbl">Carnet de Identidad:</td>
               <td class="val" width="25%"><b>${participant.ci}</b></td>
-              <td class="lbl" width="10%">Correo:</td>
-              <td class="val">${participant.correo || '—'}</td>
+              <td class="lbl" width="10%">E-mail:</td>
+              <td class="val">${participant.correo || ''}</td>
               <td class="lbl">RDA/RP:</td>
-              <td class="val">${participant.rda || '—'}</td>
+              <td class="val">${participant.rda || ''}</td>
             </tr>
           </table>
 
+          <!-- 3. Form Selection Options (Checkboxes) -->
           <div class="checks-section">
             <div class="check-row">
-              <span style="font-weight:bold;">Función que cumple:</span>
+              <span class="lbl-check">Función que cumple:</span>
               <span class="chk-box-label">Docente <span class="chk">X</span></span>
               <span class="chk-box-label">Director <span class="chk"></span></span>
               <span class="chk-box-label">Administrativo <span class="chk"></span></span>
               <span class="chk-box-label">Estudiante ESFM <span class="chk"></span></span>
+              <span class="chk-box-label">Estudiante Sec. <span class="chk"></span></span>
+              <span class="chk-box-label">Padre de Familia <span class="chk"></span></span>
+              <span class="chk-box-label">No aplica <span class="chk"></span></span>
             </div>
 
             <div class="check-row">
-              <span style="font-weight:bold;">Área:</span>
+              <span class="lbl-check">Área:</span>
               <span class="chk-box-label">Urbano <span class="chk">${isUrbano ? 'X' : ''}</span></span>
               <span class="chk-box-label">Rural <span class="chk">${isRural ? 'X' : ''}</span></span>
-              <span style="font-weight:bold; margin-left: 20px;">Distrito:</span>
-              <span>${courseToPrint.distrito || participant.distrito || 'SANTA CRUZ'}</span>
+            </div>
+
+            <table class="check-table">
+              <tr>
+                <td width="75%">
+                  <div class="field-line">
+                    <span class="lbl-line">Distrito Educativo:</span>
+                    <span class="val-line">${courseToPrint.distrito || participant.distrito || ''}</span>
+                  </div>
+                  <div class="field-line">
+                    <span class="lbl-line">Unidad Educativa:</span>
+                    <span class="val-line">${participant.unidad_educativa || ''} ${participant.sie ? `(SIE: ${participant.sie})` : ''}</span>
+                  </div>
+                </td>
+                <td width="25%" align="right">
+                  <div class="check-vertical">
+                    <span class="chk-box-label">No aplica <span class="chk"></span></span>
+                    <span class="chk-box-label">No aplica <span class="chk"></span></span>
+                  </div>
+                </td>
+              </tr>
+            </table>
+
+            <div class="check-row" style="margin-top: 4px;">
+              <span class="lbl-check">Subsistema:</span>
+              <span class="chk-box-label">Educación Regular <span class="chk">X</span></span>
+              <span class="chk-box-label">Educación Alternativa y Especial <span class="chk"></span></span>
+              <span class="chk-box-label">Ed. Superior <span class="chk"></span></span>
+              <span class="chk-box-label">No aplica <span class="chk"></span></span>
             </div>
 
             <div class="check-row">
-              <span style="font-weight:bold;">Unidad Educativa:</span>
-              <span>${participant.unidad_educativa || '—'} ${participant.sie ? `(SIE: ${participant.sie})` : ''}</span>
-            </div>
-
-            <div class="check-row">
-              <span style="font-weight:bold;">Nivel de Ed. Regular:</span>
+              <span class="lbl-check">Nivel de Ed. Regular:</span>
               <span class="chk-box-label">Inicial <span class="chk">${isInicial ? 'X' : ''}</span></span>
               <span class="chk-box-label">Primaria <span class="chk">${isPrimaria ? 'X' : ''}</span></span>
               <span class="chk-box-label">Secundaria <span class="chk">${isSecundaria ? 'X' : ''}</span></span>
+              <span class="chk-box-label">Ed. Superior <span class="chk"></span></span>
+              <span class="chk-box-label">No aplica <span class="chk">${(!isInicial && !isPrimaria && !isSecundaria) ? 'X' : ''}</span></span>
             </div>
           </div>
 
-          <table class="footer-table" style="width: 100%;">
+          <!-- 4. Footer & Signature -->
+          <table class="footer-table">
             <tr>
               <td width="50%" align="left" valign="bottom">
-                <span style="font-size: 8.5pt; font-weight: bold;">Fecha de inscripción:</span>
-                <span style="border-bottom: 1px solid #000; padding: 0 10px; font-weight: bold;">
-                  ${todayStr}
+                <span class="lbl">Fecha de inscripción:</span>
+                <span style="border-bottom: 1px solid #000; padding: 0 15px; font-weight: bold;">
+                  ${new Date().toLocaleDateString('es-BO')}
                 </span>
               </td>
               <td width="50%" align="center" valign="bottom">
                 <div class="signature-line"></div>
-                <div class="signature-lbl">Firma del Participante (CI: ${participant.ci})</div>
+                <div class="signature-lbl">Firma Participante (CI: ${participant.ci})</div>
               </td>
             </tr>
           </table>
         </div>
+      `;
+    };
+
+    const fichaHtml = buildFichaHtml();
+
+    printWindow.document.write(`
+      <html>
+      <head>
+        <title>Ficha de Inscripción - ${participant.ci}</title>
+        <style>
+          @page {
+            size: letter portrait;
+            margin: 0.25in 0.25in;
+          }
+          html, body {
+            height: 100%;
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            background: #fff;
+          }
+          .sheet-container {
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+            justify-content: space-between;
+            box-sizing: border-box;
+            padding: 0.1in 0;
+            position: relative;
+          }
+          .ficha {
+            height: 48%;
+            box-sizing: border-box;
+            border: 2px solid #000;
+            border-radius: 4px;
+            padding: 10px 14px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            position: relative;
+            background: #fff;
+          }
+          .divider-line {
+            border-top: 1.5px dashed #777;
+            width: 100%;
+            text-align: center;
+            padding: 6px 0;
+            font-size: 8pt;
+            color: #555;
+            box-sizing: border-box;
+          }
+          table { width: 100%; border-collapse: collapse; }
+          .header-table { margin-bottom: 6px; border-bottom: 1.5px solid #000; padding-bottom: 4px; }
+          .logo-img { height: 44px; max-width: 100%; object-fit: contain; display: block; }
+          .title-main { font-size: 13pt; font-weight: bold; letter-spacing: 0.5px; color: #000; line-height: 1.1; }
+          .title-sub { font-size: 7.2pt; font-weight: bold; color: #333; }
+          .lbl { font-size: 7.8pt; font-weight: bold; color: #000; }
+          .val { font-size: 8.2pt; color: #111; }
+          .data-table { margin-bottom: 6px; }
+          .data-table td { border: 1px solid #000; padding: 3px 5px; vertical-align: middle; }
+          .data-table .lbl { background-color: #f2f2f2; text-align: right; padding-right: 8px; }
+          .personal-table { margin-bottom: 6px; }
+          .personal-table td { border: 1px solid #000; padding: 3px 5px; vertical-align: middle; }
+          .personal-table .lbl { background-color: #f2f2f2; text-align: right; padding-right: 6px; }
+          .checks-section { font-size: 7pt; line-height: 1.15; margin-bottom: 6px; flex: 1; display: flex; flexDirection: column; justifyContent: flex-start; }
+          .check-row { margin-bottom: 4px; display: flex; flex-wrap: wrap; align-items: center; }
+          .lbl-check { font-weight: bold; margin-right: 8px; width: 100px; display: inline-block; }
+          .chk-box-label { margin-right: 10px; display: inline-flex; align-items: center; gap: 4px; }
+          .chk { display: inline-block; width: 11px; height: 11px; border: 1.5px solid #000; text-align: center; font-size: 7pt; line-height: 11px; font-weight: bold; background: #fff; }
+          .check-table { width: 100%; }
+          .check-table td { padding: 0; vertical-align: middle; }
+          .field-line { display: flex; align-items: flex-end; margin-bottom: 3px; width: 98%; }
+          .lbl-line { font-weight: bold; margin-right: 6px; white-space: nowrap; }
+          .val-line { border-bottom: 1px solid #444; flex: 1; padding-left: 5px; font-size: 8pt; font-weight: bold; height: 13px; line-height: 13px; }
+          .check-vertical { display: flex; flex-direction: column; gap: 3px; align-items: flex-end; }
+          .footer-table { margin-top: auto; padding-top: 6px; }
+          .signature-line { border-top: 1px solid #000; width: 80%; margin: 0 auto; }
+          .signature-lbl { font-size: 8pt; font-weight: bold; margin-top: 2px; }
+        </style>
+      </head>
+      <body>
+        <div class="sheet-container">
+          <!-- Duplicate Copy 1 (UNEFCO COPY) -->
+          ${fichaHtml}
+          
+          <!-- Visual line dividing the page when cutting -->
+          <div class="divider-line">---------------------- CORTE POR AQUÍ PARA ENTREGAR AL MAESTRO / UNEFCO ----------------------</div>
+          
+          <!-- Duplicate Copy 2 (PARTICIPANT COPY) -->
+          ${fichaHtml}
+        </div>
+        <script>
+          window.onload = function() {
+            window.print();
+            setTimeout(function() { window.close(); }, 500);
+          };
+        </script>
       </body>
       </html>
-    `;
-
-    printWindow.document.write(html);
+    `);
     printWindow.document.close();
   };
 
