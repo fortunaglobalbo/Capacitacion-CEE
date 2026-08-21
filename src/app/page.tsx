@@ -1097,6 +1097,26 @@ function HomePage() {
             >
               <Sparkles size={14} /> /grupos (Pública)
             </a>
+            <a 
+              href="/inscripciones"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="btn btn-sm" 
+              style={{ 
+                background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)',
+                color: 'var(--white)',
+                borderRadius: 'var(--radius-sm)',
+                boxShadow: '0 2px 8px rgba(15, 23, 42, 0.4)',
+                fontWeight: 700,
+                textDecoration: 'none',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px'
+              }} 
+              title="Abrir página pública de ficha de inscripción y requisitos (/inscripciones)"
+            >
+              <FileText size={14} /> /inscripciones (Pública)
+            </a>
             {isSupervisor && (
               <button 
                 type="button"
