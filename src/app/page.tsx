@@ -1077,20 +1077,26 @@ function HomePage() {
             >
               <CalendarDays size={14} /> Cursos
             </button>
-            <button 
-              type="button"
+            <a 
+              href="/grupos"
+              target="_blank"
+              rel="noopener noreferrer"
               className="btn btn-sm" 
               style={{ 
-                background: viewMode === 'guia' ? 'linear-gradient(135deg, #bfa05e 0%, #9a7b38 100%)' : 'transparent',
-                color: viewMode === 'guia' ? 'var(--white)' : 'var(--gray-700)',
+                background: 'linear-gradient(135deg, #bfa05e 0%, #9a7b38 100%)',
+                color: 'var(--white)',
                 borderRadius: 'var(--radius-sm)',
-                boxShadow: viewMode === 'guia' ? '0 2px 8px rgba(191, 160, 94, 0.4)' : 'none',
-                fontWeight: 700
+                boxShadow: '0 2px 8px rgba(191, 160, 94, 0.4)',
+                fontWeight: 700,
+                textDecoration: 'none',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px'
               }} 
-              onClick={() => { setViewMode('guia'); setShowForm(false); setShowAgendaForm(false); }}
+              title="Abrir página pública de guía para grupos (/grupos)"
             >
-              <Sparkles size={14} /> Guía 3 Pasos
-            </button>
+              <Sparkles size={14} /> /grupos (Pública)
+            </a>
             {isSupervisor && (
               <button 
                 type="button"
@@ -1430,9 +1436,7 @@ function HomePage() {
       )}
 
       {/* Content */}
-      {viewMode === 'guia' ? (
-        <GuiaPasosSubtab />
-      ) : loading && (viewMode === 'cursos' ? cursos.length === 0 : agenda.length === 0) ? (
+      {loading && (viewMode === 'cursos' ? cursos.length === 0 : agenda.length === 0) ? (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '20px', padding: '20px 0' }}>
           {[1, 2, 3].map((i) => (
             <div key={i} className="skeleton skeleton-card" />
