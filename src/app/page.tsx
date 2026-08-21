@@ -4,7 +4,7 @@ import { useState, useMemo, useCallback, useEffect } from 'react';
 import { Curso, Grupo, AppFilters, DEFAULT_FILTERS, MESES, Tecnico, Facilitador, CicloFormativo, AgendaContacto } from '@/types';
 import { getNoteCompliance, getReviewCount } from '@/lib/utils/compliance';
 import { supabase } from '@/lib/supabase/client';
-import { Search, Filter, RefreshCw, Plus, LayoutGrid, CalendarDays, ChevronDown, AlertTriangle, BookOpen, Contact, Users, ZoomIn, ZoomOut, LogOut, Shield, Eye, Hash, User, Download, X, FileText } from 'lucide-react';
+import { Sparkles, Search, Filter, RefreshCw, Plus, LayoutGrid, CalendarDays, ChevronDown, AlertTriangle, BookOpen, Contact, Users, ZoomIn, ZoomOut, LogOut, Shield, Eye, Hash, User, Download, X, FileText } from 'lucide-react';
 import { exportAreaView } from '@/lib/utils/excelExport';
 import GrupoCard from '@/components/cursos/GrupoCard';
 import CursoForm from '@/components/cursos/CursoForm';
@@ -12,6 +12,7 @@ import AgendaCard from '@/components/agenda/AgendaCard';
 import AgendaForm from '@/components/agenda/AgendaForm';
 import ParticipantesModal from '@/components/participantes/ParticipantesModal';
 import ReporteDiarioModal from '@/components/reporte/ReporteDiarioModal';
+import { GuiaPasosSubtab } from '@/components/guia/GuiaPasosSubtab';
 import { AuthProvider, useAuth } from '@/lib/auth/AuthContext';
 import LoginPage from '@/components/auth/LoginPage';
 import ChangePasswordPage from '@/components/auth/ChangePasswordPage';
@@ -83,7 +84,7 @@ function HomePage() {
   const [searchLoading, setSearchLoading] = useState(false);
   const [cursoReviewData, setCursoReviewData] = useState<{[cursoId: string]: { validados: number; pendientesSie: number; pagados: number; pendientesPago: number; total: number }}>({});
   const [filters, setFilters] = useState<AppFilters>(DEFAULT_FILTERS);
-  const [viewMode, setViewMode] = useState<'cursos' | 'agenda'>('cursos');
+  const [viewMode, setViewMode] = useState<'cursos' | 'agenda' | 'guia'>('cursos');
   const [loading, setLoading] = useState(true);
   const [selectedView, setSelectedView] = useState<'grupal' | 'area' | 'estados'>('grupal');
 
@@ -1076,6 +1077,20 @@ function HomePage() {
             >
               <CalendarDays size={14} /> Cursos
             </button>
+            <button 
+              type="button"
+              className="btn btn-sm" 
+              style={{ 
+                background: viewMode === 'guia' ? 'linear-gradient(135deg, #bfa05e 0%, #9a7b38 100%)' : 'transparent',
+                color: viewMode === 'guia' ? 'var(--white)' : 'var(--gray-700)',
+                borderRadius: 'var(--radius-sm)',
+                boxShadow: viewMode === 'guia' ? '0 2px 8px rgba(191, 160, 94, 0.4)' : 'none',
+                fontWeight: 700
+              }} 
+              onClick={() => { setViewMode('guia'); setShowForm(false); setShowAgendaForm(false); }}
+            >
+              <Sparkles size={14} /> Guía 3 Pasos
+            </button>
             {isSupervisor && (
               <button 
                 type="button"
@@ -1415,7 +1430,9 @@ function HomePage() {
       )}
 
       {/* Content */}
-      {loading && (viewMode === 'cursos' ? cursos.length === 0 : agenda.length === 0) ? (
+      {viewMode === 'guia' ? (
+        <GuiaPasosSubtab />
+      ) : loading && (viewMode === 'cursos' ? cursos.length === 0 : agenda.length === 0) ? (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '20px', padding: '20px 0' }}>
           {[1, 2, 3].map((i) => (
             <div key={i} className="skeleton skeleton-card" />
