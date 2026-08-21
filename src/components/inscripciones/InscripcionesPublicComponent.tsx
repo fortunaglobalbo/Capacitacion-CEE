@@ -860,7 +860,7 @@ export function InscripcionesPublicComponent() {
             </button>
           </div>
           <p style={{ margin: '8px 0 0 0', fontSize: '0.88rem', color: '#64748b', fontWeight: 600 }}>
-            ℹ️ <em>Escribe únicamente tu número de carnet sin números de extensión ni letras (ej. 8639300).</em>
+            ℹ️ <em>Escribe únicamente tu número de carnet sin números de extensión ni letras (ej. 8639400).</em>
           </p>
         </form>
 
