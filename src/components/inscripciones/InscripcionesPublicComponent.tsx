@@ -65,7 +65,7 @@ export function InscripcionesPublicComponent() {
     { num: '76200708', label: 'Atención 4' }
   ];
 
-  // Search participant by CI in Supabase
+  // Search participant by CI in Supabase with catalog enrichment
   const handleSearchCI = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     const ci = ciSearch.trim();
@@ -84,53 +84,61 @@ export function InscripcionesPublicComponent() {
     setParticipant(null);
 
     try {
-      // 1. Query participantes table
+      // 1. Fetch catalog from ciclos_formativos
+      const { data: catData } = await supabase.from('ciclos_formativos').select('*');
+      const cicMap = new Map<string, any>();
+      if (catData) {
+        catData.forEach(c => cicMap.set(c.id, c));
+      }
+
+      // 2. Fetch participant info
       const { data: partData } = await supabase
         .from('participantes')
         .select('*')
         .eq('ci', ci)
         .maybeSingle();
 
-      // 2. Fetch cycle enrollments from inscripcion_ciclo
-      const { data: cicloData } = await supabase
+      // 3. Fetch enrollments by participante_ci
+      const { data: cic1 } = await supabase
         .from('inscripcion_ciclo')
         .select('*, cursos(*)')
-        .eq('ci_participante', ci);
+        .eq('participante_ci', ci);
 
-      // 3. Fetch enrollments from inscripciones
-      const { data: regularData } = await supabase
-        .from('inscripciones')
+      // 4. Fetch enrollments by ci_participante (fallback)
+      const { data: cic2 } = await supabase
+        .from('inscripcion_ciclo')
         .select('*, cursos(*)')
         .eq('ci_participante', ci);
 
       const enrolledMap = new Map<string, EnrolledCourse>();
 
-      if (cicloData) {
-        cicloData.forEach((item: any) => {
+      const combineItems = (items: any[] | null) => {
+        if (!items) return;
+        items.forEach((item: any) => {
           if (item.cursos) {
-            enrolledMap.set(String(item.cursos.id), {
-              ...item.cursos,
+            const rawCurso = item.cursos;
+            const cf = cicMap.get(rawCurso.ciclo_id) || {};
+            
+            const enrichedCourse: EnrolledCourse = {
+              ...rawCurso,
+              costo: rawCurso.costo || 150,
+              ciclo_nombre: cf.nombre || rawCurso.ciclo_nombre || rawCurso.grupo_nombre || 'Programa Formativo UNEFCO',
+              area_formativa: cf.area_formativa || rawCurso.area_formativa || rawCurso.ciclo_grupo || 'EDUCACIÓN CONTINUA',
+              tema1: rawCurso.tema1 || cf.tema1 || rawCurso.grupo_nombre || '',
+              tema2: rawCurso.tema2 || cf.tema2 || '',
+              tema3: rawCurso.tema3 || cf.tema3 || '',
+              tema4: rawCurso.tema4 || cf.tema4 || '',
               inscripcion_id: item.id,
               comprobante_url: item.comprobante_url || null
-            });
-          }
-        });
-      }
+            };
 
-      if (regularData) {
-        regularData.forEach((item: any) => {
-          if (item.cursos) {
-            const existing = enrolledMap.get(String(item.cursos.id));
-            if (!existing) {
-              enrolledMap.set(String(item.cursos.id), {
-                ...item.cursos,
-                inscripcion_id: item.id,
-                comprobante_url: item.comprobante_url || null
-              });
-            }
+            enrolledMap.set(String(rawCurso.id), enrichedCourse);
           }
         });
-      }
+      };
+
+      combineItems(cic1);
+      combineItems(cic2);
 
       const coursesList = Array.from(enrolledMap.values());
 
@@ -160,7 +168,7 @@ export function InscripcionesPublicComponent() {
     }
   };
 
-  // Upload deposit receipt to Supabase
+  // Upload deposit receipt to Supabase for a course
   const handleUploadVoucher = async (course: EnrolledCourse, file: File) => {
     if (!participant || !file) return;
 
@@ -180,7 +188,7 @@ export function InscripcionesPublicComponent() {
         if (urlData) filePublicUrl = urlData.publicUrl;
       }
 
-      // Update DB record in inscripcion_ciclo or inscripciones
+      // Update DB record in inscripcion_ciclo
       if (course.inscripcion_id) {
         await supabase
           .from('inscripcion_ciclo')
@@ -215,7 +223,7 @@ export function InscripcionesPublicComponent() {
     }
   };
 
-  // Print Official 2-up Letter Ficha de Inscripción identical to Sistema de Maestros
+  // Print Official 2-up Letter Ficha de Inscripción (Only Area, Ciclo, Costo and Cursos pre-filled; participant details blank)
   const handlePrintOfficialFicha = (targetCourse?: EnrolledCourse) => {
     if (!participant) return;
 
@@ -223,7 +231,7 @@ export function InscripcionesPublicComponent() {
       id: 'default',
       ciclo_nombre: 'PROGRAMA FORMATIVO CONTINUA UNEFCO',
       area_formativa: 'TECNOLOGÍA EDUCATIVA',
-      costo: 40,
+      costo: 150,
       distrito: participant.distrito || 'SANTA CRUZ'
     };
 
@@ -235,14 +243,6 @@ export function InscripcionesPublicComponent() {
 
     const logoMineduUrl = window.location.origin + '/logo-minedu.jpg';
     const logoUnefcoUrl = window.location.origin + '/logo-unefco.jpg';
-
-    const isUrbano = (courseToPrint.area_urbano_rural || '').toUpperCase().includes('URBANO');
-    const isRural = (courseToPrint.area_urbano_rural || '').toUpperCase().includes('RURAL');
-
-    const groupText = (courseToPrint.ciclo_grupo || courseToPrint.area_formativa || '').toUpperCase();
-    const isInicial = groupText.includes('INICIAL');
-    const isPrimaria = groupText.includes('PRIMARIA');
-    const isSecundaria = groupText.includes('SECUNDARIA');
 
     const buildFichaHtml = () => {
       return `
@@ -263,11 +263,11 @@ export function InscripcionesPublicComponent() {
             </tr>
           </table>
 
-          <!-- 1. Table for Course Details -->
+          <!-- 1. Table for Course Details (Pre-filled) -->
           <table class="data-table">
             <tr>
               <td class="lbl" width="18%">Área</td>
-              <td class="val">${courseToPrint.area_formativa || courseToPrint.ciclo_grupo || 'EDUCACIÓN CONTINUA'}</td>
+              <td class="val"><b>${courseToPrint.area_formativa || courseToPrint.ciclo_grupo || 'EDUCACIÓN CONTINUA'}</b></td>
             </tr>
             <tr>
               <td class="lbl">Ciclo Formativo</td>
@@ -275,11 +275,11 @@ export function InscripcionesPublicComponent() {
             </tr>
             <tr>
               <td class="lbl">Costo / Monto</td>
-              <td class="val"><b>Bs. ${courseToPrint.costo || 40}</b></td>
+              <td class="val"><b>Bs. ${courseToPrint.costo || 150}</b></td>
             </tr>
             <tr>
               <td class="lbl">Curso Nº 1</td>
-              <td class="val">${courseToPrint.tema1 || courseToPrint.grupo_nombre || 'Módulo 1'}</td>
+              <td class="val">${courseToPrint.tema1 || ''}</td>
             </tr>
             <tr>
               <td class="lbl">Curso Nº 2</td>
@@ -295,29 +295,33 @@ export function InscripcionesPublicComponent() {
             </tr>
           </table>
 
-          <!-- 2. Personal Info Section -->
+          <!-- 2. Personal Info Section (BLANK for manual completion) -->
           <table class="personal-table">
             <tr>
               <td class="lbl" width="20%">Apellido(s) y Nombre(s):</td>
-              <td class="val" colspan="3"><b>${participant.apellidos} ${participant.nombres}</b></td>
+              <td class="val" colspan="3"></td>
               <td class="lbl" width="12%">Telf/Cel:</td>
-              <td class="val" width="15%">${participant.celular || ''}</td>
+              <td class="val" width="15%"></td>
             </tr>
             <tr>
               <td class="lbl">Carnet de Identidad:</td>
-              <td class="val" width="25%"><b>${participant.ci}</b></td>
+              <td class="val" width="25%"></td>
               <td class="lbl" width="10%">E-mail:</td>
-              <td class="val">${participant.correo || ''}</td>
+              <td class="val"></td>
               <td class="lbl">RDA/RP:</td>
-              <td class="val">${participant.rda || ''}</td>
+              <td class="val"></td>
+            </tr>
+            <tr>
+              <td class="lbl">Fecha de Nacimiento:</td>
+              <td class="val" colspan="5"></td>
             </tr>
           </table>
 
-          <!-- 3. Form Selection Options (Checkboxes) -->
+          <!-- 3. Form Selection Options (Checkboxes BLANK) -->
           <div class="checks-section">
             <div class="check-row">
               <span class="lbl-check">Función que cumple:</span>
-              <span class="chk-box-label">Docente <span class="chk">X</span></span>
+              <span class="chk-box-label">Docente <span class="chk"></span></span>
               <span class="chk-box-label">Director <span class="chk"></span></span>
               <span class="chk-box-label">Administrativo <span class="chk"></span></span>
               <span class="chk-box-label">Estudiante ESFM <span class="chk"></span></span>
@@ -328,8 +332,8 @@ export function InscripcionesPublicComponent() {
 
             <div class="check-row">
               <span class="lbl-check">Área:</span>
-              <span class="chk-box-label">Urbano <span class="chk">${isUrbano ? 'X' : ''}</span></span>
-              <span class="chk-box-label">Rural <span class="chk">${isRural ? 'X' : ''}</span></span>
+              <span class="chk-box-label">Urbano <span class="chk"></span></span>
+              <span class="chk-box-label">Rural <span class="chk"></span></span>
             </div>
 
             <table class="check-table">
@@ -337,11 +341,11 @@ export function InscripcionesPublicComponent() {
                 <td width="75%">
                   <div class="field-line">
                     <span class="lbl-line">Distrito Educativo:</span>
-                    <span class="val-line">${courseToPrint.distrito || participant.distrito || ''}</span>
+                    <span class="val-line"></span>
                   </div>
                   <div class="field-line">
                     <span class="lbl-line">Unidad Educativa:</span>
-                    <span class="val-line">${participant.unidad_educativa || ''} ${participant.sie ? `(SIE: ${participant.sie})` : ''}</span>
+                    <span class="val-line"></span>
                   </div>
                 </td>
                 <td width="25%" align="right">
@@ -355,7 +359,7 @@ export function InscripcionesPublicComponent() {
 
             <div class="check-row" style="margin-top: 4px;">
               <span class="lbl-check">Subsistema:</span>
-              <span class="chk-box-label">Educación Regular <span class="chk">X</span></span>
+              <span class="chk-box-label">Educación Regular <span class="chk"></span></span>
               <span class="chk-box-label">Educación Alternativa y Especial <span class="chk"></span></span>
               <span class="chk-box-label">Ed. Superior <span class="chk"></span></span>
               <span class="chk-box-label">No aplica <span class="chk"></span></span>
@@ -363,26 +367,32 @@ export function InscripcionesPublicComponent() {
 
             <div class="check-row">
               <span class="lbl-check">Nivel de Ed. Regular:</span>
-              <span class="chk-box-label">Inicial <span class="chk">${isInicial ? 'X' : ''}</span></span>
-              <span class="chk-box-label">Primaria <span class="chk">${isPrimaria ? 'X' : ''}</span></span>
-              <span class="chk-box-label">Secundaria <span class="chk">${isSecundaria ? 'X' : ''}</span></span>
+              <span class="chk-box-label">Inicial <span class="chk"></span></span>
+              <span class="chk-box-label">Primaria <span class="chk"></span></span>
+              <span class="chk-box-label">Secundaria <span class="chk"></span></span>
               <span class="chk-box-label">Ed. Superior <span class="chk"></span></span>
-              <span class="chk-box-label">No aplica <span class="chk">${(!isInicial && !isPrimaria && !isSecundaria) ? 'X' : ''}</span></span>
+              <span class="chk-box-label">No aplica <span class="chk"></span></span>
             </div>
           </div>
 
-          <!-- 4. Footer & Signature -->
+          <!-- 4. Footer & Signature (BLANK) -->
           <table class="footer-table">
             <tr>
               <td width="50%" align="left" valign="bottom">
                 <span class="lbl">Fecha de inscripción:</span>
-                <span style="border-bottom: 1px solid #000; padding: 0 15px; font-weight: bold;">
-                  ${new Date().toLocaleDateString('es-BO')}
+                <span style="border-bottom: 1px solid #000; padding: 0 20px; font-weight: bold;">
+                  &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+                </span> / 
+                <span style="border-bottom: 1px solid #000; padding: 0 20px; font-weight: bold;">
+                  &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+                </span> / 
+                <span style="border-bottom: 1px solid #000; padding: 0 30px; font-weight: bold;">
+                  &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
                 </span>
               </td>
               <td width="50%" align="center" valign="bottom">
                 <div class="signature-line"></div>
-                <div class="signature-lbl">Firma Participante (CI: ${participant.ci})</div>
+                <div class="signature-lbl">Firma Participante</div>
               </td>
             </tr>
           </table>
@@ -451,7 +461,7 @@ export function InscripcionesPublicComponent() {
           .personal-table { margin-bottom: 6px; }
           .personal-table td { border: 1px solid #000; padding: 3px 5px; vertical-align: middle; }
           .personal-table .lbl { background-color: #f2f2f2; text-align: right; padding-right: 6px; }
-          .checks-section { font-size: 7pt; line-height: 1.15; margin-bottom: 6px; flex: 1; display: flex; flexDirection: column; justifyContent: flex-start; }
+          .checks-section { font-size: 7pt; line-height: 1.15; margin-bottom: 6px; flex: 1; display: flex; flex-direction: column; justify-content: flex-start; }
           .check-row { margin-bottom: 4px; display: flex; flex-wrap: wrap; align-items: center; }
           .lbl-check { font-weight: bold; margin-right: 8px; width: 100px; display: inline-block; }
           .chk-box-label { margin-right: 10px; display: inline-flex; align-items: center; gap: 4px; }
@@ -731,7 +741,7 @@ export function InscripcionesPublicComponent() {
                               fontSize: '0.95rem',
                               fontWeight: 900
                             }}>
-                              💰 Precio: Bs. {c.costo || 40}
+                              💰 Precio: Bs. {c.costo || 150}
                             </span>
                           </div>
 
@@ -784,7 +794,7 @@ export function InscripcionesPublicComponent() {
                       <h5 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 900, color: '#0f172a' }}>
                         Pre-Inscripción Confirmada
                       </h5>
-                      <span style={{ fontSize: '1.05rem', color: '#b45309', fontWeight: 800 }}>💰 Precio estándar: Bs. 40</span>
+                      <span style={{ fontSize: '1.05rem', color: '#b45309', fontWeight: 800 }}>💰 Precio del Ciclo: Bs. 150</span>
                     </div>
                     <button
                       type="button"
@@ -991,7 +1001,7 @@ export function InscripcionesPublicComponent() {
               lineHeight: 1.6,
               fontWeight: 600
             }}>
-              Presenta en nuestras oficinas la Ficha de Inscripción junto con los siguientes documentos requeridos:
+              Presenta en nuestras oficinas la Ficha de Inscripción impresa y llenada a mano junto con los siguientes documentos requeridos:
             </p>
 
             <div style={{
@@ -1177,7 +1187,7 @@ export function InscripcionesPublicComponent() {
                     marginBottom: '12px'
                   }}>
                     <div style={{ fontWeight: 800, fontSize: '1.05rem', color: '#0f172a', marginBottom: '4px' }}>
-                      {course.ciclo_nombre || course.grupo_nombre || 'Curso Registrado'} (Bs. {course.costo || 40})
+                      {course.ciclo_nombre || course.grupo_nombre || 'Curso Registrado'} (Bs. {course.costo || 150})
                     </div>
 
                     {course.comprobante_url ? (
@@ -1217,7 +1227,7 @@ export function InscripcionesPublicComponent() {
                 fontWeight: 600,
                 lineHeight: 1.6
               }}>
-                💳 <strong>Monto a Depositar:</strong> Consulta tu Carnet en el <strong>Paso 1</strong> para ver el monto exacto de tu ciclo (Bs. 40 / 50) y habilitar la opción de subir tu comprobante de depósito.
+                💳 <strong>Monto a Depositar:</strong> Consulta tu Carnet en el <strong>Paso 1</strong> para ver el costo de cada ciclo (Bs. 150) y habilitar la opción de subir tu comprobante de depósito.
               </div>
             )}
           </div>
