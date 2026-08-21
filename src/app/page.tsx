@@ -4,7 +4,7 @@ import { useState, useMemo, useCallback, useEffect } from 'react';
 import { Curso, Grupo, AppFilters, DEFAULT_FILTERS, MESES, Tecnico, Facilitador, CicloFormativo, AgendaContacto } from '@/types';
 import { getNoteCompliance, getReviewCount } from '@/lib/utils/compliance';
 import { supabase } from '@/lib/supabase/client';
-import { Sparkles, Search, Filter, RefreshCw, Plus, LayoutGrid, CalendarDays, ChevronDown, AlertTriangle, BookOpen, Contact, Users, ZoomIn, ZoomOut, LogOut, Shield, Eye, Hash, User, Download, X, FileText } from 'lucide-react';
+import { Sparkles, Search, Filter, RefreshCw, Plus, LayoutGrid, CalendarDays, ChevronDown, AlertTriangle, BookOpen, Contact, Users, ZoomIn, ZoomOut, LogOut, Shield, Eye, Hash, User, Download, X, FileText, Trash2 } from 'lucide-react';
 import { exportAreaView } from '@/lib/utils/excelExport';
 import GrupoCard from '@/components/cursos/GrupoCard';
 import CursoForm from '@/components/cursos/CursoForm';
@@ -13,6 +13,7 @@ import AgendaForm from '@/components/agenda/AgendaForm';
 import ParticipantesModal from '@/components/participantes/ParticipantesModal';
 import ReporteDiarioModal from '@/components/reporte/ReporteDiarioModal';
 import { GuiaPasosSubtab } from '@/components/guia/GuiaPasosSubtab';
+import { LimpiarComprobantesModal } from '@/components/admin/LimpiarComprobantesModal';
 import { AuthProvider, useAuth } from '@/lib/auth/AuthContext';
 import LoginPage from '@/components/auth/LoginPage';
 import ChangePasswordPage from '@/components/auth/ChangePasswordPage';
@@ -87,6 +88,7 @@ function HomePage() {
   const [viewMode, setViewMode] = useState<'cursos' | 'agenda' | 'guia'>('cursos');
   const [loading, setLoading] = useState(true);
   const [selectedView, setSelectedView] = useState<'grupal' | 'area' | 'estados'>('grupal');
+  const [showLimpiarComprobantesModal, setShowLimpiarComprobantesModal] = useState(false);
 
   // --- Dynamic Participant Search ---
   useEffect(() => {
@@ -1378,6 +1380,28 @@ function HomePage() {
                   {reviewCount} curso{reviewCount > 1 ? 's' : ''} por revisar
                 </div>
               )}
+
+              <button
+                className="btn"
+                style={{
+                  background: 'linear-gradient(135deg, #dc2626 0%, #b91c1c 100%)',
+                  color: '#ffffff',
+                  fontWeight: 700,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  padding: '8px 14px',
+                  borderRadius: 'var(--radius-sm)',
+                  boxShadow: '0 2px 8px rgba(220, 38, 38, 0.3)',
+                  cursor: 'pointer',
+                  border: 'none',
+                  fontSize: '0.82rem',
+                }}
+                onClick={() => setShowLimpiarComprobantesModal(true)}
+                title="Eliminar comprobantes bancarios subidos por mes para liberar espacio en el servidor"
+              >
+                <Trash2 size={14} /> Limpiar Comprobantes
+              </button>
             </>
           )}
         </div>
@@ -1797,6 +1821,11 @@ function HomePage() {
         isOpen={showReporteDiarioModal}
         onClose={() => setShowReporteDiarioModal(false)}
         currentUser={user}
+      />
+
+      <LimpiarComprobantesModal
+        isOpen={showLimpiarComprobantesModal}
+        onClose={() => setShowLimpiarComprobantesModal(false)}
       />
     </div>
   );

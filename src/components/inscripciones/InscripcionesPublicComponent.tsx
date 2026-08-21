@@ -3,9 +3,9 @@
 import React, { useState } from 'react';
 import { supabase } from '@/lib/supabase/client';
 import { 
-  Search, Download, FileText, Building2, CreditCard, 
+  Search, Download, FileText, Building2, CreditCard, Upload,
   AlertTriangle, CheckCircle2, MapPin, Clock, FileCheck, UserCheck, 
-  Printer, Sparkles, PhoneCall, MessageCircle, ExternalLink, BookOpen, Layers
+  Printer, Sparkles, PhoneCall, MessageCircle, ExternalLink, BookOpen, Layers, Check
 } from 'lucide-react';
 import Swal from 'sweetalert2';
 
@@ -15,6 +15,7 @@ interface EnrolledCourse {
   grupo_nombre?: string;
   area_formativa?: string;
   ciclo_grupo?: string;
+  costo?: number;
   tema1?: string;
   tema2?: string;
   tema3?: string;
@@ -24,6 +25,8 @@ interface EnrolledCourse {
   distrito?: string;
   lugar?: string;
   area_urbano_rural?: string;
+  inscripcion_id?: string | number;
+  comprobante_url?: string | null;
 }
 
 interface ParticipantData {
@@ -48,6 +51,9 @@ export function InscripcionesPublicComponent() {
   const [searched, setSearched] = useState(false);
   const [copied, setCopied] = useState<string | null>(null);
 
+  // Upload receipt states per course
+  const [uploadingCourseId, setUploadingCourseId] = useState<string | number | null>(null);
+
   const handleCopy = (num: string) => {
     navigator.clipboard.writeText(num);
     setCopied(num);
@@ -61,7 +67,7 @@ export function InscripcionesPublicComponent() {
     { num: '76200708', label: 'Atención 4' }
   ];
 
-  // Search CI in Supabase and fetch ALL enrolled cycles
+  // Search participant by CI in Supabase
   const handleSearchCI = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     const ci = ciSearch.trim();
@@ -80,32 +86,35 @@ export function InscripcionesPublicComponent() {
     setParticipant(null);
 
     try {
-      // 1. Query participantes table
+      // 1. Fetch participant info
       const { data: partData } = await supabase
         .from('participantes')
         .select('*')
         .eq('ci', ci)
         .maybeSingle();
 
-      // 2. Fetch enrollments from inscripcion_ciclo
+      // 2. Fetch cycle enrollments from inscripcion_ciclo
       const { data: cicloData } = await supabase
         .from('inscripcion_ciclo')
         .select('*, cursos(*)')
         .eq('ci_participante', ci);
 
-      // 3. Fetch enrollments from inscripciones
+      // 3. Fetch regular enrollments from inscripciones
       const { data: regularData } = await supabase
         .from('inscripciones')
         .select('*, cursos(*)')
         .eq('ci_participante', ci);
 
-      // Combine courses
       const enrolledMap = new Map<string, EnrolledCourse>();
 
       if (cicloData) {
         cicloData.forEach((item: any) => {
           if (item.cursos) {
-            enrolledMap.set(String(item.cursos.id), item.cursos);
+            enrolledMap.set(String(item.cursos.id), {
+              ...item.cursos,
+              inscripcion_id: item.id,
+              comprobante_url: item.comprobante_url || null
+            });
           }
         });
       }
@@ -113,7 +122,14 @@ export function InscripcionesPublicComponent() {
       if (regularData) {
         regularData.forEach((item: any) => {
           if (item.cursos) {
-            enrolledMap.set(String(item.cursos.id), item.cursos);
+            const existing = enrolledMap.get(String(item.cursos.id));
+            if (!existing) {
+              enrolledMap.set(String(item.cursos.id), {
+                ...item.cursos,
+                inscripcion_id: item.id,
+                comprobante_url: item.comprobante_url || null
+              });
+            }
           }
         });
       }
@@ -123,7 +139,7 @@ export function InscripcionesPublicComponent() {
       if (partData || coursesList.length > 0) {
         setParticipant({
           ci: partData?.ci || ci,
-          nombres: partData?.nombres || 'Participante Registrado',
+          nombres: partData?.nombres || 'Participante',
           apellidos: partData?.apellidos || '',
           rda: partData?.rda || '',
           celular: partData?.celular || '',
@@ -146,6 +162,62 @@ export function InscripcionesPublicComponent() {
     }
   };
 
+  // Upload deposit receipt to Supabase for specific course
+  const handleUploadVoucher = async (course: EnrolledCourse, file: File) => {
+    if (!participant || !file) return;
+
+    setUploadingCourseId(course.id);
+    try {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `voucher_${participant.ci}_curso_${course.id}_${Date.now()}.${fileExt}`;
+      const filePath = `comprobantes/${fileName}`;
+
+      const { error: uploadErr } = await supabase.storage
+        .from('comprobantes')
+        .upload(filePath, file, { upsert: true });
+
+      let filePublicUrl = filePath;
+      if (!uploadErr) {
+        const { data: urlData } = supabase.storage.from('comprobantes').getPublicUrl(filePath);
+        if (urlData) filePublicUrl = urlData.publicUrl;
+      }
+
+      // Update inscripcion_ciclo or inscripciones record
+      if (course.inscripcion_id) {
+        await supabase
+          .from('inscripcion_ciclo')
+          .update({ comprobante_url: filePublicUrl })
+          .eq('id', course.inscripcion_id);
+      }
+
+      // Update local state
+      setParticipant(prev => {
+        if (!prev) return null;
+        return {
+          ...prev,
+          cursos: prev.cursos.map(c => c.id === course.id ? { ...c, comprobante_url: filePublicUrl } : c)
+        };
+      });
+
+      Swal.fire({
+        icon: 'success',
+        title: '¡Comprobante Subido!',
+        text: 'Tu comprobante de pago ha sido guardado exitosamente en el sistema para la revisión del técnico.',
+        confirmButtonColor: '#16a34a'
+      });
+    } catch (err: any) {
+      console.error('Error al subir comprobante:', err);
+      Swal.fire({
+        icon: 'error',
+        title: 'Error al subir',
+        text: err.message || 'No se pudo guardar el archivo.',
+        confirmButtonColor: '#dc2626'
+      });
+    } finally {
+      setUploadingCourseId(null);
+    }
+  };
+
   // Print Official Ficha de Inscripción matching system template
   const handlePrintOfficialFicha = (targetCourse?: EnrolledCourse) => {
     if (!participant) return;
@@ -154,6 +226,7 @@ export function InscripcionesPublicComponent() {
       id: 'default',
       ciclo_nombre: 'PROGRAMA DE FORMACIÓN CONTINUA UNEFCO',
       area_formativa: 'TECNOLOGÍA EDUCATIVA',
+      costo: 40,
       distrito: participant.distrito || 'SANTA CRUZ'
     };
 
@@ -186,8 +259,8 @@ export function InscripcionesPublicComponent() {
         <style>
           @page { size: letter portrait; margin: 0.3in 0.25in; }
           body { font-family: Arial, sans-serif; margin: 0; padding: 0; background: #fff; color: #000; }
-          .no-print { text-align: right; padding: 10px; background: #0f172a; color: white; }
-          .no-print button { background: #16a34a; color: white; border: none; padding: 10px 20px; font-weight: bold; border-radius: 6px; cursor: pointer; }
+          .no-print { text-align: right; padding: 12px; background: #0f172a; color: white; }
+          .no-print button { background: #16a34a; color: white; border: none; padding: 10px 22px; font-weight: bold; border-radius: 6px; cursor: pointer; font-size: 14px; }
           .ficha { border: 2px solid #000; border-radius: 4px; padding: 14px 18px; background: #fff; margin-bottom: 20px; }
           table { width: 100%; border-collapse: collapse; }
           .header-table { margin-bottom: 10px; border-bottom: 2px solid #000; padding-bottom: 6px; }
@@ -243,6 +316,10 @@ export function InscripcionesPublicComponent() {
             <tr>
               <td class="lbl">Ciclo Formativo</td>
               <td class="val"><b>${courseToPrint.ciclo_nombre || 'PROGRAMA FORMATIVO UNEFCO'}</b></td>
+            </tr>
+            <tr>
+              <td class="lbl">Costo / Monto</td>
+              <td class="val"><b>Bs. ${courseToPrint.costo || 40}</b></td>
             </tr>
             <tr>
               <td class="lbl">Curso Nº 1</td>
@@ -378,7 +455,7 @@ export function InscripcionesPublicComponent() {
           letterSpacing: '1px',
           marginBottom: '16px'
         }}>
-          <Sparkles size={20} /> Consulta de Inscripción y Requisitos UNEFCO
+          <Sparkles size={20} /> Proceso Oficial de Inscripción UNEFCO
         </div>
 
         <h1 style={{
@@ -400,27 +477,61 @@ export function InscripcionesPublicComponent() {
           lineHeight: 1.6,
           fontWeight: 600
         }}>
-          Consulta tu estado de pre-inscripción ingresando tu Carnet (CI) para descargar tu Ficha Oficial y visualizar los ciclos a los que te inscribiste.
+          Ingresa tu Carnet (CI) para consultar el nombre de tus ciclos, el precio a depositar, descargar tu Ficha Oficial y subir tu comprobante de pago.
         </p>
       </div>
 
-      {/* TOP CI SEARCH BAR - Clean responsive container */}
+      {/* PASO 1: SEARCH CI & FICHA DOWNLOAD */}
       <div style={{
         background: '#ffffff',
         borderRadius: '24px',
-        padding: '28px 24px',
+        padding: '32px 28px',
         boxShadow: '0 8px 24px rgba(0, 0, 0, 0.08)',
-        border: '3px solid #bfa05e',
+        border: '3.5px solid #bfa05e',
         marginBottom: '36px'
       }}>
-        <h2 style={{ margin: '0 0 10px 0', fontSize: '1.5rem', fontWeight: 900, color: '#0f172a' }}>
-          🔍 CONSULTAR ESTADO DE PRE-INSCRIPCIÓN POR CARNET (CI)
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          marginBottom: '16px'
+        }}>
+          <span style={{
+            width: '54px',
+            height: '54px',
+            borderRadius: '50%',
+            background: 'linear-gradient(135deg, #bfa05e 0%, #9a7b38 100%)',
+            color: '#ffffff',
+            fontWeight: 900,
+            fontSize: '1.6rem',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            boxShadow: '0 4px 12px rgba(191, 160, 94, 0.35)'
+          }}>
+            1
+          </span>
+          <span style={{
+            fontSize: '0.9rem',
+            fontWeight: 900,
+            color: '#9a7b38',
+            background: '#fefce8',
+            padding: '6px 16px',
+            borderRadius: '16px',
+            border: '1.5px solid #fef08a'
+          }}>
+            Paso 1: Consulta y Ficha
+          </span>
+        </div>
+
+        <h2 style={{ margin: '0 0 10px 0', fontSize: '1.6rem', fontWeight: 900, color: '#0f172a' }}>
+          PASO 1: INGRESAR CARNET (CI) Y FICHA DE INSCRIPCIÓN
         </h2>
-        <p style={{ margin: 0, fontSize: '1.1rem', color: '#475569', fontWeight: 600 }}>
-          Ingresa tu número de Carnet de Identidad para verificar tus cursos registrados y descargar tu Ficha:
+        <p style={{ margin: 0, fontSize: '1.12rem', color: '#475569', fontWeight: 600 }}>
+          Escribe tu número de Carnet de Identidad para ver tus ciclos registrados, el costo a depositar y descargar tu Ficha:
         </p>
 
-        {/* Form with responsive flex layout to ensure button fits inside */}
+        {/* Responsive search input container */}
         <form onSubmit={handleSearchCI} style={{ marginTop: '20px' }}>
           <div style={{
             display: 'flex',
@@ -431,13 +542,13 @@ export function InscripcionesPublicComponent() {
             <div style={{ flex: '1 1 280px', minWidth: '240px' }}>
               <input
                 type="text"
-                placeholder="Escribe tu número de Carnet (CI)..."
+                placeholder="Ingresa tu Carnet de Identidad (CI)..."
                 value={ciSearch}
                 onChange={(e) => setCiSearch(e.target.value)}
                 style={{
                   width: '100%',
                   boxSizing: 'border-box',
-                  padding: '14px 18px',
+                  padding: '16px 20px',
                   fontSize: '1.25rem',
                   fontWeight: 800,
                   borderRadius: '14px',
@@ -457,8 +568,8 @@ export function InscripcionesPublicComponent() {
                 color: '#ffffff',
                 border: 'none',
                 borderRadius: '14px',
-                padding: '14px 28px',
-                fontSize: '1.15rem',
+                padding: '16px 32px',
+                fontSize: '1.18rem',
                 fontWeight: 900,
                 cursor: 'pointer',
                 display: 'flex',
@@ -472,283 +583,263 @@ export function InscripcionesPublicComponent() {
             </button>
           </div>
         </form>
-      </div>
 
-      {/* CONDITIONAL RENDERING AFTER SEARCH */}
-      {searched && (
-        <div style={{ marginBottom: '36px' }}>
-          {participant ? (
-            /* SUCCESS: Participant Found */
-            <div style={{
-              background: '#ffffff',
-              borderRadius: '24px',
-              padding: '28px 24px',
-              boxShadow: '0 10px 28px rgba(22, 163, 74, 0.15)',
-              border: '3px solid #16a34a'
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
-                <CheckCircle2 size={36} style={{ color: '#16a34a', flexShrink: 0 }} />
-                <div>
-                  <h3 style={{ margin: 0, fontSize: '1.6rem', fontWeight: 900, color: '#15803d' }}>
-                    ¡TE ENCUENTRAS REGISTRADO(A) EN EL SISTEMA!
-                  </h3>
-                  <span style={{ fontSize: '1.05rem', color: '#166534', fontWeight: 700 }}>
-                    Revisa a continuación tus ciclos asignados y los requisitos para completar tu inscripción.
-                  </span>
-                </div>
-              </div>
-
-              {/* Participant Personal Summary Card */}
-              <div style={{
-                background: '#f0fdf4',
-                border: '1.5px solid #86efac',
-                borderRadius: '16px',
-                padding: '18px 20px',
-                marginBottom: '24px',
-                display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
-                gap: '12px',
-                fontSize: '1.08rem',
-                color: '#14532d'
-              }}>
-                <div><strong>Nombres:</strong> {participant.nombres} {participant.apellidos}</div>
-                <div><strong>Carnet (CI):</strong> {participant.ci}</div>
-                <div><strong>Unidad Educativa:</strong> {participant.unidad_educativa || '—'}</div>
-                <div><strong>Distrito:</strong> {participant.distrito || '—'}</div>
-              </div>
-
-              {/* LIST OF ALL ENROLLED CICLOS / COURSES */}
-              <h4 style={{ margin: '0 0 14px 0', fontSize: '1.3rem', fontWeight: 900, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Layers size={22} style={{ color: '#bfa05e' }} /> CICLOS Y CURSOS A LOS QUE TE INSCRIBISTE ({participant.cursos.length}):
-              </h4>
-
-              {participant.cursos.length > 0 ? (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', marginBottom: '24px' }}>
-                  {participant.cursos.map((c, idx) => (
-                    <div key={c.id || idx} style={{
-                      background: '#f8fafc',
-                      border: '2px solid #cbd5e1',
-                      borderRadius: '16px',
-                      padding: '18px 20px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      flexWrap: 'wrap',
-                      gap: '14px'
-                    }}>
-                      <div>
-                        <div style={{
-                          display: 'inline-block',
-                          background: '#0f172a',
-                          color: '#ffffff',
-                          padding: '4px 12px',
-                          borderRadius: '12px',
-                          fontSize: '0.82rem',
-                          fontWeight: 900,
-                          marginBottom: '6px'
-                        }}>
-                          CICLO {idx + 1}
-                        </div>
-                        <h5 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 900, color: '#0f172a' }}>
-                          {c.ciclo_nombre || c.area_formativa || 'Programa Formativo UNEFCO'}
-                        </h5>
-                        <p style={{ margin: '4px 0 0 0', fontSize: '1rem', color: '#475569', fontWeight: 600 }}>
-                          {c.grupo_nombre ? `Grupo: ${c.grupo_nombre} | ` : ''}
-                          {c.facilitador_nombre ? `Facilitador: ${c.facilitador_nombre} | ` : ''}
-                          Distrito: {c.distrito || participant.distrito || 'Santa Cruz'}
-                        </p>
-                      </div>
-
-                      <button
-                        type="button"
-                        onClick={() => handlePrintOfficialFicha(c)}
-                        style={{
-                          background: 'linear-gradient(135deg, #16a34a 0%, #15803d 100%)',
-                          color: '#ffffff',
-                          border: 'none',
-                          borderRadius: '12px',
-                          padding: '12px 20px',
-                          fontSize: '1.05rem',
-                          fontWeight: 900,
-                          cursor: 'pointer',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '8px',
-                          boxShadow: '0 4px 12px rgba(22, 163, 74, 0.25)'
-                        }}
-                      >
-                        <Printer size={20} /> Descargar Ficha del Ciclo {idx + 1}
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div style={{
-                  background: '#f8fafc',
-                  border: '1.5px solid #cbd5e1',
-                  borderRadius: '16px',
-                  padding: '18px',
-                  marginBottom: '24px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  flexWrap: 'wrap',
-                  gap: '14px'
-                }}>
-                  <div>
-                    <h5 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 900, color: '#0f172a' }}>
-                      Pre-Inscripción General Confirmada
-                    </h5>
-                    <p style={{ margin: '4px 0 0 0', fontSize: '1rem', color: '#475569', fontWeight: 600 }}>
-                      Tus datos personales ya están registrados en nuestra base de datos.
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => handlePrintOfficialFicha()}
-                    style={{
-                      background: 'linear-gradient(135deg, #16a34a 0%, #15803d 100%)',
-                      color: '#ffffff',
-                      border: 'none',
-                      borderRadius: '12px',
-                      padding: '12px 20px',
-                      fontSize: '1.05rem',
-                      fontWeight: 900,
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '8px',
-                      boxShadow: '0 4px 12px rgba(22, 163, 74, 0.25)'
-                    }}
-                  >
-                    <Printer size={20} /> Imprimir Ficha Oficial
-                  </button>
-                </div>
-              )}
-            </div>
-          ) : (
-            /* WARNING: CI NOT REGISTERED IN FORM -> Direct Contacts Box */
-            <div style={{
-              background: '#fff1f2',
-              border: '3px solid #e11d48',
-              borderRadius: '24px',
-              padding: '28px 24px',
-              color: '#9f1239',
-              boxShadow: '0 10px 28px rgba(225, 29, 72, 0.15)'
-            }}>
-              <div style={{ display: 'flex', alignItems: 'flex-start', gap: '14px', marginBottom: '16px' }}>
-                <AlertTriangle size={40} style={{ color: '#e11d48', flexShrink: 0, marginTop: '2px' }} />
-                <div>
-                  <h3 style={{ margin: 0, fontSize: '1.6rem', fontWeight: 900, color: '#be123c' }}>
-                    ⚠️ NO TE ENCUENTRAS EN NUESTRA BASE DE DATOS
-                  </h3>
-                  <p style={{ margin: '8px 0 0 0', fontSize: '1.15rem', color: '#881337', fontWeight: 700, lineHeight: 1.6 }}>
-                    Es muy posible que aún <strong>no hayas llenado el formulario de pre-inscripción</strong> o haya un error en tu número de carnet.
-                  </p>
-                </div>
-              </div>
-
+        {/* SEARCH RESULTS */}
+        {searched && (
+          <div style={{ marginTop: '24px' }}>
+            {participant ? (
+              /* SUCCESS: Participant Found */
               <div style={{
                 background: '#ffffff',
-                border: '2px solid #fda4af',
-                borderRadius: '18px',
-                padding: '20px',
-                color: '#4c0519',
-                marginTop: '16px'
+                borderRadius: '20px',
+                padding: '24px',
+                boxShadow: '0 8px 24px rgba(22, 163, 74, 0.12)',
+                border: '3px solid #16a34a'
               }}>
-                <h4 style={{ margin: '0 0 10px 0', fontSize: '1.25rem', fontWeight: 900, color: '#9f1239' }}>
-                  📞 POR FAVOR CONTÁCTATE DIRECTAMENTE CON NOSOTROS:
-                </h4>
-                <p style={{ margin: '0 0 16px 0', fontSize: '1.08rem', fontWeight: 600, color: '#881337' }}>
-                  Comunícate por WhatsApp a cualquiera de nuestras líneas de atención habilitadas para verificar tu registro:
-                </p>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
+                  <CheckCircle2 size={36} style={{ color: '#16a34a', flexShrink: 0 }} />
+                  <div>
+                    <h3 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 900, color: '#15803d' }}>
+                      ¡REGISTRO ENCONTRADO EN LA BASE DE DATOS!
+                    </h3>
+                    <span style={{ fontSize: '1.05rem', color: '#166534', fontWeight: 700 }}>
+                      Maestro(a): {participant.apellidos} {participant.nombres} | CI: {participant.ci}
+                    </span>
+                  </div>
+                </div>
 
-                <div style={{
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
-                  gap: '12px'
-                }}>
-                  {contacts.map((c) => {
-                    const walink = `https://wa.me/591${c.num}?text=Hola,%20busqu%C3%A9%20mi%20carnet%20y%20no%20aparezco%20registrado.%20Deseo%20inscribirme.`;
-                    const isCopied = copied === c.num;
-                    return (
-                      <div key={c.num} style={{
+                {/* List of enrolled cycles with price and ficha download */}
+                <h4 style={{ margin: '18px 0 12px 0', fontSize: '1.25rem', fontWeight: 900, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <Layers size={22} style={{ color: '#bfa05e' }} /> TUS CICLOS Y CURSOS REGISTRADOS ({participant.cursos.length}):
+                </h4>
+
+                {participant.cursos.length > 0 ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                    {participant.cursos.map((c, idx) => (
+                      <div key={c.id || idx} style={{
+                        background: '#f8fafc',
+                        border: '2px solid #cbd5e1',
+                        borderRadius: '16px',
+                        padding: '20px',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'space-between',
-                        background: '#f8fafc',
-                        border: '1.5px solid #cbd5e1',
-                        borderRadius: '14px',
-                        padding: '10px 14px'
+                        flexWrap: 'wrap',
+                        gap: '16px'
                       }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          <PhoneCall size={18} style={{ color: '#25D366' }} />
-                          <span style={{ fontWeight: 900, fontSize: '1.1rem', color: '#0f172a' }}>
-                            {c.num}
-                          </span>
-                        </div>
-
-                        <div style={{ display: 'flex', gap: '6px' }}>
-                          <button
-                            type="button"
-                            onClick={() => handleCopy(c.num)}
-                            style={{
-                              background: isCopied ? '#dcfce7' : '#ffffff',
-                              border: '1px solid #cbd5e1',
-                              color: isCopied ? '#166534' : '#334155',
-                              padding: '5px 10px',
-                              borderRadius: '8px',
-                              fontSize: '0.82rem',
-                              fontWeight: 800,
-                              cursor: 'pointer'
-                            }}
-                          >
-                            {isCopied ? '¡Copiado!' : 'Copiar'}
-                          </button>
-
-                          <a
-                            href={walink}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            style={{
-                              background: 'linear-gradient(135deg, #25D366 0%, #128C7E 100%)',
+                        <div style={{ flex: '1 1 300px' }}>
+                          <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '6px' }}>
+                            <span style={{
+                              background: '#0f172a',
                               color: '#ffffff',
-                              textDecoration: 'none',
-                              padding: '5px 12px',
-                              borderRadius: '8px',
+                              padding: '4px 12px',
+                              borderRadius: '10px',
                               fontSize: '0.85rem',
-                              fontWeight: 900,
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: '4px'
-                            }}
-                          >
-                            <MessageCircle size={14} /> Chat <ExternalLink size={10} />
-                          </a>
+                              fontWeight: 900
+                            }}>
+                              CICLO {idx + 1}
+                            </span>
+
+                            {/* COST / PRECIO DEL CICLO */}
+                            <span style={{
+                              background: '#fefce8',
+                              border: '1.5px solid #fef08a',
+                              color: '#b45309',
+                              padding: '4px 12px',
+                              borderRadius: '10px',
+                              fontSize: '0.95rem',
+                              fontWeight: 900
+                            }}>
+                              💰 Precio: Bs. {c.costo || 40}
+                            </span>
+                          </div>
+
+                          <h5 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 900, color: '#0f172a' }}>
+                            {c.ciclo_nombre || c.area_formativa || 'Programa Formativo UNEFCO'}
+                          </h5>
+
+                          <p style={{ margin: '6px 0 0 0', fontSize: '1.02rem', color: '#475569', fontWeight: 600 }}>
+                            {c.grupo_nombre ? `Grupo: ${c.grupo_nombre} | ` : ''}
+                            Distrito: {c.distrito || participant.distrito || 'Santa Cruz'}
+                          </p>
                         </div>
+
+                        <button
+                          type="button"
+                          onClick={() => handlePrintOfficialFicha(c)}
+                          style={{
+                            background: 'linear-gradient(135deg, #16a34a 0%, #15803d 100%)',
+                            color: '#ffffff',
+                            border: 'none',
+                            borderRadius: '12px',
+                            padding: '14px 22px',
+                            fontSize: '1.08rem',
+                            fontWeight: 900,
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '8px',
+                            boxShadow: '0 4px 12px rgba(22, 163, 74, 0.25)'
+                          }}
+                        >
+                          <Printer size={20} /> Descargar Ficha del Ciclo {idx + 1}
+                        </button>
                       </div>
-                    );
-                  })}
+                    ))}
+                  </div>
+                ) : (
+                  <div style={{
+                    background: '#f8fafc',
+                    border: '1.5px solid #cbd5e1',
+                    borderRadius: '16px',
+                    padding: '18px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    flexWrap: 'wrap',
+                    gap: '14px'
+                  }}>
+                    <div>
+                      <h5 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 900, color: '#0f172a' }}>
+                        Pre-Inscripción Confirmada
+                      </h5>
+                      <span style={{ fontSize: '1.05rem', color: '#b45309', fontWeight: 800 }}>💰 Precio estándar: Bs. 40</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handlePrintOfficialFicha()}
+                      style={{
+                        background: 'linear-gradient(135deg, #16a34a 0%, #15803d 100%)',
+                        color: '#ffffff',
+                        border: 'none',
+                        borderRadius: '12px',
+                        padding: '14px 22px',
+                        fontSize: '1.08rem',
+                        fontWeight: 900,
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                        boxShadow: '0 4px 12px rgba(22, 163, 74, 0.25)'
+                      }}
+                    >
+                      <Printer size={20} /> Imprimir Ficha Oficial
+                    </button>
+                  </div>
+                )}
+              </div>
+            ) : (
+              /* WARNING: CI NOT FOUND -> Contact info */
+              <div style={{
+                background: '#fff1f2',
+                border: '3px solid #e11d48',
+                borderRadius: '20px',
+                padding: '24px',
+                color: '#9f1239',
+                boxShadow: '0 8px 24px rgba(225, 29, 72, 0.15)'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'flex-start', gap: '14px', marginBottom: '14px' }}>
+                  <AlertTriangle size={36} style={{ color: '#e11d48', flexShrink: 0, marginTop: '2px' }} />
+                  <div>
+                    <h3 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 900, color: '#be123c' }}>
+                      ⚠️ NO TE ENCUENTRAS EN NUESTRA BASE DE DATOS
+                    </h3>
+                    <p style={{ margin: '6px 0 0 0', fontSize: '1.12rem', color: '#881337', fontWeight: 700, lineHeight: 1.55 }}>
+                      Es muy posible que aún <strong>no hayas llenado el formulario de pre-inscripción</strong> o tu carnet fue escrito con algún error.
+                    </p>
+                  </div>
                 </div>
 
                 <div style={{
-                  marginTop: '16px',
-                  padding: '12px 16px',
-                  background: '#fff1f2',
-                  borderRadius: '12px',
-                  fontSize: '1.05rem',
-                  color: '#881337',
-                  fontWeight: 700
+                  background: '#ffffff',
+                  border: '2px solid #fda4af',
+                  borderRadius: '16px',
+                  padding: '18px',
+                  color: '#4c0519',
+                  marginTop: '14px'
                 }}>
-                  📍 <strong>O bien apersónate a nuestras oficinas:</strong> Av. San Martín s/n Equipetrol, ESFM Enrique Finot (Horario continuo de 08:00 a 16:00).
+                  <h4 style={{ margin: '0 0 10px 0', fontSize: '1.2rem', fontWeight: 900, color: '#9f1239' }}>
+                    📞 POR FAVOR CONTÁCTATE CON NOSOTROS PARA AYUDARTE:
+                  </h4>
+                  <p style={{ margin: '0 0 14px 0', fontSize: '1.05rem', fontWeight: 600, color: '#881337' }}>
+                    Escríbenos por WhatsApp a cualquiera de nuestros números de atención:
+                  </p>
+
+                  <div style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+                    gap: '12px'
+                  }}>
+                    {contacts.map((c) => {
+                      const walink = `https://wa.me/591${c.num}?text=Hola,%20consulte%20mi%20carnet%20y%20no%20aparezco%20registrado.%20Deseo%20inscribirme.`;
+                      const isCopied = copied === c.num;
+                      return (
+                        <div key={c.num} style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          background: '#f8fafc',
+                          border: '1.5px solid #cbd5e1',
+                          borderRadius: '12px',
+                          padding: '10px 12px'
+                        }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <PhoneCall size={18} style={{ color: '#25D366' }} />
+                            <span style={{ fontWeight: 900, fontSize: '1.05rem', color: '#0f172a' }}>
+                              {c.num}
+                            </span>
+                          </div>
+
+                          <div style={{ display: 'flex', gap: '6px' }}>
+                            <button
+                              type="button"
+                              onClick={() => handleCopy(c.num)}
+                              style={{
+                                background: isCopied ? '#dcfce7' : '#ffffff',
+                                border: '1px solid #cbd5e1',
+                                color: isCopied ? '#166534' : '#334155',
+                                padding: '4px 8px',
+                                borderRadius: '6px',
+                                fontSize: '0.8rem',
+                                fontWeight: 800,
+                                cursor: 'pointer'
+                              }}
+                            >
+                              {isCopied ? '¡Copiado!' : 'Copiar'}
+                            </button>
+
+                            <a
+                              href={walink}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              style={{
+                                background: 'linear-gradient(135deg, #25D366 0%, #128C7E 100%)',
+                                color: '#ffffff',
+                                textDecoration: 'none',
+                                padding: '4px 10px',
+                                borderRadius: '6px',
+                                fontSize: '0.82rem',
+                                fontWeight: 900,
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '4px'
+                              }}
+                            >
+                              <MessageCircle size={13} /> Chat
+                            </a>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
               </div>
-            </div>
-          )}
-        </div>
-      )}
+            )}
+          </div>
+        )}
+      </div>
 
-      {/* REQUIREMENTS SECTION (SHOWS IF REGISTERED OR GENERAL) */}
+      {/* PASO 2 & PASO 3 GRID */}
       <div style={{
         display: 'grid',
         gridTemplateColumns: 'repeat(auto-fit, minmax(350px, 1fr))',
@@ -819,7 +910,7 @@ export function InscripcionesPublicComponent() {
               lineHeight: 1.6,
               fontWeight: 600
             }}>
-              Deberás presentar los siguientes documentos físicos en nuestras oficinas correspondientes:
+              Presenta en nuestras oficinas la Ficha de Inscripción junto con los siguientes documentos requeridos:
             </p>
 
             <div style={{
@@ -888,7 +979,7 @@ export function InscripcionesPublicComponent() {
           </div>
         </div>
 
-        {/* PASO 3: DEPÓSITO BANCARIO */}
+        {/* PASO 3: DEPÓSITO BANCARIO & SUBIR COMPROBANTE */}
         <div style={{
           background: '#ffffff',
           borderRadius: '24px',
@@ -981,18 +1072,73 @@ export function InscripcionesPublicComponent() {
               </div>
             </div>
 
-            <div style={{
-              background: '#f8fafc',
-              border: '2px solid #cbd5e1',
-              borderRadius: '16px',
-              padding: '18px',
-              fontSize: '1.08rem',
-              color: '#334155',
-              fontWeight: 600,
-              lineHeight: 1.6
-            }}>
-              💳 <strong>Entrega del Comprobante:</strong> Entrega el comprobante de depósito bancario junto con tu fotocopia de RDA y tu Ficha impresas directamente en la oficina de UNEFCO.
-            </div>
+            {/* Subir comprobante para los ciclos en que está registrado */}
+            {participant && participant.cursos.length > 0 ? (
+              <div style={{
+                background: '#f0fdf4',
+                border: '2px solid #16a34a',
+                borderRadius: '18px',
+                padding: '18px'
+              }}>
+                <h4 style={{ margin: '0 0 10px 0', fontSize: '1.2rem', fontWeight: 900, color: '#15803d' }}>
+                  📤 SUBIR TU COMPROBANTE DE DEPÓSITO DIGITAL
+                </h4>
+                <p style={{ margin: '0 0 14px 0', fontSize: '1rem', color: '#166534', fontWeight: 600 }}>
+                  Selecciona la foto o imagen de tu comprobante de pago para adjuntarlo a tu pre-inscripción:
+                </p>
+
+                {participant.cursos.map((course) => (
+                  <div key={course.id} style={{
+                    background: '#ffffff',
+                    border: '1.5px solid #86efac',
+                    borderRadius: '14px',
+                    padding: '14px',
+                    marginBottom: '12px'
+                  }}>
+                    <div style={{ fontWeight: 800, fontSize: '1.05rem', color: '#0f172a', marginBottom: '4px' }}>
+                      {course.ciclo_nombre || course.grupo_nombre || 'Curso Registrado'} (Bs. {course.costo || 40})
+                    </div>
+
+                    {course.comprobante_url ? (
+                      <div style={{ color: '#166534', fontWeight: 800, fontSize: '0.95rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <Check size={18} /> ¡Comprobante ya subido al sistema!
+                      </div>
+                    ) : (
+                      <input
+                        type="file"
+                        accept="image/*,application/pdf"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) handleUploadVoucher(course, file);
+                        }}
+                        disabled={uploadingCourseId === course.id}
+                        style={{
+                          width: '100%',
+                          padding: '8px',
+                          fontSize: '0.95rem',
+                          borderRadius: '8px',
+                          border: '1px solid #cbd5e1',
+                          background: '#f8fafc'
+                        }}
+                      />
+                    )}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div style={{
+                background: '#f8fafc',
+                border: '2px solid #cbd5e1',
+                borderRadius: '16px',
+                padding: '18px',
+                fontSize: '1.08rem',
+                color: '#334155',
+                fontWeight: 600,
+                lineHeight: 1.6
+              }}>
+                💳 <strong>Monto a Depositar:</strong> Consulta tu Carnet en el <strong>Paso 1</strong> para ver el monto exacto de tu ciclo (Bs. 40 / 50) y habilitar la opción de subir tu comprobante de depósito.
+              </div>
+            )}
           </div>
         </div>
 
