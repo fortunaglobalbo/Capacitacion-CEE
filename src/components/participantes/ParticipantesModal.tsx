@@ -8,7 +8,7 @@ import {
   X, Search, UserPlus, Trash2, Save, Download, Printer,
   Loader2, ShieldAlert, CheckCircle2, AlertTriangle, Edit,
   Plus, Phone, ArrowRight, Check, RefreshCw, FileText, Camera, Upload,
-  User, IdCard, Award, Hash, School
+  User, IdCard, Award, Hash, School, Sparkles, FileSpreadsheet, FileImage, File
 } from 'lucide-react';
 import Swal from 'sweetalert2';
 
@@ -103,7 +103,7 @@ export default function ParticipantesModal({
 
   // Importer Panel states
   const [showImporter, setShowImporter] = useState(false);
-  const [activeImportTab, setActiveImportTab] = useState<'individual' | 'excel'>('individual');
+  const [activeImportTab, setActiveImportTab] = useState<'individual' | 'excel' | 'ia'>('ia');
   const [excelText, setExcelText] = useState('');
   const [previewList, setPreviewList] = useState<PreviewParticipant[]>([]);
   const [importingBatch, setImportingBatch] = useState(false);
@@ -675,7 +675,7 @@ export default function ParticipantesModal({
     setCameraActive(false);
   };
 
-  // Capture photo & parse with Gemini API
+  // Capture photo & parse with AI (OpenCode Go)
   const handleCaptureAndParse = async () => {
     if (!videoRef.current || !videoStream) return;
 
@@ -696,7 +696,8 @@ export default function ParticipantesModal({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           fileData: base64Image,
-          mimeType: 'image/jpeg'
+          mimeType: 'image/jpeg',
+          fileName: 'captura_camara.jpg'
         })
       });
 
@@ -707,7 +708,7 @@ export default function ParticipantesModal({
 
       setPreviewList(resData.data);
       stopCamera();
-      Swal.fire('Escaneo Exitoso', `La IA detectó ${resData.data.length} participantes en la imagen. Revisa la lista abajo.`, 'success');
+      Swal.fire('Escaneo Exitoso', `La IA (OpenCode Go) detectó ${resData.data.length} participantes en la imagen. Revisa la lista abajo.`, 'success');
     } catch (err: any) {
       Swal.fire('Error de escaneo IA', err.message || 'No se pudo procesar la nómina con IA.', 'error');
     } finally {
@@ -715,39 +716,91 @@ export default function ParticipantesModal({
     }
   };
 
-  // Parse Uploaded File (Image or PDF)
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Parse Uploaded File with AI (PDF, Excel, CSV, or Image)
+  const handleAIFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     setIaLoading(true);
-    const reader = new FileReader();
-    reader.onload = async (event) => {
-      const base64Data = event.target?.result as string;
-      try {
+    try {
+      const isExcelOrCsv = /\.(xlsx|xls|csv)$/i.test(file.name);
+
+      if (isExcelOrCsv) {
+        // Read sheet text content
+        const data = await file.arrayBuffer();
+        const workbook = XLSX.read(data, { type: 'array' });
+        let allSheetsText = '';
+
+        workbook.SheetNames.forEach((sheetName) => {
+          const sheet = workbook.Sheets[sheetName];
+          const csv = XLSX.utils.sheet_to_csv(sheet);
+          allSheetsText += `\n[Hoja: ${sheetName}]\n${csv}\n`;
+        });
+
+        // Send extracted text to OpenCode Go AI endpoint
         const res = await fetch('/api/ai/parse-nomina', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            fileData: base64Data,
-            mimeType: file.type
+            extractedText: allSheetsText,
+            fileName: file.name
           })
         });
 
         const resData = await res.json();
         if (!res.ok || !resData.success) {
-          throw new Error(resData.message || 'Error procesando archivo');
+          throw new Error(resData.message || 'Error procesando archivo con IA');
         }
 
         setPreviewList(resData.data);
-        Swal.fire('Procesado Exitoso', `La IA procesó el archivo y detectó ${resData.data.length} participantes.`, 'success');
-      } catch (err: any) {
-        Swal.fire('Error de IA', err.message || 'Falló el análisis del archivo.', 'error');
-      } finally {
-        setIaLoading(false);
+        Swal.fire({
+          icon: 'success',
+          title: '¡Análisis con IA (OpenCode Go) Exitoso!',
+          text: `La IA procesó el archivo Excel/CSV y extrajo ${resData.data.length} participantes listos para revisar e importar.`,
+          timer: 3500
+        });
+      } else {
+        // PDF or Image
+        const reader = new FileReader();
+        reader.onload = async (event) => {
+          const base64Data = event.target?.result as string;
+          try {
+            const res = await fetch('/api/ai/parse-nomina', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                fileData: base64Data,
+                mimeType: file.type || (file.name.toLowerCase().endsWith('.pdf') ? 'application/pdf' : 'image/jpeg'),
+                fileName: file.name
+              })
+            });
+
+            const resData = await res.json();
+            if (!res.ok || !resData.success) {
+              throw new Error(resData.message || 'Error analizando documento con IA');
+            }
+
+            setPreviewList(resData.data);
+            Swal.fire({
+              icon: 'success',
+              title: '¡Análisis con IA (OpenCode Go) Exitoso!',
+              text: `La IA analizó el archivo y detectó ${resData.data.length} participantes listos para revisar e importar.`,
+              timer: 3500
+            });
+          } catch (err: any) {
+            Swal.fire('Error de IA', err.message || 'Falló el análisis del archivo con IA.', 'error');
+          } finally {
+            setIaLoading(false);
+          }
+        };
+        reader.readAsDataURL(file);
+        return;
       }
-    };
-    reader.readAsDataURL(file);
+    } catch (err: any) {
+      Swal.fire('Error de IA', err.message || 'Falló el análisis con Inteligencia Artificial.', 'error');
+    } finally {
+      setIaLoading(false);
+    }
   };
 
   // Batch Save parsed participants from Preview
@@ -2057,7 +2110,23 @@ export default function ParticipantesModal({
                 </h4>
 
                 {/* Tabs Selector */}
-                <div style={{ display: 'flex', gap: '4px', background: 'rgba(0,0,0,0.05)', padding: '3px', borderRadius: 'var(--radius-sm)' }}>
+                <div style={{ display: 'flex', gap: '4px', background: 'rgba(0,0,0,0.05)', padding: '3px', borderRadius: 'var(--radius-sm)', flexWrap: 'wrap' }}>
+                  <button
+                    type="button"
+                    className="btn btn-xs"
+                    style={{ background: activeImportTab === 'ia' ? 'linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%)' : 'transparent', color: activeImportTab === 'ia' ? '#ffffff' : '#4338ca', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '4px', boxShadow: activeImportTab === 'ia' ? '0 2px 8px rgba(99, 102, 241, 0.35)' : 'none' }}
+                    onClick={() => setActiveImportTab('ia')}
+                  >
+                    <Sparkles size={13} style={{ color: activeImportTab === 'ia' ? '#fbbf24' : '#6366f1' }} /> Importar con IA (OpenCode Go)
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-xs"
+                    style={{ background: activeImportTab === 'excel' ? 'var(--primary-500)' : 'transparent', color: activeImportTab === 'excel' ? 'var(--white)' : 'var(--gray-700)', display: 'flex', alignItems: 'center', gap: '4px' }}
+                    onClick={() => setActiveImportTab('excel')}
+                  >
+                    <FileSpreadsheet size={12} /> Excel / CSV Local
+                  </button>
                   <button
                     type="button"
                     className="btn btn-xs"
@@ -2066,18 +2135,142 @@ export default function ParticipantesModal({
                   >
                     Registro Individual
                   </button>
-                  <button
-                    type="button"
-                    className="btn btn-xs"
-                    style={{ background: activeImportTab === 'excel' ? 'var(--primary-500)' : 'transparent', color: activeImportTab === 'excel' ? 'var(--white)' : 'var(--gray-700)', display: 'flex', alignItems: 'center', gap: '4px' }}
-                    onClick={() => setActiveImportTab('excel')}
-                  >
-                    <Upload size={12} /> Importar Excel / CSV
-                  </button>
                 </div>
               </div>
 
-              {/* Tab Content: 1. Manual Form */}
+              {/* Tab Content: 1. AI OpenCode Go Importer */}
+              {activeImportTab === 'ia' && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                  {/* OpenCode Go Banner / Info */}
+                  <div style={{
+                    background: 'linear-gradient(135deg, #e0e7ff 0%, #ede9fe 100%)',
+                    border: '1.5px solid #c7d2fe',
+                    borderRadius: 'var(--radius-md)',
+                    padding: '12px 16px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    flexWrap: 'wrap',
+                    gap: '10px'
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <div style={{ background: '#4f46e5', color: '#ffffff', width: '32px', height: '32px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 6px rgba(79, 70, 229, 0.4)' }}>
+                        <Sparkles size={18} />
+                      </div>
+                      <div>
+                        <span style={{ fontSize: '0.86rem', fontWeight: 900, color: '#312e81', display: 'block' }}>
+                          Lector Multimodal con Inteligencia Artificial (OpenCode Go)
+                        </span>
+                        <span style={{ fontSize: '0.74rem', color: '#4338ca', fontWeight: 600 }}>
+                          Analiza y extrae automáticamente listas de participantes desde archivos <b>PDF, Excel (.xlsx/.xls), CSV o Imágenes/Fotos</b>.
+                        </span>
+                      </div>
+                    </div>
+
+                    <span style={{
+                      background: '#4338ca',
+                      color: '#ffffff',
+                      padding: '3px 10px',
+                      borderRadius: '12px',
+                      fontSize: '0.7rem',
+                      fontWeight: 800,
+                      letterSpacing: '0.5px'
+                    }}>
+                      PROVEEDOR: OPENCODE GO
+                    </span>
+                  </div>
+
+                  {/* Dropzone for AI files */}
+                  <div style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '14px',
+                    border: '2px dashed #818cf8',
+                    borderRadius: 'var(--radius-md)',
+                    padding: '28px 20px',
+                    background: 'var(--white)',
+                    transition: 'all 0.2s ease',
+                    textAlign: 'center'
+                  }}>
+                    <div style={{ display: 'flex', gap: '14px', alignItems: 'center', justifyContent: 'center', flexWrap: 'wrap' }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
+                        <FileText size={32} style={{ color: '#dc2626' }} />
+                        <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#dc2626' }}>PDF</span>
+                      </div>
+                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
+                        <FileSpreadsheet size={32} style={{ color: '#16a34a' }} />
+                        <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#16a34a' }}>Excel / CSV</span>
+                      </div>
+                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
+                        <FileImage size={32} style={{ color: '#2563eb' }} />
+                        <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#2563eb' }}>Imagen</span>
+                      </div>
+                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
+                        <Camera size={32} style={{ color: '#7c3aed' }} />
+                        <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#7c3aed' }}>Cámara</span>
+                      </div>
+                    </div>
+
+                    <div>
+                      <span style={{ fontSize: '0.92rem', fontWeight: 900, color: 'var(--gray-800)', display: 'block', marginBottom: '4px' }}>
+                        Selecciona o Arrastra tu Nómina (PDF, Excel, Imagen o CSV)
+                      </span>
+                      <span style={{ fontSize: '0.78rem', color: 'var(--gray-500)', display: 'block' }}>
+                        La IA de <b>OpenCode Go</b> analizará el archivo, descifrará los nombres, C.I., RDA, celular y colegio, y los estructurará automáticamente.
+                      </span>
+                    </div>
+
+                    {iaLoading ? (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', color: '#4f46e5', fontWeight: 800, fontSize: '0.9rem', padding: '10px 22px', background: '#eef2ff', borderRadius: '8px', border: '1px solid #c7d2fe' }}>
+                        <Loader2 size={20} className="spin" /> Procesando con IA (OpenCode Go)... Por favor espera unos segundos.
+                      </div>
+                    ) : (
+                      <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', justifyContent: 'center' }}>
+                        <label className="btn btn-primary btn-sm" style={{ cursor: 'pointer', background: 'linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%)', border: 'none', color: '#ffffff', display: 'inline-flex', gap: '8px', fontWeight: 800, padding: '10px 20px', borderRadius: '8px', boxShadow: '0 4px 12px rgba(79, 70, 229, 0.3)' }}>
+                          <Upload size={16} /> Seleccionar Archivo (PDF / Excel / Imagen / CSV)
+                          <input
+                            type="file"
+                            accept=".pdf,.xlsx,.xls,.csv,image/*"
+                            onChange={handleAIFileUpload}
+                            style={{ display: 'none' }}
+                            disabled={iaLoading}
+                          />
+                        </label>
+
+                        <button
+                          type="button"
+                          className="btn btn-secondary btn-sm"
+                          onClick={startCamera}
+                          disabled={iaLoading}
+                          style={{ display: 'inline-flex', gap: '6px', fontWeight: 700, padding: '10px 16px', borderRadius: '8px' }}
+                        >
+                          <Camera size={16} /> Escanear con Cámara
+                        </button>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Camera Viewfinder if active */}
+                  {cameraActive && (
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px', background: '#0f172a', padding: '16px', borderRadius: 'var(--radius-md)', color: '#ffffff' }}>
+                      <span style={{ fontSize: '0.85rem', fontWeight: 800 }}>Enfoca la lista física o nómina impresa:</span>
+                      <video ref={videoRef} autoPlay playsInline style={{ width: '100%', maxWidth: '480px', borderRadius: '8px', border: '2px solid #6366f1' }} />
+                      <div style={{ display: 'flex', gap: '10px' }}>
+                        <button type="button" className="btn btn-success btn-sm" onClick={handleCaptureAndParse} disabled={iaLoading}>
+                          <Camera size={14} /> Capturar y Analizar con IA
+                        </button>
+                        <button type="button" className="btn btn-secondary btn-sm" onClick={stopCamera}>
+                          Cancelar
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Tab Content: 2. Manual Form */}
               {activeImportTab === 'individual' && (
                 <form onSubmit={handleAddParticipantSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '12px' }}>
@@ -2180,7 +2373,7 @@ export default function ParticipantesModal({
                 </form>
               )}
 
-              {/* Tab Content: 2. Smart Excel / CSV File Upload */}
+              {/* Tab Content: 3. Smart Excel / CSV File Upload */}
               {activeImportTab === 'excel' && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
                   <p style={{ margin: 0, fontSize: '0.82rem', color: 'var(--gray-600)' }}>
