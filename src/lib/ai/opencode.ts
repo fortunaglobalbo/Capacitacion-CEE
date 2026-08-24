@@ -38,7 +38,7 @@ export async function callAI({
     }
 
     const payload = {
-      model: model || process.env.OPENCODE_GO_MODEL || 'gpt-4o',
+      model: model || process.env.OPENCODE_GO_MODEL || 'deepseek-v4-flash-vision-exp',
       messages: [
         { role: 'system', content: systemPrompt },
         { 
