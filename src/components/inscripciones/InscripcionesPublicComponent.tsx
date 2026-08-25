@@ -123,10 +123,9 @@ export function InscripcionesPublicComponent() {
   };
 
   const contacts = [
-    { num: '77476059', label: 'Atención 1' },
-    { num: '68405551', label: 'Atención 2' },
-    { num: '72174446', label: 'Atención 3' },
-    { num: '76200708', label: 'Atención 4' }
+    { num: '76200708', name: 'Lic. Claudia Olivares', label: 'Coordinación' },
+    { num: '72174446', name: 'Juan Alba', label: 'Atención y Consultas' },
+    { num: '77476059', name: 'Ing. Gilmar Chavarria', label: 'Soporte Técnico' }
   ];
 
   // Filter input to numbers only
@@ -558,6 +557,37 @@ export function InscripcionesPublicComponent() {
         window.scrollTo({ top: 0, behavior: 'smooth' });
       }
     }, 50);
+  };
+
+  // Congratulatory dialog before proceeding from Step 3 to Step 4 (Informativo)
+  const handleProceedToStep4 = () => {
+    Swal.fire({
+      icon: 'success',
+      title: '🎉 ¡Felicitaciones Maestra / Maestro!',
+      html: `
+        <div style="font-size: 1.05rem; line-height: 1.6; color: #1e293b; text-align: left; padding: 4px 6px;">
+          <p style="margin: 0 0 12px 0; font-size: 1.08rem;">
+            ¡Has completado exitosamente los <strong>3 pasos de tu registro digital</strong>!
+          </p>
+          <div style="background: #f8fafc; border: 2px solid #cbd5e1; border-radius: 14px; padding: 12px 16px; margin-bottom: 14px;">
+            <div style="color: #16a34a; font-weight: 800; margin-bottom: 6px;">✅ Paso 1: Ficha Virtual y Grupo Oficial de WhatsApp</div>
+            <div style="color: #0284c7; font-weight: 800; margin-bottom: 6px;">✅ Paso 2: Fotocopia de RDA o Certificado de Trabajo</div>
+            <div style="color: #6366f1; font-weight: 800;">✅ Paso 3: Comprobante de Depósito Bancario</div>
+          </div>
+          <div style="background: #eff6ff; border: 2px solid #3b82f6; border-radius: 14px; padding: 14px 16px; color: #1e40af; font-weight: 800; font-size: 1.02rem;">
+            📢 <strong>Te invitamos a leer con atención el Paso 4 Informativo</strong> sobre la presentación de tus documentos físicos y los contactos oficiales para cualquier consulta.
+          </div>
+        </div>
+      `,
+      confirmButtonText: '📖 Continuar y Leer Paso 4 Informativo 👉',
+      confirmButtonColor: '#0284c7',
+      allowOutsideClick: false,
+      width: '580px'
+    }).then((result) => {
+      if (result.isConfirmed) {
+        goToStep(4);
+      }
+    });
   };
 
   // Lightbox for Document / Voucher Preview
@@ -1295,7 +1325,7 @@ export function InscripcionesPublicComponent() {
                 {currentStep === 1 && 'Nivel 1: Datos Personales, Ficha Virtual y Grupo de WhatsApp'}
                 {currentStep === 2 && 'Nivel 2: Documentación Requerida (Copia RDA o Certificado)'}
                 {currentStep === 3 && 'Nivel 3: Depósito Bancario y Comprobante'}
-                {currentStep === 4 && 'Nivel 4: Finalización y Entrega en Oficinas UNEFCO'}
+                {currentStep === 4 && 'Paso 4 (Informativo): Presentación de Documentos y Contactos'}
               </span>
             </div>
 
@@ -2391,7 +2421,7 @@ export function InscripcionesPublicComponent() {
                   )}
                   <button
                     type="button"
-                    onClick={() => goToStep(4)}
+                    onClick={handleProceedToStep4}
                     style={{
                       background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)',
                       color: '#ffffff',
@@ -2407,7 +2437,7 @@ export function InscripcionesPublicComponent() {
                       boxShadow: guideNextStep ? '0 0 20px rgba(245, 158, 11, 0.6)' : '0 6px 18px rgba(15, 23, 42, 0.3)'
                     }}
                   >
-                    Continuar al Paso 4 (Finalización) <ArrowRight size={22} />
+                    Continuar al Paso 4 (Informativo) <ArrowRight size={22} />
                   </button>
                 </div>
               </div>
@@ -2415,7 +2445,7 @@ export function InscripcionesPublicComponent() {
           )}
 
           {/* ========================================================
-              NIVEL 4: RESUMEN FINAL & ENTREGA EN OFICINAS UNEFCO
+              NIVEL 4: INFORMATIVO - RESUMEN FINAL, OFICINAS Y CONTACTOS
              ======================================================== */}
           {currentStep === 4 && (
             <div className="step-card step-card-blue">
@@ -2435,13 +2465,17 @@ export function InscripcionesPublicComponent() {
                   4
                 </span>
                 <span style={{ fontSize: '0.9rem', fontWeight: 900, color: '#0369a1', background: '#f0f9ff', padding: '6px 14px', borderRadius: '14px', border: '1.5px solid #bae6fd' }}>
-                  Paso 4: Entrega en Oficinas
+                  Paso 4: Información Importante
                 </span>
               </div>
 
               <h2 style={{ margin: '0 0 10px 0', fontSize: 'clamp(1.3rem, 3.8vw, 1.6rem)', fontWeight: 900, color: '#0f172a' }}>
-                PASO 4: PRESENTACIÓN DE DOCUMENTOS FÍSICOS
+                PASO 4 (INFORMATIVO): PRESENTACIÓN DE DOCUMENTOS FÍSICOS Y CONTACTOS
               </h2>
+
+              <p style={{ margin: '0 0 18px 0', fontSize: '1.05rem', color: '#475569', fontWeight: 600, lineHeight: 1.6 }}>
+                ¡Felicitaciones por completar tus 3 pasos! Revisa a continuación la información sobre la entrega presencial de tus requisitos y los contactos de atención autorizados:
+              </p>
 
               {/* CRITICAL MENTION REGARDING PHYSICAL SUBMISSION IN FIRST CLASS */}
               <div style={{
@@ -2473,7 +2507,7 @@ export function InscripcionesPublicComponent() {
                     1. Ficha de Inscripción
                   </span>
                   <span style={{ fontSize: '0.95rem', color: '#475569', fontWeight: 600 }}>
-                    Ficha impresa con tus datos correctos, firmada a mano.
+                    Ficha impresa con tus datos correctos, firmada a mano (2 copias en hoja carta).
                   </span>
                 </div>
 
@@ -2535,8 +2569,96 @@ export function InscripcionesPublicComponent() {
                 </div>
               </div>
 
+              {/* Official Support Contacts */}
+              <div style={{
+                background: '#ffffff',
+                border: '2.5px solid #cbd5e1',
+                borderRadius: '20px',
+                padding: '22px 20px',
+                marginTop: '20px',
+                boxShadow: '0 4px 14px rgba(0,0,0,0.04)'
+              }}>
+                <div style={{ fontWeight: 900, fontSize: '1.25rem', color: '#0f172a', marginBottom: '14px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <PhoneCall size={26} style={{ color: '#25D366' }} /> 📞 CONTACTOS OFICIALES DE ATENCIÓN Y CONSULTAS UNEFCO:
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '14px' }}>
+                  {contacts.map((c) => (
+                    <div
+                      key={c.num}
+                      style={{
+                        background: '#f8fafc',
+                        border: '2px solid #e2e8f0',
+                        borderRadius: '16px',
+                        padding: '16px 18px',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        justifyContent: 'space-between',
+                        gap: '12px'
+                      }}
+                    >
+                      <div>
+                        <span style={{ fontSize: '0.85rem', fontWeight: 800, color: '#0284c7', textTransform: 'uppercase', display: 'block', marginBottom: '2px' }}>
+                          {c.label}
+                        </span>
+                        <h4 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 900, color: '#0f172a' }}>
+                          {c.name}
+                        </h4>
+                        <span style={{ fontSize: '1.1rem', fontWeight: 800, color: '#475569', display: 'block', marginTop: '4px' }}>
+                          📱 {c.num}
+                        </span>
+                      </div>
+
+                      <div style={{ display: 'flex', gap: '8px' }}>
+                        <a
+                          href={`https://wa.me/591${c.num}?text=${encodeURIComponent(`Hola ${c.name}, soy el/la participante ${participant.nombres} ${participant.apellidos} (CI: ${participant.ci}), tengo una consulta sobre mi inscripción UNEFCO.`)}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          style={{
+                            flex: 1,
+                            background: 'linear-gradient(135deg, #25D366 0%, #128C7E 100%)',
+                            color: '#ffffff',
+                            textDecoration: 'none',
+                            borderRadius: '10px',
+                            padding: '10px 12px',
+                            fontSize: '0.92rem',
+                            fontWeight: 800,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '6px',
+                            boxShadow: '0 2px 8px rgba(37, 211, 102, 0.3)'
+                          }}
+                        >
+                          <MessageCircle size={18} /> WhatsApp
+                        </a>
+
+                        <a
+                          href={`tel:+591${c.num}`}
+                          style={{
+                            background: '#0f172a',
+                            color: '#ffffff',
+                            textDecoration: 'none',
+                            borderRadius: '10px',
+                            padding: '10px 14px',
+                            fontSize: '0.92rem',
+                            fontWeight: 800,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '6px'
+                          }}
+                        >
+                          <PhoneCall size={18} /> Llamar
+                        </a>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
               {/* Navigation Back Buttons */}
-              <div style={{ marginTop: '28px', display: 'flex', justifyContent: 'space-between', gap: '10px', flexWrap: 'wrap' }}>
+              <div style={{ marginTop: '28px', display: 'flex', justifyContent: 'flex-start', gap: '10px' }}>
                 <button
                   type="button"
                   onClick={() => goToStep(3)}
@@ -2555,26 +2677,6 @@ export function InscripcionesPublicComponent() {
                   }}
                 >
                   <ArrowLeft size={20} /> Volver al Paso 3
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => handlePrintOfficialFicha()}
-                  style={{
-                    background: 'linear-gradient(135deg, #16a34a 0%, #15803d 100%)',
-                    color: '#ffffff',
-                    border: 'none',
-                    borderRadius: '14px',
-                    padding: '14px 24px',
-                    fontSize: '1.1rem',
-                    fontWeight: 900,
-                    cursor: 'pointer',
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '8px'
-                  }}
-                >
-                  <Printer size={20} /> Imprimir Ficha Oficial
                 </button>
               </div>
             </div>
