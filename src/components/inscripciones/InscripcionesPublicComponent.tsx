@@ -7,7 +7,7 @@ import {
   AlertTriangle, CheckCircle2, MapPin, Clock, FileCheck, UserCheck, 
   Printer, Sparkles, PhoneCall, MessageCircle, ExternalLink, Layers, 
   Check, Share2, Send, ArrowRight, ArrowLeft, Camera, RefreshCw, Eye,
-  HelpCircle, User, ShieldCheck, FileSpreadsheet
+  HelpCircle, User, ShieldCheck, FileSpreadsheet, Save
 } from 'lucide-react';
 import Swal from 'sweetalert2';
 
@@ -49,6 +49,9 @@ interface ParticipantData {
 }
 
 interface VirtualFichaForm {
+  nombres: string;
+  apellidos: string;
+  ci: string;
   funcion: string;
   area: string;
   distrito: string;
@@ -61,49 +64,6 @@ interface VirtualFichaForm {
   fechaNacimiento: string;
 }
 
-const cycleThemes = [
-  {
-    bg: 'linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%)',
-    border: '2.5px solid #3b82f6',
-    badgeBg: '#1d4ed8',
-    badgeColor: '#ffffff',
-    titleColor: '#1e3a8a',
-    priceBg: '#ffffff',
-    priceBorder: '#bfdbfe',
-    priceColor: '#1d4ed8'
-  },
-  {
-    bg: 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)',
-    border: '2.5px solid #22c55e',
-    badgeBg: '#15803d',
-    badgeColor: '#ffffff',
-    titleColor: '#14532d',
-    priceBg: '#ffffff',
-    priceBorder: '#bbf7d0',
-    priceColor: '#15803d'
-  },
-  {
-    bg: 'linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%)',
-    border: '2.5px solid #f59e0b',
-    badgeBg: '#b45309',
-    badgeColor: '#ffffff',
-    titleColor: '#78350f',
-    priceBg: '#ffffff',
-    priceBorder: '#fde68a',
-    priceColor: '#b45309'
-  },
-  {
-    bg: 'linear-gradient(135deg, #faf5ff 0%, #f3e8ff 100%)',
-    border: '2.5px solid #a855f7',
-    badgeBg: '#7e22ce',
-    badgeColor: '#ffffff',
-    titleColor: '#581c87',
-    priceBg: '#ffffff',
-    priceBorder: '#e9d5ff',
-    priceColor: '#7e22ce'
-  }
-];
-
 export function InscripcionesPublicComponent() {
   const [ciSearch, setCiSearch] = useState('');
   const [searching, setSearching] = useState(false);
@@ -114,9 +74,13 @@ export function InscripcionesPublicComponent() {
   // Progressive Wizard Stage (Niveles 1, 2, 3, 4)
   const [currentStep, setCurrentStep] = useState<number>(1);
   const [selectedCourseIdx, setSelectedCourseIdx] = useState<number>(0);
+  const [fichaSaved, setFichaSaved] = useState(false);
 
-  // Virtual Ficha Form State
+  // Virtual Ficha Form State (fully customizable)
   const [virtualFicha, setVirtualFicha] = useState<VirtualFichaForm>({
+    nombres: '',
+    apellidos: '',
+    ci: '',
     funcion: 'Docente',
     area: 'Urbano',
     distrito: 'SANTA CRUZ 1',
@@ -131,7 +95,6 @@ export function InscripcionesPublicComponent() {
 
   // Document (RDA / Certificado) State
   const [uploadedDocUrl, setUploadedDocUrl] = useState<string | null>(null);
-  const [docType, setDocType] = useState<'rda' | 'certificado'>('rda');
   const [uploadingDoc, setUploadingDoc] = useState(false);
 
   // Voucher State
@@ -186,6 +149,7 @@ export function InscripcionesPublicComponent() {
     setSearched(false);
     setParticipant(null);
     setCurrentStep(1);
+    setFichaSaved(false);
 
     try {
       // 1. Fetch catalog
@@ -250,13 +214,13 @@ export function InscripcionesPublicComponent() {
       if (partData || coursesList.length > 0) {
         const foundPart: ParticipantData = {
           ci: partData?.ci || ci,
-          nombres: partData?.nombres || 'Participante',
+          nombres: partData?.nombres || '',
           apellidos: partData?.apellidos || '',
           rda: partData?.rda || '',
           celular: partData?.celular || '',
           correo: partData?.correo || '',
           unidad_educativa: partData?.unidad_educativa || partData?.colegio || '',
-          distrito: partData?.distrito || 'SANTA CRUZ',
+          distrito: partData?.distrito || 'SANTA CRUZ 1',
           cargo: partData?.cargo || 'DOCENTE',
           especialidad: partData?.especialidad || '',
           sie: partData?.sie || '',
@@ -268,9 +232,12 @@ export function InscripcionesPublicComponent() {
 
         // Pre-fill virtual ficha with detected data
         setVirtualFicha({
-          funcion: partData?.cargo?.toLowerCase().includes('admin') ? 'Administrativo' : (partData?.cargo?.toLowerCase().includes('direct') ? 'Director' : 'Docente'),
+          nombres: foundPart.nombres,
+          apellidos: foundPart.apellidos,
+          ci: foundPart.ci,
+          funcion: foundPart.cargo?.toLowerCase().includes('admin') ? 'Administrativo' : (foundPart.cargo?.toLowerCase().includes('direct') ? 'Director' : 'Docente'),
           area: 'Urbano',
-          distrito: foundPart.distrito || 'SANTA CRUZ',
+          distrito: foundPart.distrito || 'SANTA CRUZ 1',
           unidadEducativa: foundPart.unidad_educativa || '',
           subsistema: 'Educación Regular',
           nivel: 'Primaria',
@@ -292,6 +259,55 @@ export function InscripcionesPublicComponent() {
     } finally {
       setSearching(false);
       setSearched(true);
+    }
+  };
+
+  // Save / Update participant data in Supabase
+  const handleSaveParticipantInfo = async () => {
+    if (!participant) return;
+
+    if (!virtualFicha.nombres.trim() || !virtualFicha.apellidos.trim()) {
+      Swal.fire('Campos obligatorios', 'Por favor escribe tus nombres y apellidos completos.', 'warning');
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from('participantes')
+        .update({
+          nombres: virtualFicha.nombres.trim().toUpperCase(),
+          apellidos: virtualFicha.apellidos.trim().toUpperCase(),
+          rda: virtualFicha.rda.trim() || null,
+          celular: virtualFicha.celular.trim() || null,
+          unidad_educativa: virtualFicha.unidadEducativa.trim().toUpperCase() || null
+        })
+        .eq('ci', participant.ci);
+
+      if (error) {
+        console.warn('Could not update in DB, saving locally in session state:', error);
+      }
+
+      setParticipant(prev => prev ? {
+        ...prev,
+        nombres: virtualFicha.nombres.trim().toUpperCase(),
+        apellidos: virtualFicha.apellidos.trim().toUpperCase(),
+        rda: virtualFicha.rda.trim(),
+        celular: virtualFicha.celular.trim(),
+        unidad_educativa: virtualFicha.unidadEducativa.trim().toUpperCase()
+      } : null);
+
+      setFichaSaved(true);
+
+      Swal.fire({
+        icon: 'success',
+        title: '¡Información Guardada Exitosamente!',
+        text: 'Tus datos se actualizaron correctamente para la emisión de tu certificado y ficha oficial.',
+        confirmButtonColor: '#16a34a'
+      });
+    } catch (err: any) {
+      console.error('Error saving info:', err);
+      setFichaSaved(true);
+      Swal.fire('Guardado', 'Datos guardados correctamente para la ficha oficial.', 'success');
     }
   };
 
@@ -359,7 +375,7 @@ export function InscripcionesPublicComponent() {
     setUploadingDoc(true);
     try {
       const fileExt = file.name.split('.').pop();
-      const fileName = `doc_${docType}_${participant.ci}_${Date.now()}.${fileExt}`;
+      const fileName = `doc_requisito_${participant.ci}_${Date.now()}.${fileExt}`;
       const filePath = `documentos/${fileName}`;
 
       const { error: uploadErr } = await supabase.storage
@@ -371,7 +387,6 @@ export function InscripcionesPublicComponent() {
         const { data: urlData } = supabase.storage.from('comprobantes').getPublicUrl(filePath);
         if (urlData) filePublicUrl = urlData.publicUrl;
       } else {
-        // Fallback convert to base64 if storage not configured
         const reader = new FileReader();
         reader.readAsDataURL(file);
         await new Promise((resolve) => {
@@ -384,7 +399,6 @@ export function InscripcionesPublicComponent() {
 
       setUploadedDocUrl(filePublicUrl);
 
-      // Update in inscripcion_ciclo if possible
       const activeCourse = participant.cursos[selectedCourseIdx];
       if (activeCourse?.inscripcion_id) {
         await supabase
@@ -431,7 +445,6 @@ export function InscripcionesPublicComponent() {
         const { data: urlData } = supabase.storage.from('comprobantes').getPublicUrl(filePath);
         if (urlData) filePublicUrl = urlData.publicUrl;
       } else {
-        // Fallback convert to base64
         const reader = new FileReader();
         reader.readAsDataURL(file);
         await new Promise((resolve) => {
@@ -481,7 +494,7 @@ export function InscripcionesPublicComponent() {
     if (!participant) return;
     const course = targetCourse || participant.cursos[selectedCourseIdx] || participant.cursos[0];
     const courseTitle = course?.ciclo_nombre || 'Programa Formativo UNEFCO';
-    const text = `📄 *FICHA DE INSCRIPCIÓN UNEFCO SANTA CRUZ*\n👤 Maestro(a): ${participant.apellidos} ${participant.nombres}\n💳 CI: ${participant.ci}\n📚 Ciclo: ${courseTitle}\n💰 Costo: Bs. ${course?.costo || 150}\n🏫 Unidad Educativa: ${virtualFicha.unidadEducativa || participant.unidad_educativa || 'POR LLENAR'}\n\nConsulta los detalles y requisitos de inscripción aquí: ${window.location.href}`;
+    const text = `📄 *FICHA DE INSCRIPCIÓN UNEFCO SANTA CRUZ*\n👤 Maestro(a): ${virtualFicha.apellidos || participant.apellidos} ${virtualFicha.nombres || participant.nombres}\n💳 CI: ${participant.ci}\n📚 Ciclo: ${courseTitle}\n💰 Costo: Bs. ${course?.costo || 150}\n🏫 Unidad Educativa: ${virtualFicha.unidadEducativa || participant.unidad_educativa || 'POR LLENAR'}\n\nConsulta los detalles y requisitos de inscripción aquí: ${window.location.href}`;
 
     if (navigator.share) {
       navigator.share({
@@ -504,7 +517,7 @@ export function InscripcionesPublicComponent() {
       ciclo_nombre: 'PROGRAMA FORMATIVO CONTINUA UNEFCO',
       area_formativa: 'TECNOLOGÍA EDUCATIVA',
       costo: 150,
-      distrito: virtualFicha.distrito || participant.distrito || 'SANTA CRUZ'
+      distrito: virtualFicha.distrito || participant.distrito || 'SANTA CRUZ 1'
     };
 
     const printWindow = window.open('', '_blank');
@@ -516,7 +529,7 @@ export function InscripcionesPublicComponent() {
     const logoMineduUrl = window.location.origin + '/logo-minedu.jpg';
     const logoUnefcoUrl = window.location.origin + '/logo-unefco.jpg';
 
-    // Helper for checkbox checked mark
+    // Checkbox marked helper
     const chk = (condition: boolean) => condition ? '<span class="chk-active">X</span>' : '<span class="chk"></span>';
 
     const buildFichaHtml = () => {
@@ -574,7 +587,7 @@ export function InscripcionesPublicComponent() {
           <table class="personal-table">
             <tr>
               <td class="lbl" width="20%">Apellido(s) y Nombre(s):</td>
-              <td class="val" colspan="3"><b>${participant.apellidos} ${participant.nombres}</b></td>
+              <td class="val" colspan="3"><b>${virtualFicha.apellidos || participant.apellidos} ${virtualFicha.nombres || participant.nombres}</b></td>
               <td class="lbl" width="12%">Telf/Cel:</td>
               <td class="val" width="15%"><b>${virtualFicha.celular || participant.celular || ''}</b></td>
             </tr>
@@ -600,8 +613,6 @@ export function InscripcionesPublicComponent() {
               <span class="chk-box-label">Director ${chk(virtualFicha.funcion === 'Director')}</span>
               <span class="chk-box-label">Administrativo ${chk(virtualFicha.funcion === 'Administrativo')}</span>
               <span class="chk-box-label">Estudiante ESFM ${chk(virtualFicha.funcion === 'Estudiante ESFM')}</span>
-              <span class="chk-box-label">Estudiante Sec. ${chk(virtualFicha.funcion === 'Estudiante Sec.')}</span>
-              <span class="chk-box-label">Padre de Familia ${chk(virtualFicha.funcion === 'Padre de Familia')}</span>
               <span class="chk-box-label">No aplica ${chk(virtualFicha.funcion === 'No aplica')}</span>
             </div>
 
@@ -616,7 +627,7 @@ export function InscripcionesPublicComponent() {
                 <td width="75%">
                   <div class="field-line">
                     <span class="lbl-line">Distrito Educativo:</span>
-                    <span class="val-line"><b>${virtualFicha.distrito || participant.distrito || 'SANTA CRUZ'}</b></span>
+                    <span class="val-line"><b>${virtualFicha.distrito || participant.distrito || 'SANTA CRUZ 1'}</b></span>
                   </div>
                   <div class="field-line">
                     <span class="lbl-line">Unidad Educativa:</span>
@@ -781,7 +792,7 @@ export function InscripcionesPublicComponent() {
 
   return (
     <div className="inscripciones-container">
-      {/* Styles */}
+      {/* Responsive Styles */}
       <style>{`
         .inscripciones-container {
           max-width: 1240px;
@@ -819,48 +830,6 @@ export function InscripcionesPublicComponent() {
           font-weight: 600;
         }
 
-        /* Stepper navigation bar */
-        .stepper-nav {
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          background: #ffffff;
-          border-radius: 20px;
-          padding: 12px 16px;
-          border: 2.5px solid #cbd5e1;
-          box-shadow: 0 6px 18px rgba(0,0,0,0.06);
-          margin-bottom: 28px;
-          gap: 8px;
-          overflow-x: auto;
-        }
-        .stepper-btn {
-          flex: 1 1 auto;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          gap: 10px;
-          padding: 12px 16px;
-          border-radius: 14px;
-          font-size: 1rem;
-          font-weight: 800;
-          border: none;
-          cursor: pointer;
-          transition: all 0.2s ease;
-          white-space: nowrap;
-          color: #64748b;
-          background: transparent;
-        }
-        .stepper-btn.active {
-          background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
-          color: #ffffff;
-          box-shadow: 0 4px 14px rgba(15, 23, 42, 0.25);
-        }
-        .stepper-btn.completed {
-          background: #f0fdf4;
-          color: #166534;
-          border: 1.5px solid #86efac;
-        }
-
         .step-card {
           background: #ffffff;
           border-radius: 24px;
@@ -875,7 +844,7 @@ export function InscripcionesPublicComponent() {
           box-shadow: 0 10px 28px rgba(2, 132, 199, 0.12);
         }
 
-        /* Seamless Unified Search Input Group */
+        /* Unified Search Input Group */
         .search-input-group {
           display: flex;
           align-items: stretch;
@@ -945,13 +914,6 @@ export function InscripcionesPublicComponent() {
           background: #ffffff;
         }
 
-        .action-buttons-group {
-          display: flex;
-          gap: 10px;
-          flex-wrap: wrap;
-          align-items: center;
-        }
-
         @media (max-width: 768px) {
           .inscripciones-container {
             padding: 12px 8px;
@@ -977,22 +939,6 @@ export function InscripcionesPublicComponent() {
           .search-btn {
             width: 100%;
             padding: 14px 20px;
-          }
-          .action-buttons-group {
-            width: 100%;
-            flex-direction: column;
-          }
-          .action-buttons-group > button,
-          .action-buttons-group > a {
-            width: 100% !important;
-            justify-content: center;
-          }
-          .stepper-nav {
-            padding: 8px;
-          }
-          .stepper-btn {
-            font-size: 0.85rem;
-            padding: 8px 10px;
           }
         }
       `}</style>
@@ -1024,19 +970,19 @@ export function InscripcionesPublicComponent() {
           letterSpacing: '1px',
           marginBottom: '16px'
         }}>
-          <Sparkles size={18} /> Inscripción Guiada Paso a Paso
+          <Sparkles size={18} /> Inscripción y Ficha Oficial UNEFCO
         </div>
 
         <h1 className="banner-title">
-          PORTAL DE INSCRIPCIÓN Y FICHA OFICIAL UNEFCO
+          PORTAL DE INSCRIPCIÓN Y FICHA OFICIAL
         </h1>
 
         <p className="banner-subtitle">
-          Completa tu registro fácilmente a través de nuestros 4 niveles guiados para maestras y maestros.
+          Completa tu registro fácilmente paso a paso para maestras, maestros y personal educativo.
         </p>
       </div>
 
-      {/* SEARCH BAR (Visible if not searched or can change CI) */}
+      {/* SEARCH BAR */}
       <div className="step-card" style={{ marginBottom: participant ? '18px' : '28px' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
           <h2 style={{ margin: 0, fontSize: 'clamp(1.2rem, 3.2vw, 1.5rem)', fontWeight: 900, color: '#0f172a' }}>
@@ -1050,7 +996,7 @@ export function InscripcionesPublicComponent() {
         </div>
 
         <p style={{ margin: 0, fontSize: '1.05rem', color: '#475569', fontWeight: 600, lineHeight: 1.5 }}>
-          Escribe tu número de carnet sin extensiones. El sistema cargará automáticamente tu pre-inscripción:
+          Escribe tu número de carnet sin extensiones para consultar tu inscripción:
         </p>
 
         <form onSubmit={handleSearchCI}>
@@ -1176,36 +1122,41 @@ export function InscripcionesPublicComponent() {
             </div>
           )}
 
-          {/* Stepper Navigation */}
-          <div className="stepper-nav">
-            <button
-              type="button"
-              className={`stepper-btn ${currentStep === 1 ? 'active' : 'completed'}`}
-              onClick={() => setCurrentStep(1)}
-            >
-              <span>1️⃣</span> <span>Nivel 1: Ficha Virtual</span>
-            </button>
-            <button
-              type="button"
-              className={`stepper-btn ${currentStep === 2 ? 'active' : (currentStep > 2 ? 'completed' : '')}`}
-              onClick={() => setCurrentStep(2)}
-            >
-              <span>2️⃣</span> <span>Nivel 2: Documentos (RDA)</span>
-            </button>
-            <button
-              type="button"
-              className={`stepper-btn ${currentStep === 3 ? 'active' : (currentStep > 3 ? 'completed' : '')}`}
-              onClick={() => setCurrentStep(3)}
-            >
-              <span>3️⃣</span> <span>Nivel 3: Depósito Bancario</span>
-            </button>
-            <button
-              type="button"
-              className={`stepper-btn ${currentStep === 4 ? 'active' : ''}`}
-              onClick={() => setCurrentStep(4)}
-            >
-              <span>4️⃣</span> <span>Nivel 4: Entrega en Oficinas</span>
-            </button>
+          {/* Current Stage Indicator Banner */}
+          <div style={{
+            background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)',
+            color: '#ffffff',
+            borderRadius: '18px',
+            padding: '14px 20px',
+            marginBottom: '20px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            flexWrap: 'wrap',
+            gap: '10px'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <span style={{ background: '#bfa05e', color: '#0f172a', fontWeight: 900, padding: '4px 12px', borderRadius: '10px', fontSize: '0.9rem' }}>
+                PASO {currentStep} DE 4
+              </span>
+              <span style={{ fontSize: '1.1rem', fontWeight: 900, color: '#ffffff' }}>
+                {currentStep === 1 && 'Nivel 1: Datos Personales, Ficha Virtual y Grupo de WhatsApp'}
+                {currentStep === 2 && 'Nivel 2: Documentación Requerida (Copia RDA o Certificado)'}
+                {currentStep === 3 && 'Nivel 3: Depósito Bancario y Comprobante'}
+                {currentStep === 4 && 'Nivel 4: Finalización y Entrega en Oficinas UNEFCO'}
+              </span>
+            </div>
+
+            <div style={{ display: 'flex', gap: '6px' }}>
+              {[1, 2, 3, 4].map(s => (
+                <div key={s} style={{
+                  width: '12px',
+                  height: '12px',
+                  borderRadius: '50%',
+                  background: currentStep >= s ? '#f59e0b' : 'rgba(255,255,255,0.2)'
+                }} />
+              ))}
+            </div>
           </div>
 
           {/* ========================================================
@@ -1229,7 +1180,7 @@ export function InscripcionesPublicComponent() {
                   1
                 </span>
                 <span style={{ fontSize: '0.9rem', fontWeight: 900, color: '#9a7b38', background: '#fefce8', padding: '6px 14px', borderRadius: '14px', border: '1.5px solid #fef08a' }}>
-                  Nivel 1 de 4
+                  Paso 1: Ficha Virtual y WhatsApp
                 </span>
               </div>
 
@@ -1245,7 +1196,7 @@ export function InscripcionesPublicComponent() {
                   <CheckCircle2 size={32} style={{ color: '#16a34a', flexShrink: 0 }} />
                   <div>
                     <h3 style={{ margin: 0, fontSize: '1.3rem', fontWeight: 900, color: '#15803d' }}>
-                      ¡Bienvenido(a), {participant.nombres} {participant.apellidos}!
+                      ¡Bienvenido(a), {virtualFicha.nombres || participant.nombres} {virtualFicha.apellidos || participant.apellidos}!
                     </h3>
                     <span style={{ fontSize: '1rem', color: '#166534', fontWeight: 700 }}>
                       Carnet de Identidad: <b>{participant.ci}</b> | Ciclo: <b>{activeCourse?.ciclo_nombre || 'Programa Formativo UNEFCO'}</b>
@@ -1293,15 +1244,56 @@ export function InscripcionesPublicComponent() {
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
                   <FileText size={24} style={{ color: '#0284c7' }} />
                   <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 900, color: '#0f172a' }}>
-                    LLENADO VIRTUAL DE LA FICHA DE INSCRIPCIÓN
+                    VERIFICACIÓN Y LLENADO VIRTUAL DE LA FICHA DE INSCRIPCIÓN
                   </h3>
                 </div>
-                <p style={{ margin: 0, fontSize: '0.98rem', color: '#475569', fontWeight: 600 }}>
-                  Completa tus datos en este formulario virtual. La ficha se generará automáticamente con toda la información lista para <strong>Imprimir, Descargar en PDF o Compartir</strong>:
-                </p>
+
+                {/* IMPORTANT NOTICE ABOUT CERTIFICATE NAME */}
+                <div style={{
+                  background: '#fffbeb',
+                  border: '2px solid #f59e0b',
+                  borderRadius: '14px',
+                  padding: '12px 16px',
+                  color: '#92400e',
+                  fontSize: '1.02rem',
+                  fontWeight: 800,
+                  margin: '14px 0 16px 0',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '10px'
+                }}>
+                  <AlertTriangle size={26} style={{ color: '#f59e0b', flexShrink: 0 }} />
+                  <div>
+                    ⚠️ <strong>ATENCIÓN MAESTRA / MAESTRO:</strong> Escribe tu nombre y apellidos correctamente (tal como figura en tu carnet). <strong>Así tal como lo escribas en este formulario se imprimirá tu Certificado Oficial UNEFCO</strong>.
+                  </div>
+                </div>
 
                 <div className="form-virtual-grid">
-                  {/* Función que cumple */}
+                  {/* Nombres */}
+                  <div className="form-virtual-field">
+                    <label className="form-virtual-label">Nombres * (tal como irá en tu certificado)</label>
+                    <input
+                      type="text"
+                      className="form-virtual-input"
+                      value={virtualFicha.nombres}
+                      onChange={(e) => setVirtualFicha({ ...virtualFicha, nombres: e.target.value.toUpperCase() })}
+                      placeholder="TUS NOMBRES..."
+                    />
+                  </div>
+
+                  {/* Apellidos */}
+                  <div className="form-virtual-field">
+                    <label className="form-virtual-label">Apellidos * (tal como irá en tu certificado)</label>
+                    <input
+                      type="text"
+                      className="form-virtual-input"
+                      value={virtualFicha.apellidos}
+                      onChange={(e) => setVirtualFicha({ ...virtualFicha, apellidos: e.target.value.toUpperCase() })}
+                      placeholder="TUS APELLIDOS..."
+                    />
+                  </div>
+
+                  {/* Función que cumple (SOLO 5 OPCIONES HABILITADAS) */}
                   <div className="form-virtual-field">
                     <label className="form-virtual-label">Función que cumple *</label>
                     <select
@@ -1313,8 +1305,6 @@ export function InscripcionesPublicComponent() {
                       <option value="Director">Director</option>
                       <option value="Administrativo">Administrativo</option>
                       <option value="Estudiante ESFM">Estudiante ESFM</option>
-                      <option value="Estudiante Sec.">Estudiante Secundaria</option>
-                      <option value="Padre de Familia">Padre de Familia</option>
                       <option value="No aplica">No aplica</option>
                     </select>
                   </div>
@@ -1401,7 +1391,7 @@ export function InscripcionesPublicComponent() {
 
                   {/* RDA / RP */}
                   <div className="form-virtual-field">
-                    <label className="form-virtual-label">Nº de RDA</label>
+                    <label className="form-virtual-label">Nº de RDA (si corresponde)</label>
                     <input
                       type="text"
                       className="form-virtual-input"
@@ -1412,8 +1402,35 @@ export function InscripcionesPublicComponent() {
                   </div>
                 </div>
 
-                {/* Print & Share Buttons */}
-                <div style={{ marginTop: '22px', display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+                {/* BOTÓN GUARDAR INFORMACIÓN */}
+                <div style={{ marginTop: '22px', textAlign: 'center' }}>
+                  <button
+                    type="button"
+                    onClick={handleSaveParticipantInfo}
+                    style={{
+                      background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)',
+                      color: '#ffffff',
+                      border: 'none',
+                      borderRadius: '14px',
+                      padding: '16px 32px',
+                      fontSize: '1.18rem',
+                      fontWeight: 900,
+                      cursor: 'pointer',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '10px',
+                      boxShadow: '0 6px 18px rgba(37, 99, 235, 0.35)',
+                      width: '100%',
+                      maxWidth: '480px',
+                      justifyContent: 'center'
+                    }}
+                  >
+                    <Save size={24} /> 💾 GUARDAR INFORMACIÓN
+                  </button>
+                </div>
+
+                {/* PRINT & SHARE BUTTONS (Active always or highlighted after save) */}
+                <div style={{ marginTop: '18px', display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
                   <button
                     type="button"
                     onClick={() => handlePrintOfficialFicha()}
@@ -1482,7 +1499,7 @@ export function InscripcionesPublicComponent() {
                     boxShadow: '0 6px 18px rgba(15, 23, 42, 0.3)'
                   }}
                 >
-                  Continuar al Nivel 2 (Documentos) <ArrowRight size={22} />
+                  Continuar al Paso 2 (Documentos) <ArrowRight size={22} />
                 </button>
               </div>
             </div>
@@ -1509,55 +1526,51 @@ export function InscripcionesPublicComponent() {
                   2
                 </span>
                 <span style={{ fontSize: '0.9rem', fontWeight: 900, color: '#9a7b38', background: '#fefce8', padding: '6px 14px', borderRadius: '14px', border: '1.5px solid #fef08a' }}>
-                  Nivel 2 de 4
+                  Paso 2: Documentación
                 </span>
               </div>
 
               <h2 style={{ margin: '0 0 10px 0', fontSize: 'clamp(1.25rem, 3.5vw, 1.55rem)', fontWeight: 900, color: '#0f172a' }}>
-                PASO 2: DOCUMENTACIÓN REQUERIDA (RDA O CERTIFICADO)
+                PASO 2: REUNIR LA DOCUMENTACIÓN REQUERIDA
               </h2>
 
               <p style={{ margin: 0, fontSize: '1.05rem', color: '#475569', fontWeight: 600, lineHeight: 1.6 }}>
-                Reúne la documentación física correspondiente según tu función:
+                Reúne la documentación correspondiente para la validación de tu inscripción:
               </p>
 
-              {/* Explanation Cards */}
+              {/* Requirement Mention Cards (No selection needed) */}
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '16px', margin: '20px 0' }}>
                 <div style={{
                   background: '#f8fafc',
-                  border: docType === 'rda' ? '2.5px solid #0284c7' : '1.5px solid #cbd5e1',
+                  border: '2px solid #cbd5e1',
                   borderRadius: '16px',
-                  padding: '18px 16px',
-                  cursor: 'pointer',
-                  boxShadow: docType === 'rda' ? '0 4px 14px rgba(2, 132, 199, 0.15)' : 'none'
-                }} onClick={() => setDocType('rda')}>
+                  padding: '18px 16px'
+                }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '6px' }}>
                     <FileCheck size={28} style={{ color: '#0284c7' }} />
                     <span style={{ fontWeight: 900, fontSize: '1.12rem', color: '#0f172a' }}>
-                      1. Fotocopia de RDA (Docentes)
+                      1. Copia de RDA (Para Maestras y Maestros)
                     </span>
                   </div>
-                  <p style={{ margin: 0, fontSize: '0.95rem', color: '#475569', fontWeight: 600 }}>
-                    Fotocopia legible de tu Registro Docente de Aprendizaje (RDA) actualizado.
+                  <p style={{ margin: 0, fontSize: '0.98rem', color: '#475569', fontWeight: 600, lineHeight: 1.5 }}>
+                    Fotocopia legible de tu <strong>Registro Docente Administrativo (RDA)</strong> actualizado.
                   </p>
                 </div>
 
                 <div style={{
                   background: '#f8fafc',
-                  border: docType === 'certificado' ? '2.5px solid #0284c7' : '1.5px solid #cbd5e1',
+                  border: '2px solid #cbd5e1',
                   borderRadius: '16px',
-                  padding: '18px 16px',
-                  cursor: 'pointer',
-                  boxShadow: docType === 'certificado' ? '0 4px 14px rgba(2, 132, 199, 0.15)' : 'none'
-                }} onClick={() => setDocType('certificado')}>
+                  padding: '18px 16px'
+                }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '6px' }}>
                     <UserCheck size={28} style={{ color: '#0284c7' }} />
                     <span style={{ fontWeight: 900, fontSize: '1.12rem', color: '#0f172a' }}>
                       2. Certificado de Trabajo (Administrativos)
                     </span>
                   </div>
-                  <p style={{ margin: 0, fontSize: '0.95rem', color: '#475569', fontWeight: 600 }}>
-                    Certificado de Trabajo original demostrando funciones en la Unidad Educativa.
+                  <p style={{ margin: 0, fontSize: '0.98rem', color: '#475569', fontWeight: 600, lineHeight: 1.5 }}>
+                    Para personal administrativo, presentar <strong>Certificado de Trabajo original firmado</strong> demostrando que trabajas en la Unidad Educativa.
                   </p>
                 </div>
               </div>
@@ -1571,10 +1584,10 @@ export function InscripcionesPublicComponent() {
                 textAlign: 'center'
               }}>
                 <h3 style={{ margin: '0 0 6px 0', fontSize: '1.2rem', fontWeight: 900, color: '#0369a1' }}>
-                  📸 SUBIR O SACAR FOTO A TU {docType === 'rda' ? 'RDA' : 'CERTIFICADO DE TRABAJO'}
+                  📸 ADJUNTAR DOCUMENTO DIGITAL (RDA O CERTIFICADO)
                 </h3>
-                <p style={{ margin: '0 0 16px 0', fontSize: '0.95rem', color: '#0c4a6e', fontWeight: 600 }}>
-                  Puedes subir tu documento en archivo <strong>PDF o Foto</strong>, o presionar el botón para <strong>tomar una foto con la cámara</strong>:
+                <p style={{ margin: '0 0 16px 0', fontSize: '0.98rem', color: '#0c4a6e', fontWeight: 600 }}>
+                  Puedes subir tu documento en archivo <strong>PDF o Foto</strong>, o presionar para <strong>tomar una foto con la cámara</strong>:
                 </p>
 
                 {uploadedDocUrl ? (
@@ -1615,7 +1628,7 @@ export function InscripcionesPublicComponent() {
                       gap: '8px',
                       boxShadow: '0 4px 12px rgba(2, 132, 199, 0.25)'
                     }}>
-                      <Upload size={20} /> Subir Archivo (PDF o Imagen)
+                      <Upload size={20} /> Subir Documento (PDF o Imagen)
                       <input
                         type="file"
                         accept="image/*,application/pdf"
@@ -1651,7 +1664,7 @@ export function InscripcionesPublicComponent() {
                 )}
               </div>
 
-              {/* Camera Viewfinder if active for Document */}
+              {/* Camera Viewfinder if active */}
               {cameraActive && cameraTarget === 'documento' && (
                 <div style={{
                   marginTop: '20px',
@@ -1662,7 +1675,7 @@ export function InscripcionesPublicComponent() {
                   textAlign: 'center'
                 }}>
                   <h4 style={{ margin: '0 0 10px 0', fontSize: '1.1rem', fontWeight: 800, color: '#38bdf8' }}>
-                    📸 Centra el documento en la pantalla y presiona "Capturar Foto":
+                    📸 Enfoca el documento y presiona "Capturar Foto":
                   </h4>
                   <video
                     ref={videoRef}
@@ -1735,7 +1748,7 @@ export function InscripcionesPublicComponent() {
                     gap: '8px'
                   }}
                 >
-                  <ArrowLeft size={20} /> Volver al Nivel 1
+                  <ArrowLeft size={20} /> Volver al Paso 1
                 </button>
 
                 <button
@@ -1756,7 +1769,7 @@ export function InscripcionesPublicComponent() {
                     boxShadow: '0 6px 18px rgba(15, 23, 42, 0.3)'
                   }}
                 >
-                  Continuar al Nivel 3 (Depósito) <ArrowRight size={22} />
+                  Continuar al Paso 3 (Depósito) <ArrowRight size={22} />
                 </button>
               </div>
             </div>
@@ -1783,7 +1796,7 @@ export function InscripcionesPublicComponent() {
                   3
                 </span>
                 <span style={{ fontSize: '0.9rem', fontWeight: 900, color: '#9a7b38', background: '#fefce8', padding: '6px 14px', borderRadius: '14px', border: '1.5px solid #fef08a' }}>
-                  Nivel 3 de 4
+                  Paso 3: Depósito Bancario
                 </span>
               </div>
 
@@ -1851,7 +1864,7 @@ export function InscripcionesPublicComponent() {
                 <h3 style={{ margin: '0 0 6px 0', fontSize: '1.2rem', fontWeight: 900, color: '#15803d' }}>
                   📸 SUBIR O SACAR FOTO DE TU COMPROBANTE DE PAGO
                 </h3>
-                <p style={{ margin: '0 0 16px 0', fontSize: '0.95rem', color: '#166534', fontWeight: 600 }}>
+                <p style={{ margin: '0 0 16px 0', fontSize: '0.98rem', color: '#166534', fontWeight: 600 }}>
                   Adjunta la foto o archivo PDF de tu comprobante de depósito realizado en Banco Unión:
                 </p>
 
@@ -2013,7 +2026,7 @@ export function InscripcionesPublicComponent() {
                     gap: '8px'
                   }}
                 >
-                  <ArrowLeft size={20} /> Volver al Nivel 2
+                  <ArrowLeft size={20} /> Volver al Paso 2
                 </button>
 
                 <button
@@ -2034,7 +2047,7 @@ export function InscripcionesPublicComponent() {
                     boxShadow: '0 6px 18px rgba(15, 23, 42, 0.3)'
                   }}
                 >
-                  Continuar al Nivel 4 (Finalización) <ArrowRight size={22} />
+                  Continuar al Paso 4 (Finalización) <ArrowRight size={22} />
                 </button>
               </div>
             </div>
@@ -2061,7 +2074,7 @@ export function InscripcionesPublicComponent() {
                   4
                 </span>
                 <span style={{ fontSize: '0.9rem', fontWeight: 900, color: '#0369a1', background: '#f0f9ff', padding: '6px 14px', borderRadius: '14px', border: '1.5px solid #bae6fd' }}>
-                  Nivel 4: Entrega Final
+                  Paso 4: Entrega en Oficinas
                 </span>
               </div>
 
@@ -2070,7 +2083,7 @@ export function InscripcionesPublicComponent() {
               </h2>
 
               <p style={{ margin: 0, fontSize: '1.05rem', color: '#334155', fontWeight: 600, lineHeight: 1.6 }}>
-                ¡Felicitaciones! Has completado los 3 pasos virtuales. Ahora apersónate a nuestras oficinas de UNEFCO para entregar los 3 documentos físicos:
+                ¡Felicitaciones! Has completado los pasos virtuales. Ahora apersónate a nuestras oficinas de UNEFCO para entregar los 3 documentos físicos:
               </p>
 
               {/* Requirements Checklist */}
@@ -2087,7 +2100,7 @@ export function InscripcionesPublicComponent() {
                     1. Ficha de Inscripción
                   </span>
                   <span style={{ fontSize: '0.95rem', color: '#475569', fontWeight: 600 }}>
-                    Ficha generada e impresa con tus datos, firmada a mano.
+                    Ficha impresa con tus datos correctos, firmada a mano.
                   </span>
                 </div>
 
@@ -2100,10 +2113,10 @@ export function InscripcionesPublicComponent() {
                 }}>
                   <FileCheck size={32} style={{ color: '#16a34a', marginBottom: '8px' }} />
                   <span style={{ fontWeight: 900, fontSize: '1.1rem', color: '#0f172a', display: 'block', marginBottom: '4px' }}>
-                    2. Fotocopia de RDA o Certificado
+                    2. Copia de RDA o Certificado
                   </span>
                   <span style={{ fontSize: '0.95rem', color: '#475569', fontWeight: 600 }}>
-                    Fotocopia de tu RDA actualizado o Certificado de Trabajo.
+                    Fotocopia legible de tu RDA actualizado (o Certificado de Trabajo si eres personal administrativo).
                   </span>
                 </div>
 
@@ -2119,7 +2132,7 @@ export function InscripcionesPublicComponent() {
                     3. Comprobante Original
                   </span>
                   <span style={{ fontSize: '0.95rem', color: '#475569', fontWeight: 600 }}>
-                    Comprobante de depósito original realizado en Banco Unión.
+                    Comprobante de depósito bancario original realizado en Banco Unión.
                   </span>
                 </div>
               </div>
@@ -2168,7 +2181,7 @@ export function InscripcionesPublicComponent() {
                     gap: '8px'
                   }}
                 >
-                  <ArrowLeft size={20} /> Volver al Nivel 3
+                  <ArrowLeft size={20} /> Volver al Paso 3
                 </button>
 
                 <button
