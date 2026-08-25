@@ -252,8 +252,9 @@ export function InscripcionesPublicComponent() {
         });
 
         // Set existing document if any
-        if (coursesList[0]?.documento_url) {
-          setUploadedDocUrl(coursesList[0].documento_url);
+        const existingDoc = partData?.documento_url || coursesList.find(c => c.documento_url)?.documento_url || null;
+        if (existingDoc) {
+          setUploadedDocUrl(existingDoc);
         }
       } else {
         setParticipant(null);
@@ -423,13 +424,31 @@ export function InscripcionesPublicComponent() {
       setUploadedDocUrl(filePublicUrl);
       setGuideNextStep(true);
 
-      const activeCourse = participant.cursos[selectedCourseIdx];
-      if (activeCourse?.inscripcion_id) {
-        await supabase
-          .from('inscripcion_ciclo')
-          .update({ documento_url: filePublicUrl } as any)
-          .eq('id', activeCourse.inscripcion_id);
-      }
+      // 1. Update in participantes table (shared across all cycles)
+      await supabase
+        .from('participantes')
+        .update({ documento_url: filePublicUrl } as any)
+        .eq('ci', participant.ci);
+
+      // 2. Update in all inscripcion_ciclo records for this CI
+      await supabase
+        .from('inscripcion_ciclo')
+        .update({ documento_url: filePublicUrl } as any)
+        .eq('participante_ci', participant.ci);
+
+      await supabase
+        .from('inscripcion_ciclo')
+        .update({ documento_url: filePublicUrl } as any)
+        .eq('ci_participante', participant.ci);
+
+      // 3. Update local state for all courses
+      setParticipant(prev => {
+        if (!prev) return null;
+        return {
+          ...prev,
+          cursos: prev.cursos.map(c => ({ ...c, documento_url: filePublicUrl }))
+        };
+      });
 
       Swal.fire({
         icon: 'success',
@@ -521,6 +540,41 @@ export function InscripcionesPublicComponent() {
     } finally {
       setUploadingCourseId(null);
     }
+  };
+
+  // Step Navigation with Smooth Top Autoscroll
+  const goToStep = (step: number) => {
+    setCurrentStep(step);
+    setGuideNextStep(false);
+    if (typeof window !== 'undefined') {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  };
+
+  // Lightbox for Document / Voucher Preview
+  const handleViewLightbox = (url: string, title: string) => {
+    if (!url) return;
+    Swal.fire({
+      title: title,
+      html: `
+        <div style="text-align: center; max-height: 70vh; overflow-y: auto;">
+          ${url.toLowerCase().endsWith('.pdf') ? `
+            <iframe src="${url}" style="width: 100%; height: 500px; border: none; border-radius: 8px;"></iframe>
+          ` : `
+            <img src="${url}" alt="${title}" style="max-width: 100%; border-radius: 8px; box-shadow: 0 4px 14px rgba(0,0,0,0.15);" />
+          `}
+        </div>
+      `,
+      showCancelButton: true,
+      confirmButtonText: '🔍 Abrir en Pantalla Completa',
+      cancelButtonText: 'Cerrar',
+      confirmButtonColor: '#0284c7',
+      width: '680px'
+    }).then((res) => {
+      if (res.isConfirmed) {
+        window.open(url, '_blank');
+      }
+    });
   };
 
   // Share Ficha via WhatsApp / Web Share
@@ -1236,14 +1290,31 @@ export function InscripcionesPublicComponent() {
               </span>
             </div>
 
-            <div style={{ display: 'flex', gap: '6px' }}>
+            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
               {[1, 2, 3, 4].map(s => (
-                <div key={s} style={{
-                  width: '12px',
-                  height: '12px',
-                  borderRadius: '50%',
-                  background: currentStep >= s ? '#f59e0b' : 'rgba(255,255,255,0.2)'
-                }} />
+                <button
+                  key={s}
+                  type="button"
+                  onClick={() => goToStep(s)}
+                  title={`Ir al Paso ${s}`}
+                  style={{
+                    width: '32px',
+                    height: '32px',
+                    borderRadius: '50%',
+                    border: currentStep === s ? '2px solid #ffffff' : 'none',
+                    background: currentStep === s ? '#f59e0b' : (currentStep > s ? '#16a34a' : 'rgba(255,255,255,0.25)'),
+                    color: '#ffffff',
+                    fontWeight: 900,
+                    fontSize: '0.88rem',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    boxShadow: currentStep === s ? '0 0 10px rgba(245, 158, 11, 0.6)' : 'none'
+                  }}
+                >
+                  {currentStep > s ? '✓' : s}
+                </button>
               ))}
             </div>
           </div>
@@ -1577,10 +1648,7 @@ export function InscripcionesPublicComponent() {
                 )}
                 <button
                   type="button"
-                  onClick={() => {
-                    setCurrentStep(2);
-                    setGuideNextStep(false);
-                  }}
+                  onClick={() => goToStep(2)}
                   style={{
                     background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)',
                     color: '#ffffff',
@@ -1689,20 +1757,75 @@ export function InscripcionesPublicComponent() {
 
                 {uploadedDocUrl ? (
                   <div style={{
-                    background: '#dcfce7',
-                    border: '2px solid #16a34a',
-                    borderRadius: '14px',
-                    padding: '14px',
-                    color: '#166534',
-                    fontWeight: 800,
-                    fontSize: '1.05rem',
+                    background: '#f0fdf4',
+                    border: '2px solid #86efac',
+                    borderRadius: '16px',
+                    padding: '16px',
+                    margin: '16px 0',
                     display: 'flex',
+                    flexDirection: 'column',
                     alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: '10px',
-                    marginBottom: '14px'
+                    gap: '12px'
                   }}>
-                    <CheckCircle2 size={24} /> ¡Documento adjuntado exitosamente en el sistema!
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#166534', fontWeight: 800, fontSize: '1.05rem' }}>
+                      <CheckCircle2 size={24} style={{ color: '#16a34a' }} /> ¡Documento adjuntado exitosamente en el sistema!
+                    </div>
+
+                    {/* Thumbnail preview */}
+                    <div style={{ maxWidth: '280px', maxHeight: '180px', overflow: 'hidden', borderRadius: '10px', border: '1.5px solid #86efac', background: '#ffffff', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '6px' }}>
+                      {uploadedDocUrl.toLowerCase().endsWith('.pdf') ? (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '16px', color: '#0284c7', fontWeight: 800 }}>
+                          <FileText size={36} /> Documento PDF Adjunto
+                        </div>
+                      ) : (
+                        <img src={uploadedDocUrl} alt="Vista previa RDA / Certificado" style={{ maxWidth: '100%', maxHeight: '160px', objectFit: 'contain', borderRadius: '6px' }} />
+                      )}
+                    </div>
+
+                    <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', justifyContent: 'center' }}>
+                      <button
+                        type="button"
+                        onClick={() => handleViewLightbox(uploadedDocUrl, 'RDA / Certificado de Trabajo')}
+                        style={{
+                          background: 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)',
+                          color: '#ffffff',
+                          border: 'none',
+                          borderRadius: '10px',
+                          padding: '10px 18px',
+                          fontSize: '0.95rem',
+                          fontWeight: 800,
+                          cursor: 'pointer',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '6px',
+                          boxShadow: '0 2px 8px rgba(2, 132, 199, 0.25)'
+                        }}
+                      >
+                        <Eye size={18} /> 🔍 Ver Documento
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setUploadedDocUrl(null);
+                        }}
+                        style={{
+                          background: '#f1f5f9',
+                          color: '#334155',
+                          border: '1.5px solid #cbd5e1',
+                          borderRadius: '10px',
+                          padding: '10px 18px',
+                          fontSize: '0.95rem',
+                          fontWeight: 800,
+                          cursor: 'pointer',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '6px'
+                        }}
+                      >
+                        <RefreshCw size={18} /> 🔄 Volver a Sacar Foto o Subir Otro Archivo
+                      </button>
+                    </div>
                   </div>
                 ) : null}
 
@@ -1831,7 +1954,7 @@ export function InscripcionesPublicComponent() {
               <div ref={nextStepRef} style={{ marginTop: '28px', display: 'flex', justifyContent: 'space-between', gap: '10px', flexWrap: 'wrap', alignItems: 'center' }}>
                 <button
                   type="button"
-                  onClick={() => setCurrentStep(1)}
+                  onClick={() => goToStep(1)}
                   style={{
                     background: '#f1f5f9',
                     color: '#334155',
@@ -1857,10 +1980,7 @@ export function InscripcionesPublicComponent() {
                   )}
                   <button
                     type="button"
-                    onClick={() => {
-                      setCurrentStep(3);
-                      setGuideNextStep(false);
-                    }}
+                    onClick={() => goToStep(3)}
                     style={{
                       background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)',
                       color: '#ffffff',
@@ -1916,6 +2036,61 @@ export function InscripcionesPublicComponent() {
                 Realiza el depósito correspondiente a la cuenta oficial de UNEFCO en Banco Unión:
               </p>
 
+              {/* Multi-cycle Selector for Deposits */}
+              {participant && participant.cursos.length > 1 && (
+                <div style={{
+                  background: '#f8fafc',
+                  border: '2px solid #cbd5e1',
+                  borderRadius: '16px',
+                  padding: '16px 18px',
+                  margin: '18px 0 6px 0'
+                }}>
+                  <label style={{ fontSize: '1rem', fontWeight: 900, color: '#0f172a', display: 'block', marginBottom: '10px' }}>
+                    📚 Estás inscrito(a) en {participant.cursos.length} Ciclos Formativos. Selecciona el ciclo para registrar o verificar su comprobante:
+                  </label>
+                  <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+                    {participant.cursos.map((c, idx) => (
+                      <button
+                        key={c.id || idx}
+                        type="button"
+                        onClick={() => setSelectedCourseIdx(idx)}
+                        style={{
+                          flex: '1 1 220px',
+                          background: selectedCourseIdx === idx ? 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)' : '#ffffff',
+                          color: selectedCourseIdx === idx ? '#ffffff' : '#1e293b',
+                          border: selectedCourseIdx === idx ? '2.5px solid #bfa05e' : '2px solid #cbd5e1',
+                          borderRadius: '14px',
+                          padding: '12px 16px',
+                          fontSize: '0.95rem',
+                          fontWeight: 800,
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          gap: '8px',
+                          boxShadow: selectedCourseIdx === idx ? '0 4px 14px rgba(15, 23, 42, 0.25)' : 'none'
+                        }}
+                      >
+                        <span style={{ textAlign: 'left', lineHeight: 1.3 }}>
+                          <strong>Ciclo {idx + 1}:</strong> {c.ciclo_nombre}
+                        </span>
+                        <span style={{
+                          background: c.comprobante_url ? '#16a34a' : '#f59e0b',
+                          color: '#ffffff',
+                          borderRadius: '8px',
+                          padding: '3px 8px',
+                          fontSize: '0.78rem',
+                          fontWeight: 900,
+                          whiteSpace: 'nowrap'
+                        }}>
+                          {c.comprobante_url ? '✅ Subido' : '⏳ Pendiente'}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {/* Official Bank Account Banner */}
               <div style={{
                 background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)',
@@ -1953,7 +2128,7 @@ export function InscripcionesPublicComponent() {
                   </div>
 
                   <div style={{ textAlign: 'right' }}>
-                    <span style={{ fontSize: '0.95rem', color: '#cbd5e1', fontWeight: 700, display: 'block' }}>Monto por Ciclo:</span>
+                    <span style={{ fontSize: '0.95rem', color: '#cbd5e1', fontWeight: 700, display: 'block' }}>Monto para {activeCourse?.ciclo_nombre?.slice(0, 25)}:</span>
                     <span style={{ fontSize: '1.6rem', fontWeight: 900, color: '#facc15' }}>
                       Bs. {activeCourse?.costo || 150}
                     </span>
@@ -1973,25 +2148,86 @@ export function InscripcionesPublicComponent() {
                   📸 SUBIR O SACAR FOTO DE TU COMPROBANTE DE PAGO
                 </h3>
                 <p style={{ margin: '0 0 16px 0', fontSize: '0.98rem', color: '#166534', fontWeight: 600 }}>
-                  Adjunta la foto o archivo PDF de tu comprobante de depósito realizado en Banco Unión:
+                  Adjunta la foto o archivo PDF de tu comprobante de depósito realizado en Banco Unión para <strong>{activeCourse?.ciclo_nombre}</strong>:
                 </p>
 
                 {activeCourse?.comprobante_url ? (
                   <div style={{
-                    background: '#dcfce7',
-                    border: '2px solid #16a34a',
-                    borderRadius: '14px',
-                    padding: '14px',
-                    color: '#166534',
-                    fontWeight: 800,
-                    fontSize: '1.05rem',
+                    background: '#f0fdf4',
+                    border: '2px solid #86efac',
+                    borderRadius: '16px',
+                    padding: '16px',
+                    margin: '16px 0',
                     display: 'flex',
+                    flexDirection: 'column',
                     alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: '10px',
-                    marginBottom: '14px'
+                    gap: '12px'
                   }}>
-                    <CheckCircle2 size={24} /> ¡Comprobante de depósito registrado correctamente!
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#166534', fontWeight: 800, fontSize: '1.05rem' }}>
+                      <CheckCircle2 size={24} style={{ color: '#16a34a' }} /> ¡Comprobante de depósito registrado para {activeCourse.ciclo_nombre}!
+                    </div>
+
+                    {/* Thumbnail preview */}
+                    <div style={{ maxWidth: '280px', maxHeight: '180px', overflow: 'hidden', borderRadius: '10px', border: '1.5px solid #86efac', background: '#ffffff', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '6px' }}>
+                      {activeCourse.comprobante_url.toLowerCase().endsWith('.pdf') ? (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '16px', color: '#15803d', fontWeight: 800 }}>
+                          <FileText size={36} /> Comprobante PDF Adjunto
+                        </div>
+                      ) : (
+                        <img src={activeCourse.comprobante_url} alt="Vista previa Comprobante" style={{ maxWidth: '100%', maxHeight: '160px', objectFit: 'contain', borderRadius: '6px' }} />
+                      )}
+                    </div>
+
+                    <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', justifyContent: 'center' }}>
+                      <button
+                        type="button"
+                        onClick={() => handleViewLightbox(activeCourse.comprobante_url!, `Comprobante de Pago - ${activeCourse.ciclo_nombre}`)}
+                        style={{
+                          background: 'linear-gradient(135deg, #16a34a 0%, #15803d 100%)',
+                          color: '#ffffff',
+                          border: 'none',
+                          borderRadius: '10px',
+                          padding: '10px 18px',
+                          fontSize: '0.95rem',
+                          fontWeight: 800,
+                          cursor: 'pointer',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '6px',
+                          boxShadow: '0 2px 8px rgba(22, 163, 74, 0.25)'
+                        }}
+                      >
+                        <Eye size={18} /> 🔍 Ver Comprobante
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setParticipant(prev => {
+                            if (!prev) return null;
+                            return {
+                              ...prev,
+                              cursos: prev.cursos.map(c => c.id === activeCourse.id ? { ...c, comprobante_url: null } : c)
+                            };
+                          });
+                        }}
+                        style={{
+                          background: '#f1f5f9',
+                          color: '#334155',
+                          border: '1.5px solid #cbd5e1',
+                          borderRadius: '10px',
+                          padding: '10px 18px',
+                          fontSize: '0.95rem',
+                          fontWeight: 800,
+                          cursor: 'pointer',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '6px'
+                        }}
+                      >
+                        <RefreshCw size={18} /> 🔄 Volver a Sacar Foto o Cambiar Comprobante
+                      </button>
+                    </div>
                   </div>
                 ) : null}
 
@@ -2120,7 +2356,7 @@ export function InscripcionesPublicComponent() {
               <div ref={nextStepRef} style={{ marginTop: '28px', display: 'flex', justifyContent: 'space-between', gap: '10px', flexWrap: 'wrap', alignItems: 'center' }}>
                 <button
                   type="button"
-                  onClick={() => setCurrentStep(2)}
+                  onClick={() => goToStep(2)}
                   style={{
                     background: '#f1f5f9',
                     color: '#334155',
@@ -2146,10 +2382,7 @@ export function InscripcionesPublicComponent() {
                   )}
                   <button
                     type="button"
-                    onClick={() => {
-                      setCurrentStep(4);
-                      setGuideNextStep(false);
-                    }}
+                    onClick={() => goToStep(4)}
                     style={{
                       background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)',
                       color: '#ffffff',
@@ -2297,7 +2530,7 @@ export function InscripcionesPublicComponent() {
               <div style={{ marginTop: '28px', display: 'flex', justifyContent: 'space-between', gap: '10px', flexWrap: 'wrap' }}>
                 <button
                   type="button"
-                  onClick={() => setCurrentStep(3)}
+                  onClick={() => goToStep(3)}
                   style={{
                     background: '#f1f5f9',
                     color: '#334155',

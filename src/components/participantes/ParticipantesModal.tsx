@@ -21,6 +21,7 @@ interface Participante {
   celular: string | null;
   sie: string | null;
   unidad_educativa: string | null;
+  documento_url?: string | null;
   validado: boolean;
   observaciones_sie: string | null;
 }
@@ -253,6 +254,8 @@ export default function ParticipantesModal({
           nro,
           pagos,
           observaciones,
+          comprobante_url,
+          documento_url,
           participantes (
             ci,
             nombres,
@@ -261,6 +264,7 @@ export default function ParticipantesModal({
             celular,
             sie,
             unidad_educativa,
+            documento_url,
             validado,
             observaciones_sie
           )
@@ -2168,6 +2172,70 @@ export default function ParticipantesModal({
     printWindow.document.close();
   };
 
+  // Direct printable window for documents / photos
+  const handlePrintDirect = (url: string, title: string) => {
+    if (!url) return;
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+      window.open(url, '_blank');
+      return;
+    }
+    const isPdf = url.toLowerCase().endsWith('.pdf');
+    if (isPdf) {
+      printWindow.location.href = url;
+      return;
+    }
+    printWindow.document.write(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>${title}</title>
+        <style>
+          @page { size: letter portrait; margin: 10mm; }
+          body { margin: 0; padding: 10px; display: flex; flex-direction: column; align-items: center; font-family: sans-serif; }
+          .header { text-align: center; margin-bottom: 10px; font-size: 14px; font-weight: bold; color: #1e293b; }
+          img { max-width: 100%; max-height: 90vh; object-fit: contain; border-radius: 4px; box-shadow: 0 1px 4px rgba(0,0,0,0.1); }
+        </style>
+      </head>
+      <body>
+        <div class="header">${title}</div>
+        <img src="${url}" alt="${title}" onload="window.print(); setTimeout(() => window.close(), 600);" />
+      </body>
+      </html>
+    `);
+    printWindow.document.close();
+  };
+
+  // View RDA or Work Certificate lightbox
+  const handleViewDocument = (url: string, name: string) => {
+    if (!url) {
+      Swal.fire('Sin documento', 'Este participante aún no ha subido su RDA o Certificado de Trabajo.', 'info');
+      return;
+    }
+
+    Swal.fire({
+      title: `RDA / Certificado de Trabajo - ${name}`,
+      html: `
+        <div style="text-align: center; max-height: 70vh; overflow-y: auto;">
+          ${url.toLowerCase().endsWith('.pdf') ? `
+            <iframe src="${url}" style="width: 100%; height: 500px; border: none; border-radius: 8px;"></iframe>
+          ` : `
+            <img src="${url}" alt="Documento RDA / Certificado" style="max-width: 100%; border-radius: 8px; box-shadow: 0 4px 14px rgba(0,0,0,0.15);" />
+          `}
+        </div>
+      `,
+      showCancelButton: true,
+      confirmButtonText: '🖨️ Imprimir / Abrir Documento',
+      cancelButtonText: 'Cerrar',
+      confirmButtonColor: '#0284c7',
+      width: '680px'
+    }).then((res) => {
+      if (res.isConfirmed) {
+        handlePrintDirect(url, `RDA / Certificado - ${name}`);
+      }
+    });
+  };
+
   // View deposit voucher lightbox
   const handleViewComprobante = (url: string, name: string) => {
     if (!url) {
@@ -2187,13 +2255,13 @@ export default function ParticipantesModal({
         </div>
       `,
       showCancelButton: true,
-      confirmButtonText: 'Abrir en pestaña nueva / Imprimir',
+      confirmButtonText: '🖨️ Imprimir / Abrir Comprobante',
       cancelButtonText: 'Cerrar',
       confirmButtonColor: '#2563eb',
       width: '650px'
     }).then((res) => {
       if (res.isConfirmed) {
-        window.open(url, '_blank');
+        handlePrintDirect(url, `Comprobante de Pago - ${name}`);
       }
     });
   };
@@ -2971,6 +3039,7 @@ export default function ParticipantesModal({
                         sieConnected={!!sieSession}
                         onRefresh={fetchParticipantes}
                         onPrintFicha={handlePrintFichaForParticipant}
+                        onViewDocument={handleViewDocument}
                         onViewComprobante={handleViewComprobante}
                       />
                     );
@@ -3195,6 +3264,7 @@ interface RowComponentProps {
   sieConnected: boolean;
   onRefresh: () => void;
   onPrintFicha: (p: Participante) => void;
+  onViewDocument: (url: string, name: string) => void;
   onViewComprobante: (url: string, name: string) => void;
 }
 
@@ -3211,6 +3281,7 @@ function RowComponent({
   sieConnected,
   onRefresh,
   onPrintFicha,
+  onViewDocument,
   onViewComprobante
 }: RowComponentProps) {
   const [pagos, setPagos] = useState(ins.pagos || 'Pendiente');
@@ -3219,6 +3290,8 @@ function RowComponent({
   const [rda, setRda] = useState(p.rda || '');
   const [celular, setCelular] = useState(p.celular || '');
   const [saving, setSaving] = useState(false);
+
+  const docUrl = ins.documento_url || p.documento_url || null;
 
   // Synchronize internal state with changes to props from parent
   useEffect(() => {
@@ -3595,25 +3668,48 @@ function RowComponent({
             </span>
           )}
 
-          {/* Imprimir / Ver Ficha Oficial de Inscripción */}
+          {/* 1. Imprimir / Ver Ficha Oficial de Inscripción */}
           <button
             type="button"
             className="btn btn-xs"
             onClick={() => onPrintFicha(p)}
-            title="Imprimir / Ver Ficha Oficial de Inscripción (PDF)"
-            style={{ padding: '6px', background: '#10b981', color: '#ffffff', border: 'none', borderRadius: '4px' }}
+            title="📄 1. Imprimir / Ver Ficha Oficial de Inscripción (2 copias en hoja carta)"
+            style={{ padding: '6px', background: '#10b981', color: '#ffffff', border: 'none', borderRadius: '4px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
           >
             <FileText size={12} />
           </button>
 
-          {/* Ver Comprobante de Depósito */}
+          {/* 2. Ver / Imprimir RDA o Certificado de Trabajo */}
+          {docUrl ? (
+            <button
+              type="button"
+              className="btn btn-xs"
+              onClick={() => onViewDocument(docUrl, `${p.apellidos} ${p.nombres}`)}
+              title="🪪 2. Ver / Imprimir Fotocopia RDA o Certificado de Trabajo"
+              style={{ padding: '6px', background: '#0284c7', color: '#ffffff', border: 'none', borderRadius: '4px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
+            >
+              <IdCard size={12} />
+            </button>
+          ) : (
+            <button
+              type="button"
+              className="btn btn-xs"
+              onClick={() => onViewDocument('', `${p.apellidos} ${p.nombres}`)}
+              title="Sin RDA o Certificado de Trabajo subido"
+              style={{ padding: '6px', background: '#f1f5f9', color: '#94a3b8', border: '1px solid #cbd5e1', borderRadius: '4px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
+            >
+              <IdCard size={12} />
+            </button>
+          )}
+
+          {/* 3. Ver / Imprimir Comprobante de Depósito */}
           {ins.comprobante_url ? (
             <button
               type="button"
               className="btn btn-xs"
               onClick={() => onViewComprobante(ins.comprobante_url!, `${p.apellidos} ${p.nombres}`)}
-              title="Ver Comprobante de Depósito Bancario Subido"
-              style={{ padding: '6px', background: '#6366f1', color: '#ffffff', border: 'none', borderRadius: '4px' }}
+              title="💳 3. Ver / Imprimir Comprobante de Depósito Bancario"
+              style={{ padding: '6px', background: '#6366f1', color: '#ffffff', border: 'none', borderRadius: '4px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
             >
               <CreditCard size={12} />
             </button>
@@ -3622,8 +3718,8 @@ function RowComponent({
               type="button"
               className="btn btn-xs"
               onClick={() => onViewComprobante('', `${p.apellidos} ${p.nombres}`)}
-              title="Sin comprobante subido"
-              style={{ padding: '6px', background: '#f1f5f9', color: '#94a3b8', border: '1px solid #cbd5e1', borderRadius: '4px' }}
+              title="Sin comprobante de depósito subido para este ciclo"
+              style={{ padding: '6px', background: '#f1f5f9', color: '#94a3b8', border: '1px solid #cbd5e1', borderRadius: '4px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
             >
               <CreditCard size={12} />
             </button>
