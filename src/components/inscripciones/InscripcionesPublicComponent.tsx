@@ -583,12 +583,13 @@ export function InscripcionesPublicComponent() {
     setCurrentStep(step);
     setGuideNextStep(false);
     setTimeout(() => {
-      if (wizardStepsRef.current) {
-        wizardStepsRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      const el = (step === 4 ? document.getElementById('step-4-card') : null) || wizardStepsRef.current;
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'start' });
       } else if (typeof window !== 'undefined') {
         window.scrollTo({ top: 0, behavior: 'smooth' });
       }
-    }, 50);
+    }, 80);
   };
 
   // Congratulatory dialog before proceeding from Step 3 to Step 4 (Informativo)
@@ -614,15 +615,16 @@ export function InscripcionesPublicComponent() {
       confirmButtonText: '📖 Continuar y Leer Paso 4 Informativo 👉',
       confirmButtonColor: '#0284c7',
       allowOutsideClick: false,
-      width: '580px'
-    }).then((result) => {
-      if (result.isConfirmed) {
-        goToStep(4);
+      width: '580px',
+      didClose: () => {
+        setCurrentStep(4);
+        setGuideNextStep(false);
         setTimeout(() => {
-          if (wizardStepsRef.current) {
-            wizardStepsRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          const el = document.getElementById('step-4-card') || wizardStepsRef.current;
+          if (el) {
+            el.scrollIntoView({ behavior: 'smooth', block: 'start' });
           }
-        }, 120);
+        }, 150);
       }
     });
   };
@@ -2562,7 +2564,7 @@ export function InscripcionesPublicComponent() {
               NIVEL 4: INFORMATIVO - RESUMEN FINAL, OFICINAS Y CONTACTOS
              ======================================================== */}
           {currentStep === 4 && (
-            <div className="step-card step-card-blue">
+            <div id="step-4-card" className="step-card step-card-blue" style={{ scrollMarginTop: '24px' }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
                 <span style={{
                   width: '50px',
@@ -2608,13 +2610,14 @@ export function InscripcionesPublicComponent() {
               </div>
 
               {/* Requirements Checklist */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '16px', margin: '20px 0' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '14px', margin: '20px 0', width: '100%', boxSizing: 'border-box' }}>
                 <div style={{
                   background: '#ffffff',
                   border: '2px solid #cbd5e1',
                   borderRadius: '16px',
                   padding: '18px 16px',
-                  boxShadow: '0 4px 12px rgba(0,0,0,0.04)'
+                  boxShadow: '0 4px 12px rgba(0,0,0,0.04)',
+                  boxSizing: 'border-box'
                 }}>
                   <FileText size={32} style={{ color: '#0284c7', marginBottom: '8px' }} />
                   <span style={{ fontWeight: 900, fontSize: '1.1rem', color: '#0f172a', display: 'block', marginBottom: '4px' }}>
@@ -2630,7 +2633,8 @@ export function InscripcionesPublicComponent() {
                   border: '2px solid #cbd5e1',
                   borderRadius: '16px',
                   padding: '18px 16px',
-                  boxShadow: '0 4px 12px rgba(0,0,0,0.04)'
+                  boxShadow: '0 4px 12px rgba(0,0,0,0.04)',
+                  boxSizing: 'border-box'
                 }}>
                   <FileCheck size={32} style={{ color: '#16a34a', marginBottom: '8px' }} />
                   <span style={{ fontWeight: 900, fontSize: '1.1rem', color: '#0f172a', display: 'block', marginBottom: '4px' }}>
@@ -2646,7 +2650,8 @@ export function InscripcionesPublicComponent() {
                   border: '2px solid #cbd5e1',
                   borderRadius: '16px',
                   padding: '18px 16px',
-                  boxShadow: '0 4px 12px rgba(0,0,0,0.04)'
+                  boxShadow: '0 4px 12px rgba(0,0,0,0.04)',
+                  boxSizing: 'border-box'
                 }}>
                   <CreditCard size={32} style={{ color: '#bfa05e', marginBottom: '8px' }} />
                   <span style={{ fontWeight: 900, fontSize: '1.1rem', color: '#0f172a', display: 'block', marginBottom: '4px' }}>
@@ -2664,7 +2669,9 @@ export function InscripcionesPublicComponent() {
                 color: '#ffffff',
                 borderRadius: '20px',
                 padding: '22px 18px',
-                boxShadow: '0 8px 20px rgba(2, 132, 199, 0.3)'
+                boxShadow: '0 8px 20px rgba(2, 132, 199, 0.3)',
+                boxSizing: 'border-box',
+                width: '100%'
               }}>
                 <div style={{ fontWeight: 900, fontSize: '1.25rem', color: '#ffffff', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '10px' }}>
                   <Building2 size={26} /> LUGAR Y HORARIO DE ATENCIÓN EN OFICINAS:
@@ -2688,15 +2695,23 @@ export function InscripcionesPublicComponent() {
                 background: '#ffffff',
                 border: '2.5px solid #cbd5e1',
                 borderRadius: '20px',
-                padding: '22px 20px',
+                padding: '20px 18px',
                 marginTop: '20px',
-                boxShadow: '0 4px 14px rgba(0,0,0,0.04)'
+                boxShadow: '0 4px 14px rgba(0,0,0,0.04)',
+                width: '100%',
+                boxSizing: 'border-box'
               }}>
-                <div style={{ fontWeight: 900, fontSize: '1.25rem', color: '#0f172a', marginBottom: '14px', display: 'flex', alignItems: 'center', gap: '10px' }}>
-                  <PhoneCall size={26} style={{ color: '#25D366' }} /> 📞 CONTACTOS OFICIALES DE ATENCIÓN Y CONSULTAS UNEFCO:
+                <div style={{ fontWeight: 900, fontSize: '1.2rem', color: '#0f172a', marginBottom: '14px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <PhoneCall size={24} style={{ color: '#25D366' }} /> 📞 CONTACTOS OFICIALES DE ATENCIÓN Y CONSULTAS UNEFCO:
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '14px' }}>
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+                  gap: '12px',
+                  width: '100%',
+                  boxSizing: 'border-box'
+                }}>
                   {contacts.map((c) => (
                     <div
                       key={c.num}
@@ -2704,68 +2719,51 @@ export function InscripcionesPublicComponent() {
                         background: '#f8fafc',
                         border: '2px solid #e2e8f0',
                         borderRadius: '16px',
-                        padding: '16px 18px',
+                        padding: '16px',
                         display: 'flex',
                         flexDirection: 'column',
                         justifyContent: 'space-between',
-                        gap: '12px'
+                        gap: '14px',
+                        boxSizing: 'border-box',
+                        minWidth: 0,
+                        width: '100%'
                       }}
                     >
                       <div>
-                        <span style={{ fontSize: '0.85rem', fontWeight: 800, color: '#0284c7', textTransform: 'uppercase', display: 'block', marginBottom: '2px' }}>
+                        <span style={{ fontSize: '0.82rem', fontWeight: 800, color: '#0284c7', textTransform: 'uppercase', display: 'block', marginBottom: '2px' }}>
                           {c.label}
                         </span>
-                        <h4 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 900, color: '#0f172a' }}>
+                        <h4 style={{ margin: 0, fontSize: '1.12rem', fontWeight: 900, color: '#0f172a', wordBreak: 'break-word' }}>
                           {c.name}
                         </h4>
-                        <span style={{ fontSize: '1.1rem', fontWeight: 800, color: '#475569', display: 'block', marginTop: '4px' }}>
+                        <span style={{ fontSize: '1.05rem', fontWeight: 800, color: '#475569', display: 'block', marginTop: '4px' }}>
                           📱 {c.num}
                         </span>
                       </div>
 
-                      <div style={{ display: 'flex', gap: '8px' }}>
-                        <a
-                          href={`https://wa.me/591${c.num}?text=${encodeURIComponent(`Hola ${c.name}, soy el/la participante ${participant.nombres} ${participant.apellidos} (CI: ${participant.ci}), tengo una consulta sobre mi inscripción UNEFCO.`)}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          style={{
-                            flex: 1,
-                            background: 'linear-gradient(135deg, #25D366 0%, #128C7E 100%)',
-                            color: '#ffffff',
-                            textDecoration: 'none',
-                            borderRadius: '10px',
-                            padding: '10px 12px',
-                            fontSize: '0.92rem',
-                            fontWeight: 800,
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            gap: '6px',
-                            boxShadow: '0 2px 8px rgba(37, 211, 102, 0.3)'
-                          }}
-                        >
-                          <MessageCircle size={18} /> WhatsApp
-                        </a>
-
-                        <a
-                          href={`tel:+591${c.num}`}
-                          style={{
-                            background: '#0f172a',
-                            color: '#ffffff',
-                            textDecoration: 'none',
-                            borderRadius: '10px',
-                            padding: '10px 14px',
-                            fontSize: '0.92rem',
-                            fontWeight: 800,
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            gap: '6px'
-                          }}
-                        >
-                          <PhoneCall size={18} /> Llamar
-                        </a>
-                      </div>
+                      <a
+                        href={`https://wa.me/591${c.num}?text=${encodeURIComponent(`Hola ${c.name}, soy el/la participante ${participant.nombres} ${participant.apellidos} (CI: ${participant.ci}), tengo una consulta sobre mi inscripción UNEFCO.`)}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        style={{
+                          width: '100%',
+                          background: 'linear-gradient(135deg, #25D366 0%, #128C7E 100%)',
+                          color: '#ffffff',
+                          textDecoration: 'none',
+                          borderRadius: '12px',
+                          padding: '12px 14px',
+                          fontSize: '0.98rem',
+                          fontWeight: 900,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '8px',
+                          boxShadow: '0 4px 12px rgba(37, 211, 102, 0.35)',
+                          boxSizing: 'border-box'
+                        }}
+                      >
+                        <MessageCircle size={20} /> Escribir al WhatsApp
+                      </a>
                     </div>
                   ))}
                 </div>
