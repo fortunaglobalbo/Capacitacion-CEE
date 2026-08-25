@@ -246,8 +246,10 @@ export default function ParticipantesModal({
   const fetchParticipantes = useCallback(async () => {
     setLoading(true);
     try {
-      console.log('fetchParticipantes: Querying for curso.id =', curso.id, 'type =', typeof curso.id);
-      const { data, error } = await supabase
+      console.log('fetchParticipantes: Querying for curso.id =', curso.id);
+      
+      // 1. Try selecting with documento_url if column exists
+      let queryRes: any = await supabase
         .from('inscripcion_ciclo')
         .select(`
           id,
@@ -272,27 +274,53 @@ export default function ParticipantesModal({
         .eq('curso_id', curso.id)
         .order('nro', { ascending: true });
 
-      console.log('fetchParticipantes: Response data =', data);
-      console.log('fetchParticipantes: Response error =', error);
+      // 2. If PostgreSQL error because documento_url does not exist yet, fallback safely
+      if (queryRes.error) {
+        console.warn('fetchParticipantes: Falling back to base query without documento_url:', queryRes.error.message);
+        queryRes = await supabase
+          .from('inscripcion_ciclo')
+          .select(`
+            id,
+            nro,
+            pagos,
+            observaciones,
+            comprobante_url,
+            participantes (
+              ci,
+              nombres,
+              apellidos,
+              rda,
+              celular,
+              sie,
+              unidad_educativa,
+              validado,
+              observaciones_sie
+            )
+          `)
+          .eq('curso_id', curso.id)
+          .order('nro', { ascending: true });
+      }
+
+      const { data, error } = queryRes;
 
       if (error) throw error;
       const sortedData = ((data || []) as unknown as Inscripcion[]).sort((a, b) => {
         if (!a.participantes && !b.participantes) return 0;
         if (!a.participantes) return 1;
         if (!b.participantes) return -1;
-        const lastNameA = a.participantes.apellidos.trim().toLowerCase();
-        const lastNameB = b.participantes.apellidos.trim().toLowerCase();
+        const lastNameA = a.participantes.apellidos?.trim().toLowerCase() || '';
+        const lastNameB = b.participantes.apellidos?.trim().toLowerCase() || '';
         if (lastNameA !== lastNameB) {
           return lastNameA.localeCompare(lastNameB, 'es', { sensitivity: 'base' });
         }
-        const firstNameA = a.participantes.nombres.trim().toLowerCase();
-        const firstNameB = b.participantes.nombres.trim().toLowerCase();
+        const firstNameA = a.participantes.nombres?.trim().toLowerCase() || '';
+        const firstNameB = b.participantes.nombres?.trim().toLowerCase() || '';
         return firstNameA.localeCompare(firstNameB, 'es', { sensitivity: 'base' });
       });
       setInscripciones(sortedData);
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error fetching enrolled participants:', err);
-      Swal.fire('Error', 'No se pudieron cargar los participantes', 'error');
+      Swal.fire('Error', err?.message || 'No se pudieron cargar los participantes', 'error');
     } finally {
       setLoading(false);
     }

@@ -597,9 +597,11 @@ CREATE TABLE IF NOT EXISTS reportes_html (
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- Columnas para adjuntos digitales (RDA / Certificado de Trabajo y Comprobantes)
+ALTER TABLE IF EXISTS participantes ADD COLUMN IF NOT EXISTS documento_url TEXT;
+ALTER TABLE IF EXISTS inscripcion_ciclo ADD COLUMN IF NOT EXISTS documento_url TEXT;
+ALTER TABLE IF EXISTS inscripcion_ciclo ADD COLUMN IF NOT EXISTS comprobante_url TEXT;
+
 ALTER TABLE reportes_html ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Permitir todo en reportes_html" ON reportes_html;
 CREATE POLICY "Permitir todo en reportes_html" ON reportes_html FOR ALL USING (true) WITH CHECK (true);
-
-
-

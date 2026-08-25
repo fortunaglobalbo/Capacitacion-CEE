@@ -108,6 +108,7 @@ export function InscripcionesPublicComponent() {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const cameraContainerRef = useRef<HTMLDivElement | null>(null);
   const nextStepRef = useRef<HTMLDivElement | null>(null);
+  const wizardStepsRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     if (cameraActive && videoRef.current && videoStream) {
@@ -256,6 +257,10 @@ export function InscripcionesPublicComponent() {
         if (existingDoc) {
           setUploadedDocUrl(existingDoc);
         }
+
+        setTimeout(() => {
+          wizardStepsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }, 300);
       } else {
         setParticipant(null);
       }
@@ -542,13 +547,17 @@ export function InscripcionesPublicComponent() {
     }
   };
 
-  // Step Navigation with Smooth Top Autoscroll
+  // Step Navigation with Smooth Steps Container Autoscroll
   const goToStep = (step: number) => {
     setCurrentStep(step);
     setGuideNextStep(false);
-    if (typeof window !== 'undefined') {
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-    }
+    setTimeout(() => {
+      if (wizardStepsRef.current) {
+        wizardStepsRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      } else if (typeof window !== 'undefined') {
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      }
+    }, 50);
   };
 
   // Lightbox for Document / Voucher Preview
@@ -1224,7 +1233,7 @@ export function InscripcionesPublicComponent() {
 
       {/* PROGRESSIVE WIZARD (Visible when participant is found) */}
       {participant && (
-        <>
+        <div ref={wizardStepsRef} style={{ scrollMarginTop: '20px' }}>
           {/* Multi-cycle Selector Tabs if more than 1 cycle */}
           {participant.cursos.length > 1 && (
             <div style={{
@@ -2599,7 +2608,7 @@ export function InscripcionesPublicComponent() {
               </p>
             </div>
           </div>
-        </>
+        </div>
       )}
     </div>
   );
