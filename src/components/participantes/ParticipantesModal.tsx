@@ -8,7 +8,8 @@ import {
   X, Search, UserPlus, Trash2, Save, Download, Printer,
   Loader2, ShieldAlert, CheckCircle2, AlertTriangle, Edit,
   Plus, Phone, ArrowRight, Check, RefreshCw, FileText, Camera, Upload,
-  User, IdCard, Award, Hash, School, Sparkles, FileSpreadsheet, FileImage, File
+  User, IdCard, Award, Hash, School, Sparkles, FileSpreadsheet, FileImage, File,
+  CreditCard
 } from 'lucide-react';
 import Swal from 'sweetalert2';
 
@@ -29,6 +30,8 @@ interface Inscripcion {
   nro: number;
   pagos: string;
   observaciones: string | null;
+  comprobante_url?: string | null;
+  documento_url?: string | null;
   participantes: Participante | null;
 }
 
@@ -1946,6 +1949,255 @@ export default function ParticipantesModal({
     );
   });
 
+  // Print official 2-up Letter Ficha de Inscripción for a participant
+  const handlePrintFichaForParticipant = (p: Participante) => {
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+      Swal.fire('Bloqueador', 'Habilita las ventanas emergentes para imprimir la Ficha de Inscripción.', 'warning');
+      return;
+    }
+
+    const logoMineduUrl = window.location.origin + '/logo-minedu.jpg';
+    const logoUnefcoUrl = window.location.origin + '/logo-unefco.jpg';
+    const chk = (condition: boolean) => condition ? '<span class="chk-active">X</span>' : '<span class="chk"></span>';
+
+    const buildFichaHtml = () => `
+      <div class="ficha">
+        <table class="header-table">
+          <tr>
+            <td width="35%" align="left" valign="middle">
+              <img src="${logoMineduUrl}" class="logo-img" alt="Ministerio de Educación" />
+            </td>
+            <td width="30%" align="center" valign="middle">
+              <div class="title-main">FICHA DE INSCRIPCIÓN</div>
+              <div class="title-sub">ITINERARIOS FORMATIVOS - MODALIDAD SEMIPRESENCIAL</div>
+            </td>
+            <td width="35%" align="right" valign="middle">
+              <img src="${logoUnefcoUrl}" class="logo-img" alt="UNEFCO" />
+            </td>
+          </tr>
+        </table>
+
+        <table class="data-table">
+          <tr>
+            <td class="lbl" width="18%">Área</td>
+            <td class="val"><b>${curso.area_urbano_rural || curso.ciclo_grupo || 'EDUCACIÓN CONTINUA'}</b></td>
+          </tr>
+          <tr>
+            <td class="lbl">Ciclo Formativo</td>
+            <td class="val"><b>${curso.ciclo_nombre || (curso as any).nombre || (curso as any).grupo_nombre || 'PROGRAMA FORMATIVO UNEFCO'}</b></td>
+          </tr>
+          <tr>
+            <td class="lbl">Costo / Monto</td>
+            <td class="val"><b>Bs. ${(curso as any).costo || 150}</b></td>
+          </tr>
+          <tr>
+            <td class="lbl">Curso Nº 1</td>
+            <td class="val">${curso.tema1 || ''}</td>
+          </tr>
+          <tr>
+            <td class="lbl">Curso Nº 2</td>
+            <td class="val">${curso.tema2 || ''}</td>
+          </tr>
+          <tr>
+            <td class="lbl">Curso Nº 3</td>
+            <td class="val">${curso.tema3 || ''}</td>
+          </tr>
+          <tr>
+            <td class="lbl">Curso Nº 4</td>
+            <td class="val">${curso.tema4 || ''}</td>
+          </tr>
+        </table>
+
+        <table class="personal-table">
+          <tr>
+            <td class="lbl" width="20%">Apellido(s) y Nombre(s):</td>
+            <td class="val" colspan="3"><b>${p.apellidos} ${p.nombres}</b></td>
+            <td class="lbl" width="12%">Telf/Cel:</td>
+            <td class="val" width="15%"><b>${p.celular || ''}</b></td>
+          </tr>
+          <tr>
+            <td class="lbl">Carnet de Identidad:</td>
+            <td class="val" width="25%"><b>${p.ci}</b></td>
+            <td class="lbl" width="10%">E-mail:</td>
+            <td class="val"><b>${(p as any).correo || ''}</b></td>
+            <td class="lbl">RDA/RP:</td>
+            <td class="val"><b>${p.rda || ''}</b></td>
+          </tr>
+          <tr>
+            <td class="lbl">Fecha de Nacimiento:</td>
+            <td class="val" colspan="5"><b></b></td>
+          </tr>
+        </table>
+
+        <div class="checks-section">
+          <div class="check-row">
+            <span class="lbl-check">Función que cumple:</span>
+            <span class="chk-box-label">Docente ${chk(true)}</span>
+            <span class="chk-box-label">Director ${chk(false)}</span>
+            <span class="chk-box-label">Administrativo ${chk(false)}</span>
+            <span class="chk-box-label">Estudiante ESFM ${chk(false)}</span>
+            <span class="chk-box-label">No aplica ${chk(false)}</span>
+          </div>
+
+          <div class="check-row">
+            <span class="lbl-check">Área:</span>
+            <span class="chk-box-label">Urbano ${chk(true)}</span>
+            <span class="chk-box-label">Rural ${chk(false)}</span>
+          </div>
+
+          <table class="check-table">
+            <tr>
+              <td width="75%">
+                <div class="field-line">
+                  <span class="lbl-line">Distrito Educativo:</span>
+                  <span class="val-line"><b>${curso.distrito || 'SANTA CRUZ 1'}</b></span>
+                </div>
+                <div class="field-line">
+                  <span class="lbl-line">Unidad Educativa:</span>
+                  <span class="val-line"><b>${p.unidad_educativa || ''}</b></span>
+                </div>
+              </td>
+              <td width="25%" align="right">
+                <div class="check-vertical">
+                  <span class="chk-box-label">No aplica ${chk(!curso.distrito)}</span>
+                  <span class="chk-box-label">No aplica ${chk(!p.unidad_educativa)}</span>
+                </div>
+              </td>
+            </tr>
+          </table>
+
+          <div class="check-row" style="margin-top: 4px;">
+            <span class="lbl-check">Subsistema:</span>
+            <span class="chk-box-label">Educación Regular ${chk(true)}</span>
+            <span class="chk-box-label">Educación Alternativa y Especial ${chk(false)}</span>
+            <span class="chk-box-label">Ed. Superior ${chk(false)}</span>
+            <span class="chk-box-label">No aplica ${chk(false)}</span>
+          </div>
+
+          <div class="check-row">
+            <span class="lbl-check">Nivel de Ed. Regular:</span>
+            <span class="chk-box-label">Inicial ${chk(false)}</span>
+            <span class="chk-box-label">Primaria ${chk(true)}</span>
+            <span class="chk-box-label">Secundaria ${chk(false)}</span>
+            <span class="chk-box-label">Ed. Superior ${chk(false)}</span>
+            <span class="chk-box-label">No aplica ${chk(false)}</span>
+          </div>
+        </div>
+
+        <table class="footer-table">
+          <tr>
+            <td width="50%" align="left" valign="bottom">
+              <span class="lbl">Fecha de inscripción:</span>
+              <span style="border-bottom: 1px solid #000; padding: 0 14px; font-weight: bold;">
+                ${new Date().getDate().toString().padStart(2, '0')}
+              </span> / 
+              <span style="border-bottom: 1px solid #000; padding: 0 14px; font-weight: bold;">
+                ${(new Date().getMonth() + 1).toString().padStart(2, '0')}
+              </span> / 
+              <span style="border-bottom: 1px solid #000; padding: 0 18px; font-weight: bold;">
+                ${new Date().getFullYear()}
+              </span>
+            </td>
+            <td width="50%" align="center" valign="bottom">
+              <div class="signature-line"></div>
+              <div class="signature-lbl">Firma Participante</div>
+            </td>
+          </tr>
+        </table>
+      </div>
+    `;
+
+    const fichaHtml = buildFichaHtml();
+
+    printWindow.document.write(`
+      <html>
+      <head>
+        <title>Ficha de Inscripción - ${p.ci}</title>
+        <style>
+          @page { size: letter portrait; margin: 0.25in 0.25in; }
+          html, body { height: 100%; margin: 0; padding: 0; box-sizing: border-box; background: #fff; font-family: Arial, sans-serif; }
+          .sheet-container { display: flex; flex-direction: column; height: 100%; justify-content: space-between; box-sizing: border-box; padding: 0.1in 0; position: relative; }
+          .ficha { height: 48%; box-sizing: border-box; border: 2px solid #000; border-radius: 4px; padding: 10px 14px; display: flex; flex-direction: column; justify-content: space-between; position: relative; background: #fff; }
+          .divider-line { border-top: 1.5px dashed #777; width: 100%; text-align: center; padding: 6px 0; font-size: 8pt; color: #555; box-sizing: border-box; }
+          table { width: 100%; border-collapse: collapse; }
+          .header-table { margin-bottom: 6px; border-bottom: 1.5px solid #000; padding-bottom: 4px; }
+          .logo-img { height: 44px; max-width: 100%; object-fit: contain; display: block; }
+          .title-main { font-size: 13pt; font-weight: bold; letter-spacing: 0.5px; color: #000; line-height: 1.1; }
+          .title-sub { font-size: 7.2pt; font-weight: bold; color: #333; }
+          .lbl { font-size: 7.8pt; font-weight: bold; color: #000; }
+          .val { font-size: 8.2pt; color: #111; }
+          .data-table { margin-bottom: 6px; }
+          .data-table td { border: 1px solid #000; padding: 3px 5px; vertical-align: middle; }
+          .data-table .lbl { background-color: #f2f2f2; text-align: right; padding-right: 8px; }
+          .personal-table { margin-bottom: 6px; }
+          .personal-table td { border: 1px solid #000; padding: 3px 5px; vertical-align: middle; }
+          .personal-table .lbl { background-color: #f2f2f2; text-align: right; padding-right: 6px; }
+          .checks-section { font-size: 7pt; line-height: 1.15; margin-bottom: 6px; flex: 1; display: flex; flex-direction: column; justify-content: flex-start; }
+          .check-row { margin-bottom: 4px; display: flex; flex-wrap: wrap; align-items: center; }
+          .lbl-check { font-weight: bold; margin-right: 8px; width: 100px; display: inline-block; }
+          .chk-box-label { margin-right: 10px; display: inline-flex; align-items: center; gap: 4px; }
+          .chk { display: inline-block; width: 11px; height: 11px; border: 1.5px solid #000; text-align: center; font-size: 7pt; line-height: 11px; font-weight: bold; background: #fff; }
+          .chk-active { display: inline-block; width: 11px; height: 11px; border: 1.5px solid #000; text-align: center; font-size: 7.5pt; line-height: 11px; font-weight: 900; background: #000; color: #fff; }
+          .check-table { width: 100%; }
+          .check-table td { padding: 0; vertical-align: middle; }
+          .field-line { display: flex; align-items: flex-end; margin-bottom: 3px; width: 98%; }
+          .lbl-line { font-weight: bold; margin-right: 6px; white-space: nowrap; }
+          .val-line { border-bottom: 1px solid #444; flex: 1; padding-left: 5px; font-size: 8pt; font-weight: bold; height: 13px; line-height: 13px; }
+          .check-vertical { display: flex; flex-direction: column; gap: 3px; align-items: flex-end; }
+          .footer-table { margin-top: auto; padding-top: 6px; }
+          .signature-line { border-top: 1px solid #000; width: 80%; margin: 0 auto; }
+          .signature-lbl { font-size: 8pt; font-weight: bold; margin-top: 2px; }
+        </style>
+      </head>
+      <body>
+        <div class="sheet-container">
+          ${fichaHtml}
+          <div class="divider-line">---------------------- CORTE POR AQUÍ PARA ENTREGAR AL MAESTRO / UNEFCO ----------------------</div>
+          ${fichaHtml}
+        </div>
+        <script>
+          window.onload = function() {
+            window.print();
+            setTimeout(function() { window.close(); }, 500);
+          };
+        </script>
+      </body>
+      </html>
+    `);
+    printWindow.document.close();
+  };
+
+  // View deposit voucher lightbox
+  const handleViewComprobante = (url: string, name: string) => {
+    if (!url) {
+      Swal.fire('Sin comprobante', 'Este participante aún no ha registrado un comprobante de depósito.', 'info');
+      return;
+    }
+
+    Swal.fire({
+      title: `Comprobante de Pago - ${name}`,
+      html: `
+        <div style="text-align: center; max-height: 70vh; overflow-y: auto;">
+          ${url.toLowerCase().endsWith('.pdf') ? `
+            <iframe src="${url}" style="width: 100%; height: 500px; border: none; border-radius: 8px;"></iframe>
+          ` : `
+            <img src="${url}" alt="Comprobante" style="max-width: 100%; border-radius: 8px; box-shadow: 0 4px 14px rgba(0,0,0,0.15);" />
+          `}
+        </div>
+      `,
+      showCancelButton: true,
+      confirmButtonText: 'Abrir en pestaña nueva / Imprimir',
+      cancelButtonText: 'Cerrar',
+      confirmButtonColor: '#2563eb',
+      width: '650px'
+    }).then((res) => {
+      if (res.isConfirmed) {
+        window.open(url, '_blank');
+      }
+    });
+  };
+
   return (
     <>
       <div className="modal-overlay" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', backgroundColor: 'rgba(11,21,32,0.6)', backdropFilter: 'blur(8px)', zIndex: 1000, padding: '10px', overflowY: 'auto' }}>
@@ -2047,57 +2299,57 @@ export default function ParticipantesModal({
                 </form>
               )}
             </div>
+          </div>
 
-            {/* General Actions: Search, Exports, Add Manual */}
-            <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', gap: '12px' }}>
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', flexWrap: 'wrap' }}>
-                <button type="button" className="btn btn-secondary btn-sm" onClick={handleExportExcel} title="Exportar a Excel">
-                  <Download size={14} /> Excel
-                </button>
-                <button type="button" className="btn btn-secondary btn-sm" onClick={handlePrintPDF} title="Imprimir / Exportar PDF">
-                  <Printer size={14} /> PDF
-                </button>
-                <button type="button" className="btn btn-secondary btn-sm" onClick={handlePrintPlanilla} title="Imprimir Planilla de Asistencia y Material">
-                  <Printer size={14} /> Planilla
-                </button>
-                <button type="button" className="btn btn-sm" onClick={() => handleBulkPaymentUpdate('Pagado')} title="Marcar todos los participantes como Pagados" style={{ background: 'linear-gradient(135deg, #059669 0%, #10b981 100%)', color: '#fff', border: 'none', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '5px', boxShadow: '0 2px 8px rgba(16,185,129,0.25)' }}>
-                  <CheckCircle2 size={14} /> Marcar Todos Pagados
-                </button>
-                <button type="button" className="btn btn-sm" onClick={() => handleBulkPaymentUpdate('Pendiente')} title="Marcar todos los participantes como Pendientes" style={{ background: 'linear-gradient(135deg, #d97706 0%, #f59e0b 100%)', color: '#fff', border: 'none', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '5px', boxShadow: '0 2px 8px rgba(245,158,11,0.25)' }}>
-                  <AlertTriangle size={14} /> Marcar Todos Pendientes
-                </button>
-                <button type="button" className="btn btn-danger btn-sm" onClick={handleDeleteAllEnrollments} title="Eliminar todas las inscripciones">
-                  <Trash2 size={14} /> Eliminar Todos
-                </button>
-                <button type="button" className={`btn btn-sm ${showMigrator ? 'btn-secondary' : 'btn-primary'}`} onClick={() => { setShowMigrator(!showMigrator); if (showMigrator) { setMigrPreview([]); setMigrSourceId(''); } }} style={{ background: showMigrator ? undefined : 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)', color: showMigrator ? undefined : '#fff', border: 'none', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '5px', boxShadow: showMigrator ? undefined : '0 2px 8px rgba(99,102,241,0.25)' }}>
-                  <ArrowRight size={14} /> {showMigrator ? 'Cerrar Migrador' : 'Migrar Participantes'}
-                </button>
+          {/* Top Actions: Search, Exports, Add Manual */}
+          <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', gap: '12px' }}>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', flexWrap: 'wrap' }}>
+              <button type="button" className="btn btn-secondary btn-sm" onClick={handleExportExcel} title="Exportar a Excel">
+                <Download size={14} /> Excel
+              </button>
+              <button type="button" className="btn btn-secondary btn-sm" onClick={handlePrintPDF} title="Imprimir / Exportar PDF">
+                <Printer size={14} /> PDF
+              </button>
+              <button type="button" className="btn btn-secondary btn-sm" onClick={handlePrintPlanilla} title="Imprimir Planilla de Asistencia y Material">
+                <Printer size={14} /> Planilla
+              </button>
+              <button type="button" className="btn btn-sm" onClick={() => handleBulkPaymentUpdate('Pagado')} title="Marcar todos los participantes como Pagados" style={{ background: 'linear-gradient(135deg, #059669 0%, #10b981 100%)', color: '#fff', border: 'none', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '5px', boxShadow: '0 2px 8px rgba(16,185,129,0.25)' }}>
+                <CheckCircle2 size={14} /> Marcar Todos Pagados
+              </button>
+              <button type="button" className="btn btn-sm" onClick={() => handleBulkPaymentUpdate('Pendiente')} title="Marcar todos los participantes como Pendientes" style={{ background: 'linear-gradient(135deg, #d97706 0%, #f59e0b 100%)', color: '#fff', border: 'none', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '5px', boxShadow: '0 2px 8px rgba(245,158,11,0.25)' }}>
+                <AlertTriangle size={14} /> Marcar Todos Pendientes
+              </button>
+              <button type="button" className="btn btn-danger btn-sm" onClick={handleDeleteAllEnrollments} title="Eliminar todas las inscripciones">
+                <Trash2 size={14} /> Eliminar Todos
+              </button>
+              <button type="button" className={`btn btn-sm ${showMigrator ? 'btn-secondary' : 'btn-primary'}`} onClick={() => { setShowMigrator(!showMigrator); if (showMigrator) { setMigrPreview([]); setMigrSourceId(''); } }} style={{ background: showMigrator ? undefined : 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)', color: showMigrator ? undefined : '#fff', border: 'none', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '5px', boxShadow: showMigrator ? undefined : '0 2px 8px rgba(99,102,241,0.25)' }}>
+                <ArrowRight size={14} /> {showMigrator ? 'Cerrar Migrador' : 'Migrar Participantes'}
+              </button>
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '16px', flexWrap: 'wrap' }}>
+              <span style={{ fontSize: '0.82rem', color: 'var(--gray-500)', fontWeight: 600 }}>
+                Total en Lista: <b>{filteredInscripciones.length} de {inscripciones.length}</b>
+              </span>
+
+              <div style={{ position: 'relative', flex: 1, maxWidth: '350px', minWidth: '180px' }}>
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Buscar inscrito..."
+                  style={{ width: '100%', padding: '6px 10px 6px 30px', fontSize: '0.82rem', border: '1px solid var(--gray-300)', borderRadius: 'var(--radius-sm)' }}
+                />
+                <Search size={14} style={{ position: 'absolute', left: '10px', top: '9px', color: 'var(--gray-400)' }} />
               </div>
 
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '16px', flexWrap: 'wrap' }}>
-                <span style={{ fontSize: '0.82rem', color: 'var(--gray-500)', fontWeight: 600 }}>
-                  Total en Lista: <b>{filteredInscripciones.length} de {inscripciones.length}</b>
-                </span>
-
-                <div style={{ position: 'relative', flex: 1, maxWidth: '350px', minWidth: '180px' }}>
-                  <input
-                    type="text"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    placeholder="Buscar inscrito..."
-                    style={{ width: '100%', padding: '6px 10px 6px 30px', fontSize: '0.82rem', border: '1px solid var(--gray-300)', borderRadius: 'var(--radius-sm)' }}
-                  />
-                  <Search size={14} style={{ position: 'absolute', left: '10px', top: '9px', color: 'var(--gray-400)' }} />
-                </div>
-
-                <button
-                  type="button"
-                  className={`btn ${showImporter ? 'btn-secondary' : 'btn-success'} btn-sm`}
-                  onClick={() => setShowImporter(!showImporter)}
-                >
-                  <UserPlus size={14} /> {showImporter ? 'Cerrar Importador' : 'Importar Excel / CSV'}
-                </button>
-              </div>
+              <button
+                type="button"
+                className={`btn ${showImporter ? 'btn-secondary' : 'btn-success'} btn-sm`}
+                onClick={() => setShowImporter(!showImporter)}
+              >
+                <UserPlus size={14} /> {showImporter ? 'Cerrar Importador' : 'Importar Excel / CSV'}
+              </button>
             </div>
           </div>
 
@@ -2718,6 +2970,8 @@ export default function ParticipantesModal({
                         validating={validatingPartId === ins.id}
                         sieConnected={!!sieSession}
                         onRefresh={fetchParticipantes}
+                        onPrintFicha={handlePrintFichaForParticipant}
+                        onViewComprobante={handleViewComprobante}
                       />
                     );
                   })}
@@ -2940,6 +3194,8 @@ interface RowComponentProps {
   validating: boolean;
   sieConnected: boolean;
   onRefresh: () => void;
+  onPrintFicha: (p: Participante) => void;
+  onViewComprobante: (url: string, name: string) => void;
 }
 
 function RowComponent({
@@ -2953,7 +3209,9 @@ function RowComponent({
   onValidate,
   validating,
   sieConnected,
-  onRefresh
+  onRefresh,
+  onPrintFicha,
+  onViewComprobante
 }: RowComponentProps) {
   const [pagos, setPagos] = useState(ins.pagos || 'Pendiente');
   const [observaciones, setObservaciones] = useState(ins.observaciones || '');
@@ -3330,12 +3588,47 @@ function RowComponent({
 
       {/* Acciones */}
       <td style={{ padding: '12px 16px', textAlign: 'center' }}>
-        <div style={{ display: 'flex', gap: '6px', justifyContent: 'center', alignItems: 'center' }}>
+        <div style={{ display: 'flex', gap: '5px', justifyContent: 'center', alignItems: 'center' }}>
           {saving && (
             <span style={{ display: 'inline-flex', alignItems: 'center', color: 'var(--green-600)', marginRight: '2px' }} title="Guardando automáticamente...">
               <Loader2 size={12} className="spin" />
             </span>
           )}
+
+          {/* Imprimir / Ver Ficha Oficial de Inscripción */}
+          <button
+            type="button"
+            className="btn btn-xs"
+            onClick={() => onPrintFicha(p)}
+            title="Imprimir / Ver Ficha Oficial de Inscripción (PDF)"
+            style={{ padding: '6px', background: '#10b981', color: '#ffffff', border: 'none', borderRadius: '4px' }}
+          >
+            <FileText size={12} />
+          </button>
+
+          {/* Ver Comprobante de Depósito */}
+          {ins.comprobante_url ? (
+            <button
+              type="button"
+              className="btn btn-xs"
+              onClick={() => onViewComprobante(ins.comprobante_url!, `${p.apellidos} ${p.nombres}`)}
+              title="Ver Comprobante de Depósito Bancario Subido"
+              style={{ padding: '6px', background: '#6366f1', color: '#ffffff', border: 'none', borderRadius: '4px' }}
+            >
+              <CreditCard size={12} />
+            </button>
+          ) : (
+            <button
+              type="button"
+              className="btn btn-xs"
+              onClick={() => onViewComprobante('', `${p.apellidos} ${p.nombres}`)}
+              title="Sin comprobante subido"
+              style={{ padding: '6px', background: '#f1f5f9', color: '#94a3b8', border: '1px solid #cbd5e1', borderRadius: '4px' }}
+            >
+              <CreditCard size={12} />
+            </button>
+          )}
+
           <button
             type="button"
             className="btn btn-warning btn-xs"

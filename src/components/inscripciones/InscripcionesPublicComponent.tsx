@@ -7,7 +7,7 @@ import {
   AlertTriangle, CheckCircle2, MapPin, Clock, FileCheck, UserCheck, 
   Printer, Sparkles, PhoneCall, MessageCircle, ExternalLink, Layers, 
   Check, Share2, Send, ArrowRight, ArrowLeft, Camera, RefreshCw, Eye,
-  HelpCircle, User, ShieldCheck, FileSpreadsheet, Save
+  HelpCircle, User, ShieldCheck, FileSpreadsheet, Save, Hand
 } from 'lucide-react';
 import Swal from 'sweetalert2';
 
@@ -75,6 +75,7 @@ export function InscripcionesPublicComponent() {
   const [currentStep, setCurrentStep] = useState<number>(1);
   const [selectedCourseIdx, setSelectedCourseIdx] = useState<number>(0);
   const [fichaSaved, setFichaSaved] = useState(false);
+  const [guideNextStep, setGuideNextStep] = useState(false);
 
   // Virtual Ficha Form State (fully customizable)
   const [virtualFicha, setVirtualFicha] = useState<VirtualFichaForm>({
@@ -105,6 +106,8 @@ export function InscripcionesPublicComponent() {
   const [cameraTarget, setCameraTarget] = useState<'documento' | 'comprobante' | null>(null);
   const [videoStream, setVideoStream] = useState<MediaStream | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
+  const cameraContainerRef = useRef<HTMLDivElement | null>(null);
+  const nextStepRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     if (cameraActive && videoRef.current && videoStream) {
@@ -150,6 +153,7 @@ export function InscripcionesPublicComponent() {
     setParticipant(null);
     setCurrentStep(1);
     setFichaSaved(false);
+    setGuideNextStep(false);
 
     try {
       // 1. Fetch catalog
@@ -297,29 +301,48 @@ export function InscripcionesPublicComponent() {
       } : null);
 
       setFichaSaved(true);
+      setGuideNextStep(true);
 
       Swal.fire({
         icon: 'success',
         title: '¡Información Guardada Exitosamente!',
-        text: 'Tus datos se actualizaron correctamente para la emisión de tu certificado y ficha oficial.',
+        text: 'Tus datos se actualizaron correctamente. Ya puedes imprimir tu ficha oficial o continuar al siguiente paso.',
         confirmButtonColor: '#16a34a'
       });
+
+      // Smooth auto-scroll to next step button
+      setTimeout(() => {
+        nextStepRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }, 400);
     } catch (err: any) {
       console.error('Error saving info:', err);
       setFichaSaved(true);
+      setGuideNextStep(true);
       Swal.fire('Guardado', 'Datos guardados correctamente para la ficha oficial.', 'success');
+      setTimeout(() => {
+        nextStepRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }, 400);
     }
   };
 
-  // Start Camera
+  // Start Camera with Auto-scroll to camera viewfinder
   const startCamera = async (target: 'documento' | 'comprobante') => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } }
+        video: { 
+          facingMode: 'environment', 
+          width: { ideal: 1920, min: 1280 }, 
+          height: { ideal: 1080, min: 720 } 
+        }
       });
       setVideoStream(stream);
       setCameraTarget(target);
       setCameraActive(true);
+
+      // Auto-scroll directly to camera view so the teacher sees it immediately
+      setTimeout(() => {
+        cameraContainerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }, 300);
     } catch (err: any) {
       Swal.fire('Cámara', 'No se pudo acceder a la cámara del dispositivo: ' + err.message, 'warning');
     }
@@ -347,7 +370,7 @@ export function InscripcionesPublicComponent() {
       if (!ctx) return;
 
       ctx.drawImage(videoRef.current, 0, 0, canvas.width, canvas.height);
-      const dataUrl = canvas.toDataURL('image/jpeg', 0.88);
+      const dataUrl = canvas.toDataURL('image/jpeg', 0.90);
 
       const res = await fetch(dataUrl);
       const blob = await res.blob();
@@ -398,6 +421,7 @@ export function InscripcionesPublicComponent() {
       }
 
       setUploadedDocUrl(filePublicUrl);
+      setGuideNextStep(true);
 
       const activeCourse = participant.cursos[selectedCourseIdx];
       if (activeCourse?.inscripcion_id) {
@@ -413,6 +437,10 @@ export function InscripcionesPublicComponent() {
         text: 'Tu documento ha sido adjuntado correctamente al sistema.',
         confirmButtonColor: '#16a34a'
       });
+
+      setTimeout(() => {
+        nextStepRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }, 400);
     } catch (err: any) {
       console.error('Error al subir documento:', err);
       Swal.fire({
@@ -470,12 +498,18 @@ export function InscripcionesPublicComponent() {
         };
       });
 
+      setGuideNextStep(true);
+
       Swal.fire({
         icon: 'success',
         title: '¡Comprobante Registrado!',
         text: 'Tu comprobante de pago ha sido guardado exitosamente.',
         confirmButtonColor: '#16a34a'
       });
+
+      setTimeout(() => {
+        nextStepRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }, 400);
     } catch (err: any) {
       console.error('Error al subir comprobante:', err);
       Swal.fire({
@@ -529,7 +563,6 @@ export function InscripcionesPublicComponent() {
     const logoMineduUrl = window.location.origin + '/logo-minedu.jpg';
     const logoUnefcoUrl = window.location.origin + '/logo-unefco.jpg';
 
-    // Checkbox marked helper
     const chk = (condition: boolean) => condition ? '<span class="chk-active">X</span>' : '<span class="chk"></span>';
 
     const buildFichaHtml = () => {
@@ -792,7 +825,7 @@ export function InscripcionesPublicComponent() {
 
   return (
     <div className="inscripciones-container">
-      {/* Responsive Styles */}
+      {/* Responsive Styles & Pulsing Animations */}
       <style>{`
         .inscripciones-container {
           max-width: 1240px;
@@ -912,6 +945,59 @@ export function InscripcionesPublicComponent() {
         .form-virtual-input:focus {
           border-color: #0284c7;
           background: #ffffff;
+        }
+
+        /* Animated Pointer & Pulse */
+        @keyframes pulseHand {
+          0%, 100% { transform: translateY(0) scale(1); }
+          50% { transform: translateY(-8px) scale(1.1); }
+        }
+        .animated-pointer-box {
+          animation: pulseHand 1.5s infinite ease-in-out;
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+        }
+
+        /* Letter Viewfinder overlay */
+        .letter-viewfinder-frame {
+          position: relative;
+          width: 100%;
+          max-width: 480px;
+          aspect-ratio: 8.5 / 11;
+          margin: 0 auto 16px;
+          border-radius: 16px;
+          overflow: hidden;
+          background: #000;
+          box-shadow: 0 8px 30px rgba(0,0,0,0.5);
+          border: 3px solid #38bdf8;
+        }
+        .letter-viewfinder-video {
+          width: 100%;
+          height: 100%;
+          object-fit: cover;
+          display: block;
+        }
+        .letter-guide-box {
+          position: absolute;
+          inset: 16px;
+          border: 2px dashed rgba(255, 255, 255, 0.85);
+          border-radius: 10px;
+          pointer-events: none;
+          box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.35);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
+        .letter-guide-text {
+          background: rgba(15, 23, 42, 0.75);
+          color: #ffffff;
+          padding: 6px 14px;
+          border-radius: 8px;
+          font-size: 0.85rem;
+          font-weight: 800;
+          letter-spacing: 0.5px;
+          border: 1px solid rgba(255,255,255,0.3);
         }
 
         @media (max-width: 768px) {
@@ -1102,7 +1188,10 @@ export function InscripcionesPublicComponent() {
                   <button
                     key={c.id || idx}
                     type="button"
-                    onClick={() => setSelectedCourseIdx(idx)}
+                    onClick={() => {
+                      setSelectedCourseIdx(idx);
+                      setGuideNextStep(false);
+                    }}
                     style={{
                       padding: '10px 18px',
                       borderRadius: '12px',
@@ -1293,7 +1382,7 @@ export function InscripcionesPublicComponent() {
                     />
                   </div>
 
-                  {/* Función que cumple (SOLO 5 OPCIONES HABILITADAS) */}
+                  {/* Función que cumple (5 OPCIONES HABILITADAS) */}
                   <div className="form-virtual-field">
                     <label className="form-virtual-label">Función que cumple *</label>
                     <select
@@ -1429,7 +1518,7 @@ export function InscripcionesPublicComponent() {
                   </button>
                 </div>
 
-                {/* PRINT & SHARE BUTTONS (Active always or highlighted after save) */}
+                {/* PRINT & SHARE BUTTONS */}
                 <div style={{ marginTop: '18px', display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
                   <button
                     type="button"
@@ -1479,11 +1568,19 @@ export function InscripcionesPublicComponent() {
                 </div>
               </div>
 
-              {/* Navigation Next Button */}
-              <div style={{ marginTop: '24px', display: 'flex', justifyContent: 'flex-end' }}>
+              {/* Navigation Next Button with Animated Highlight Guide */}
+              <div ref={nextStepRef} style={{ marginTop: '24px', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '8px' }}>
+                {guideNextStep && (
+                  <div className="animated-pointer-box" style={{ background: '#fef3c7', border: '1.5px solid #f59e0b', color: '#92400e', padding: '6px 16px', borderRadius: '12px', fontWeight: 800, fontSize: '0.98rem' }}>
+                    👇 ¡Información guardada! Presiona el botón para avanzar al Paso 2 👉
+                  </div>
+                )}
                 <button
                   type="button"
-                  onClick={() => setCurrentStep(2)}
+                  onClick={() => {
+                    setCurrentStep(2);
+                    setGuideNextStep(false);
+                  }}
                   style={{
                     background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)',
                     color: '#ffffff',
@@ -1496,7 +1593,7 @@ export function InscripcionesPublicComponent() {
                     display: 'inline-flex',
                     alignItems: 'center',
                     gap: '10px',
-                    boxShadow: '0 6px 18px rgba(15, 23, 42, 0.3)'
+                    boxShadow: guideNextStep ? '0 0 20px rgba(245, 158, 11, 0.6)' : '0 6px 18px rgba(15, 23, 42, 0.3)'
                   }}
                 >
                   Continuar al Paso 2 (Documentos) <ArrowRight size={22} />
@@ -1538,7 +1635,7 @@ export function InscripcionesPublicComponent() {
                 Reúne la documentación correspondiente para la validación de tu inscripción:
               </p>
 
-              {/* Requirement Mention Cards (No selection needed) */}
+              {/* Requirement Mention Cards */}
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '16px', margin: '20px 0' }}>
                 <div style={{
                   background: '#f8fafc',
@@ -1664,9 +1761,9 @@ export function InscripcionesPublicComponent() {
                 )}
               </div>
 
-              {/* Camera Viewfinder if active */}
+              {/* Camera Viewfinder with Letter Size Overlay */}
               {cameraActive && cameraTarget === 'documento' && (
-                <div style={{
+                <div ref={cameraContainerRef} style={{
                   marginTop: '20px',
                   background: '#0f172a',
                   padding: '20px',
@@ -1675,20 +1772,21 @@ export function InscripcionesPublicComponent() {
                   textAlign: 'center'
                 }}>
                   <h4 style={{ margin: '0 0 10px 0', fontSize: '1.1rem', fontWeight: 800, color: '#38bdf8' }}>
-                    📸 Enfoca el documento y presiona "Capturar Foto":
+                    📸 Ajusta la hoja tamaño carta dentro del recuadro y presiona "Capturar Foto":
                   </h4>
-                  <video
-                    ref={videoRef}
-                    autoPlay
-                    playsInline
-                    style={{
-                      width: '100%',
-                      maxWidth: '540px',
-                      borderRadius: '14px',
-                      border: '3px solid #38bdf8',
-                      marginBottom: '14px'
-                    }}
-                  />
+
+                  <div className="letter-viewfinder-frame">
+                    <video
+                      ref={videoRef}
+                      autoPlay
+                      playsInline
+                      className="letter-viewfinder-video"
+                    />
+                    <div className="letter-guide-box">
+                      <span className="letter-guide-text">📄 GUÍA HOJA CARTA</span>
+                    </div>
+                  </div>
+
                   <div style={{ display: 'flex', gap: '10px', justifyContent: 'center' }}>
                     <button
                       type="button"
@@ -1729,8 +1827,8 @@ export function InscripcionesPublicComponent() {
                 </div>
               )}
 
-              {/* Navigation Back / Next Buttons */}
-              <div style={{ marginTop: '28px', display: 'flex', justifyContent: 'space-between', gap: '10px', flexWrap: 'wrap' }}>
+              {/* Navigation Back / Next Buttons with Animated Pointer Guide */}
+              <div ref={nextStepRef} style={{ marginTop: '28px', display: 'flex', justifyContent: 'space-between', gap: '10px', flexWrap: 'wrap', alignItems: 'center' }}>
                 <button
                   type="button"
                   onClick={() => setCurrentStep(1)}
@@ -1751,26 +1849,36 @@ export function InscripcionesPublicComponent() {
                   <ArrowLeft size={20} /> Volver al Paso 1
                 </button>
 
-                <button
-                  type="button"
-                  onClick={() => setCurrentStep(3)}
-                  style={{
-                    background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)',
-                    color: '#ffffff',
-                    border: 'none',
-                    borderRadius: '14px',
-                    padding: '16px 28px',
-                    fontSize: '1.15rem',
-                    fontWeight: 900,
-                    cursor: 'pointer',
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '10px',
-                    boxShadow: '0 6px 18px rgba(15, 23, 42, 0.3)'
-                  }}
-                >
-                  Continuar al Paso 3 (Depósito) <ArrowRight size={22} />
-                </button>
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '6px' }}>
+                  {guideNextStep && (
+                    <div className="animated-pointer-box" style={{ background: '#fef3c7', border: '1.5px solid #f59e0b', color: '#92400e', padding: '6px 16px', borderRadius: '12px', fontWeight: 800, fontSize: '0.95rem' }}>
+                      👇 ¡Documento listo! Presiona para continuar al Paso 3 👉
+                    </div>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCurrentStep(3);
+                      setGuideNextStep(false);
+                    }}
+                    style={{
+                      background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)',
+                      color: '#ffffff',
+                      border: 'none',
+                      borderRadius: '14px',
+                      padding: '16px 28px',
+                      fontSize: '1.15rem',
+                      fontWeight: 900,
+                      cursor: 'pointer',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '10px',
+                      boxShadow: guideNextStep ? '0 0 20px rgba(245, 158, 11, 0.6)' : '0 6px 18px rgba(15, 23, 42, 0.3)'
+                    }}
+                  >
+                    Continuar al Paso 3 (Depósito) <ArrowRight size={22} />
+                  </button>
+                </div>
               </div>
             </div>
           )}
@@ -1942,9 +2050,9 @@ export function InscripcionesPublicComponent() {
                 )}
               </div>
 
-              {/* Camera Viewfinder if active for Voucher */}
+              {/* Camera Viewfinder for Voucher with Letter Size Overlay */}
               {cameraActive && cameraTarget === 'comprobante' && (
-                <div style={{
+                <div ref={cameraContainerRef} style={{
                   marginTop: '20px',
                   background: '#0f172a',
                   padding: '20px',
@@ -1955,18 +2063,19 @@ export function InscripcionesPublicComponent() {
                   <h4 style={{ margin: '0 0 10px 0', fontSize: '1.1rem', fontWeight: 800, color: '#38bdf8' }}>
                     📸 Enfoca el comprobante bancario del Banco Unión y presiona "Capturar Foto":
                   </h4>
-                  <video
-                    ref={videoRef}
-                    autoPlay
-                    playsInline
-                    style={{
-                      width: '100%',
-                      maxWidth: '540px',
-                      borderRadius: '14px',
-                      border: '3px solid #38bdf8',
-                      marginBottom: '14px'
-                    }}
-                  />
+
+                  <div className="letter-viewfinder-frame">
+                    <video
+                      ref={videoRef}
+                      autoPlay
+                      playsInline
+                      className="letter-viewfinder-video"
+                    />
+                    <div className="letter-guide-box">
+                      <span className="letter-guide-text">💳 GUÍA COMPROBANTE</span>
+                    </div>
+                  </div>
+
                   <div style={{ display: 'flex', gap: '10px', justifyContent: 'center' }}>
                     <button
                       type="button"
@@ -2007,8 +2116,8 @@ export function InscripcionesPublicComponent() {
                 </div>
               )}
 
-              {/* Navigation Back / Next Buttons */}
-              <div style={{ marginTop: '28px', display: 'flex', justifyContent: 'space-between', gap: '10px', flexWrap: 'wrap' }}>
+              {/* Navigation Back / Next Buttons with Animated Pointer */}
+              <div ref={nextStepRef} style={{ marginTop: '28px', display: 'flex', justifyContent: 'space-between', gap: '10px', flexWrap: 'wrap', alignItems: 'center' }}>
                 <button
                   type="button"
                   onClick={() => setCurrentStep(2)}
@@ -2029,26 +2138,36 @@ export function InscripcionesPublicComponent() {
                   <ArrowLeft size={20} /> Volver al Paso 2
                 </button>
 
-                <button
-                  type="button"
-                  onClick={() => setCurrentStep(4)}
-                  style={{
-                    background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)',
-                    color: '#ffffff',
-                    border: 'none',
-                    borderRadius: '14px',
-                    padding: '16px 28px',
-                    fontSize: '1.15rem',
-                    fontWeight: 900,
-                    cursor: 'pointer',
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '10px',
-                    boxShadow: '0 6px 18px rgba(15, 23, 42, 0.3)'
-                  }}
-                >
-                  Continuar al Paso 4 (Finalización) <ArrowRight size={22} />
-                </button>
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '6px' }}>
+                  {guideNextStep && (
+                    <div className="animated-pointer-box" style={{ background: '#fef3c7', border: '1.5px solid #f59e0b', color: '#92400e', padding: '6px 16px', borderRadius: '12px', fontWeight: 800, fontSize: '0.95rem' }}>
+                      👇 ¡Comprobante guardado! Presiona para ver el resumen final 👉
+                    </div>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCurrentStep(4);
+                      setGuideNextStep(false);
+                    }}
+                    style={{
+                      background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)',
+                      color: '#ffffff',
+                      border: 'none',
+                      borderRadius: '14px',
+                      padding: '16px 28px',
+                      fontSize: '1.15rem',
+                      fontWeight: 900,
+                      cursor: 'pointer',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '10px',
+                      boxShadow: guideNextStep ? '0 0 20px rgba(245, 158, 11, 0.6)' : '0 6px 18px rgba(15, 23, 42, 0.3)'
+                    }}
+                  >
+                    Continuar al Paso 4 (Finalización) <ArrowRight size={22} />
+                  </button>
+                </div>
               </div>
             </div>
           )}
@@ -2079,12 +2198,24 @@ export function InscripcionesPublicComponent() {
               </div>
 
               <h2 style={{ margin: '0 0 10px 0', fontSize: 'clamp(1.3rem, 3.8vw, 1.6rem)', fontWeight: 900, color: '#0f172a' }}>
-                PASO 4: ENTREGA FINAL DE REQUISITOS EN OFICINAS
+                PASO 4: PRESENTACIÓN DE DOCUMENTOS FÍSICOS
               </h2>
 
-              <p style={{ margin: 0, fontSize: '1.05rem', color: '#334155', fontWeight: 600, lineHeight: 1.6 }}>
-                ¡Felicitaciones! Has completado los pasos virtuales. Ahora apersónate a nuestras oficinas de UNEFCO para entregar los 3 documentos físicos:
-              </p>
+              {/* CRITICAL MENTION REGARDING PHYSICAL SUBMISSION IN FIRST CLASS */}
+              <div style={{
+                background: '#eff6ff',
+                border: '2.5px solid #3b82f6',
+                borderRadius: '16px',
+                padding: '16px 20px',
+                color: '#1e3a8a',
+                fontSize: '1.08rem',
+                fontWeight: 800,
+                lineHeight: 1.6,
+                marginBottom: '20px'
+              }}>
+                ℹ️ <strong>AVISO IMPORTANTE DE ENTREGA:</strong><br />
+                Por el momento, la información y documentos digitales que enviaste sirven para tu <strong>registro e inscripción preliminar</strong>. Sin embargo, los <strong>documentos físicos originales</strong> deben presentarse <strong>EN EL INICIO DE TU PRIMERA CLASE</strong> en las oficinas de UNEFCO Santa Cruz.
+              </div>
 
               {/* Requirements Checklist */}
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '16px', margin: '20px 0' }}>
