@@ -62,6 +62,9 @@ interface VirtualFichaForm {
   correo: string;
   rda: string;
   fechaNacimiento: string;
+  diaNacimiento?: string;
+  mesNacimiento?: string;
+  anoNacimiento?: string;
 }
 
 export function InscripcionesPublicComponent() {
@@ -91,8 +94,37 @@ export function InscripcionesPublicComponent() {
     celular: '',
     correo: '',
     rda: '',
-    fechaNacimiento: ''
+    fechaNacimiento: '',
+    diaNacimiento: '',
+    mesNacimiento: '',
+    anoNacimiento: ''
   });
+
+  // Helper to sync Dia, Mes, Año without complicated calendar pickers
+  const updateFechaNacimiento = (d?: string, m?: string, y?: string) => {
+    setVirtualFicha(prev => {
+      const day = d !== undefined ? d : (prev.diaNacimiento || '');
+      const month = m !== undefined ? m : (prev.mesNacimiento || '');
+      const year = y !== undefined ? y : (prev.anoNacimiento || '');
+      
+      let formatted = '';
+      if (day || month || year) {
+        if (day && month && year) {
+          formatted = `${day} de ${month} de ${year}`;
+        } else {
+          formatted = [day, month, year].filter(Boolean).join(' / ');
+        }
+      }
+      
+      return {
+        ...prev,
+        diaNacimiento: day,
+        mesNacimiento: month,
+        anoNacimiento: year,
+        fechaNacimiento: formatted
+      };
+    });
+  };
 
   // Document (RDA / Certificado) State
   const [uploadedDocUrl, setUploadedDocUrl] = useState<string | null>(null);
@@ -586,6 +618,11 @@ export function InscripcionesPublicComponent() {
     }).then((result) => {
       if (result.isConfirmed) {
         goToStep(4);
+        setTimeout(() => {
+          if (wizardStepsRef.current) {
+            wizardStepsRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          }
+        }, 120);
       }
     });
   };
@@ -1598,6 +1635,83 @@ export function InscripcionesPublicComponent() {
                       onChange={(e) => setVirtualFicha({ ...virtualFicha, rda: e.target.value })}
                       placeholder="Tu número de RDA..."
                     />
+                  </div>
+
+                  {/* FECHA DE NACIMIENTO (Día, Mes, Año sin calendario) */}
+                  <div className="form-virtual-field" style={{ gridColumn: '1 / -1', background: '#f8fafc', padding: '14px', borderRadius: '14px', border: '1.5px solid #cbd5e1' }}>
+                    <label className="form-virtual-label" style={{ marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px', color: '#0f172a' }}>
+                      🎂 Fecha de Nacimiento (Escribe tu día, selecciona mes y escribe tu año):
+                    </label>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '10px' }}>
+                      {/* Día */}
+                      <div>
+                        <span style={{ fontSize: '0.85rem', fontWeight: 800, color: '#475569', display: 'block', marginBottom: '4px' }}>
+                          Día (1 al 31):
+                        </span>
+                        <input
+                          type="text"
+                          inputMode="numeric"
+                          maxLength={2}
+                          className="form-virtual-input"
+                          value={virtualFicha.diaNacimiento || ''}
+                          onChange={(e) => {
+                            const val = e.target.value.replace(/\D/g, '');
+                            if (!val || Number(val) <= 31) {
+                              updateFechaNacimiento(val, undefined, undefined);
+                            }
+                          }}
+                          placeholder="Ej: 15"
+                          style={{ textAlign: 'center', fontWeight: 900, fontSize: '1.05rem' }}
+                        />
+                      </div>
+
+                      {/* Mes */}
+                      <div>
+                        <span style={{ fontSize: '0.85rem', fontWeight: 800, color: '#475569', display: 'block', marginBottom: '4px' }}>
+                          Mes:
+                        </span>
+                        <select
+                          className="form-virtual-input"
+                          value={virtualFicha.mesNacimiento || ''}
+                          onChange={(e) => updateFechaNacimiento(undefined, e.target.value, undefined)}
+                          style={{ fontWeight: 800, fontSize: '0.95rem' }}
+                        >
+                          <option value="">-- Selecciona Mes --</option>
+                          <option value="Enero">01 - Enero</option>
+                          <option value="Febrero">02 - Febrero</option>
+                          <option value="Marzo">03 - Marzo</option>
+                          <option value="Abril">04 - Abril</option>
+                          <option value="Mayo">05 - Mayo</option>
+                          <option value="Junio">06 - Junio</option>
+                          <option value="Julio">07 - Julio</option>
+                          <option value="Agosto">08 - Agosto</option>
+                          <option value="Septiembre">09 - Septiembre</option>
+                          <option value="Octubre">10 - Octubre</option>
+                          <option value="Noviembre">11 - Noviembre</option>
+                          <option value="Diciembre">12 - Diciembre</option>
+                        </select>
+                      </div>
+
+                      {/* Año */}
+                      <div>
+                        <span style={{ fontSize: '0.85rem', fontWeight: 800, color: '#475569', display: 'block', marginBottom: '4px' }}>
+                          Año:
+                        </span>
+                        <input
+                          type="text"
+                          inputMode="numeric"
+                          maxLength={4}
+                          className="form-virtual-input"
+                          value={virtualFicha.anoNacimiento || ''}
+                          onChange={(e) => {
+                            const val = e.target.value.replace(/\D/g, '');
+                            updateFechaNacimiento(undefined, undefined, val);
+                          }}
+                          placeholder="Ej: 1978"
+                          style={{ textAlign: 'center', fontWeight: 900, fontSize: '1.05rem' }}
+                        />
+                      </div>
+                    </div>
                   </div>
                 </div>
 
