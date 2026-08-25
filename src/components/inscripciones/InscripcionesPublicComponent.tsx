@@ -1829,52 +1829,29 @@ export function InscripcionesPublicComponent() {
                   </button>
                 </div>
 
-                {/* PRINT & SHARE BUTTONS */}
-                <div style={{ marginTop: '18px', display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+                {/* PRINT BUTTON */}
+                <div style={{ marginTop: '18px' }}>
                   <button
                     type="button"
                     onClick={() => handlePrintOfficialFicha()}
                     style={{
-                      flex: '1 1 240px',
+                      width: '100%',
                       background: 'linear-gradient(135deg, #16a34a 0%, #15803d 100%)',
                       color: '#ffffff',
                       border: 'none',
                       borderRadius: '14px',
                       padding: '16px 20px',
-                      fontSize: '1.1rem',
+                      fontSize: '1.15rem',
                       fontWeight: 900,
                       cursor: 'pointer',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
                       gap: '10px',
-                      boxShadow: '0 4px 14px rgba(22, 163, 74, 0.3)'
+                      boxShadow: '0 4px 14px rgba(22, 163, 74, 0.35)'
                     }}
                   >
-                    <Printer size={22} /> 🖨️ Imprimir / Guardar en PDF
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => handleShareFicha()}
-                    style={{
-                      flex: '1 1 200px',
-                      background: 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)',
-                      color: '#ffffff',
-                      border: 'none',
-                      borderRadius: '14px',
-                      padding: '16px 20px',
-                      fontSize: '1.1rem',
-                      fontWeight: 900,
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: '10px',
-                      boxShadow: '0 4px 14px rgba(2, 132, 199, 0.3)'
-                    }}
-                  >
-                    <Share2 size={22} /> 📲 Compartir Ficha
+                    <Printer size={24} /> 🖨️ Imprimir / Guardar Ficha Oficial en PDF
                   </button>
                 </div>
               </div>
