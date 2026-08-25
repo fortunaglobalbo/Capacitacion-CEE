@@ -597,8 +597,9 @@ CREATE TABLE IF NOT EXISTS reportes_html (
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Columnas para adjuntos digitales (RDA / Certificado de Trabajo y Comprobantes)
+-- Columnas para adjuntos digitales (RDA / Certificado de Trabajo y Comprobantes) y Fecha de Nacimiento
 ALTER TABLE IF EXISTS participantes ADD COLUMN IF NOT EXISTS documento_url TEXT;
+ALTER TABLE IF EXISTS participantes ADD COLUMN IF NOT EXISTS fecha_nacimiento TEXT;
 ALTER TABLE IF EXISTS inscripcion_ciclo ADD COLUMN IF NOT EXISTS documento_url TEXT;
 ALTER TABLE IF EXISTS inscripcion_ciclo ADD COLUMN IF NOT EXISTS comprobante_url TEXT;
 

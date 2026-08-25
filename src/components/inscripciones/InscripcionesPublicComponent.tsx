@@ -45,6 +45,7 @@ interface ParticipantData {
   cargo?: string;
   especialidad?: string;
   sie?: string;
+  fecha_nacimiento?: string;
   cursos: EnrolledCourse[];
 }
 
@@ -260,27 +261,78 @@ export function InscripcionesPublicComponent() {
           cargo: partData?.cargo || 'DOCENTE',
           especialidad: partData?.especialidad || '',
           sie: partData?.sie || '',
+          fecha_nacimiento: partData?.fecha_nacimiento || '',
           cursos: coursesList
         };
 
         setParticipant(foundPart);
         setSelectedCourseIdx(0);
 
+        // Check if there are locally stored ficha details (like birth date, funcion, area, etc.)
+        let savedLocalFicha: any = null;
+        if (typeof window !== 'undefined') {
+          try {
+            const raw = localStorage.getItem(`unefco_ficha_${foundPart.ci}`);
+            if (raw) savedLocalFicha = JSON.parse(raw);
+          } catch (e) {
+            console.error('Error reading local ficha:', e);
+          }
+        }
+
+        const rawBirthDate = partData?.fecha_nacimiento || savedLocalFicha?.fechaNacimiento || '';
+        let initialDay = savedLocalFicha?.diaNacimiento || '';
+        let initialMonth = savedLocalFicha?.mesNacimiento || '';
+        let initialYear = savedLocalFicha?.anoNacimiento || '';
+
+        // If we have rawBirthDate and no split fields, parse into Day, Month, Year
+        if (rawBirthDate && (!initialDay || !initialMonth || !initialYear)) {
+          const matchDe = rawBirthDate.match(/(\d{1,2})\s+de\s+([A-Za-z]+)\s+de\s+(\d{4})/i);
+          if (matchDe) {
+            initialDay = matchDe[1];
+            initialMonth = matchDe[2].charAt(0).toUpperCase() + matchDe[2].slice(1).toLowerCase();
+            initialYear = matchDe[3];
+          } else {
+            const matchSlash = rawBirthDate.match(/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/);
+            if (matchSlash) {
+              initialDay = matchSlash[1];
+              const monthMap: Record<string, string> = {
+                '1': 'Enero', '01': 'Enero',
+                '2': 'Febrero', '02': 'Febrero',
+                '3': 'Marzo', '03': 'Marzo',
+                '4': 'Abril', '04': 'Abril',
+                '5': 'Mayo', '05': 'Mayo',
+                '6': 'Junio', '06': 'Junio',
+                '7': 'Julio', '07': 'Julio',
+                '8': 'Agosto', '08': 'Agosto',
+                '9': 'Septiembre', '09': 'Septiembre',
+                '10': 'Octubre',
+                '11': 'Noviembre',
+                '12': 'Diciembre'
+              };
+              initialMonth = monthMap[matchSlash[2]] || matchSlash[2];
+              initialYear = matchSlash[3];
+            }
+          }
+        }
+
         // Pre-fill virtual ficha with detected data
         setVirtualFicha({
           nombres: foundPart.nombres,
           apellidos: foundPart.apellidos,
           ci: foundPart.ci,
-          funcion: foundPart.cargo?.toLowerCase().includes('admin') ? 'Administrativo' : (foundPart.cargo?.toLowerCase().includes('direct') ? 'Director' : 'Docente'),
-          area: 'Urbano',
-          distrito: foundPart.distrito || 'SANTA CRUZ 1',
-          unidadEducativa: foundPart.unidad_educativa || '',
-          subsistema: 'Educación Regular',
-          nivel: 'Primaria',
-          celular: foundPart.celular || '',
-          correo: foundPart.correo || '',
-          rda: foundPart.rda || '',
-          fechaNacimiento: ''
+          funcion: savedLocalFicha?.funcion || (foundPart.cargo?.toLowerCase().includes('admin') ? 'Administrativo' : (foundPart.cargo?.toLowerCase().includes('direct') ? 'Director' : 'Docente')),
+          area: savedLocalFicha?.area || 'Urbano',
+          distrito: savedLocalFicha?.distrito || foundPart.distrito || 'SANTA CRUZ 1',
+          unidadEducativa: savedLocalFicha?.unidadEducativa || foundPart.unidad_educativa || '',
+          subsistema: savedLocalFicha?.subsistema || 'Educación Regular',
+          nivel: savedLocalFicha?.nivel || 'Primaria',
+          celular: savedLocalFicha?.celular || foundPart.celular || '',
+          correo: savedLocalFicha?.correo || foundPart.correo || '',
+          rda: savedLocalFicha?.rda || foundPart.rda || '',
+          fechaNacimiento: rawBirthDate || (initialDay && initialMonth && initialYear ? `${initialDay} de ${initialMonth} de ${initialYear}` : ''),
+          diaNacimiento: initialDay,
+          mesNacimiento: initialMonth,
+          anoNacimiento: initialYear
         });
 
         // Set existing document if any
@@ -313,19 +365,48 @@ export function InscripcionesPublicComponent() {
     }
 
     try {
-      const { error } = await supabase
+      const computedBirth = virtualFicha.fechaNacimiento.trim() || (
+        virtualFicha.diaNacimiento && virtualFicha.mesNacimiento && virtualFicha.anoNacimiento
+          ? `${virtualFicha.diaNacimiento} de ${virtualFicha.mesNacimiento} de ${virtualFicha.anoNacimiento}`
+          : ''
+      );
+
+      // 1. Try to update in Supabase with fecha_nacimiento
+      const updatePayload: any = {
+        nombres: virtualFicha.nombres.trim().toUpperCase(),
+        apellidos: virtualFicha.apellidos.trim().toUpperCase(),
+        rda: virtualFicha.rda.trim() || null,
+        celular: virtualFicha.celular.trim() || null,
+        unidad_educativa: virtualFicha.unidadEducativa.trim().toUpperCase() || null,
+        fecha_nacimiento: computedBirth || null
+      };
+
+      const updateRes = await supabase
         .from('participantes')
-        .update({
-          nombres: virtualFicha.nombres.trim().toUpperCase(),
-          apellidos: virtualFicha.apellidos.trim().toUpperCase(),
-          rda: virtualFicha.rda.trim() || null,
-          celular: virtualFicha.celular.trim() || null,
-          unidad_educativa: virtualFicha.unidadEducativa.trim().toUpperCase() || null
-        })
+        .update(updatePayload)
         .eq('ci', participant.ci);
 
-      if (error) {
-        console.warn('Could not update in DB, saving locally in session state:', error);
+      // Fallback if column does not exist yet in Postgres
+      if (updateRes.error) {
+        console.warn('Retrying update without fecha_nacimiento:', updateRes.error.message);
+        await supabase
+          .from('participantes')
+          .update({
+            nombres: virtualFicha.nombres.trim().toUpperCase(),
+            apellidos: virtualFicha.apellidos.trim().toUpperCase(),
+            rda: virtualFicha.rda.trim() || null,
+            celular: virtualFicha.celular.trim() || null,
+            unidad_educativa: virtualFicha.unidadEducativa.trim().toUpperCase() || null
+          })
+          .eq('ci', participant.ci);
+      }
+
+      // Persist in localStorage by CI so it is always remembered on reload
+      if (typeof window !== 'undefined') {
+        localStorage.setItem(`unefco_ficha_${participant.ci}`, JSON.stringify({
+          ...virtualFicha,
+          fechaNacimiento: computedBirth
+        }));
       }
 
       setParticipant(prev => prev ? {
@@ -334,7 +415,8 @@ export function InscripcionesPublicComponent() {
         apellidos: virtualFicha.apellidos.trim().toUpperCase(),
         rda: virtualFicha.rda.trim(),
         celular: virtualFicha.celular.trim(),
-        unidad_educativa: virtualFicha.unidadEducativa.trim().toUpperCase()
+        unidad_educativa: virtualFicha.unidadEducativa.trim().toUpperCase(),
+        fecha_nacimiento: computedBirth
       } : null);
 
       setFichaSaved(true);
@@ -353,6 +435,9 @@ export function InscripcionesPublicComponent() {
       }, 400);
     } catch (err: any) {
       console.error('Error saving info:', err);
+      if (typeof window !== 'undefined') {
+        localStorage.setItem(`unefco_ficha_${participant.ci}`, JSON.stringify(virtualFicha));
+      }
       setFichaSaved(true);
       setGuideNextStep(true);
       Swal.fire('Guardado', 'Datos guardados correctamente para la ficha oficial.', 'success');
