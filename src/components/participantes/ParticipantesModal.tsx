@@ -242,6 +242,22 @@ export default function ParticipantesModal({
   const [validatingIndex, setValidatingIndex] = useState(0);
   const [validatingTotal, setValidatingTotal] = useState(0);
 
+  // Multi-selection states
+  const [selectedCis, setSelectedCis] = useState<Set<string>>(new Set());
+
+  // Massive Unidad Educativa modal states
+  const [showMassiveUeModal, setShowMassiveUeModal] = useState(false);
+  const [massiveUeName, setMassiveUeName] = useState('');
+  const [massiveSieCode, setMassiveSieCode] = useState('');
+  const [massiveScope, setMassiveScope] = useState<'all' | 'selected' | 'empty'>('all');
+  const [savingMassiveUe, setSavingMassiveUe] = useState(false);
+  const [ueSuggestions, setUeSuggestions] = useState<Array<{ codigo_sie?: string; unidad_educativa: string }>>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+
+  // Importer bulk UE state
+  const [importerMassiveUe, setImporterMassiveUe] = useState('');
+  const [importerMassiveSie, setImporterMassiveSie] = useState('');
+
   // Fetch enrolled participants
   const fetchParticipantes = useCallback(async () => {
     setLoading(true);
@@ -1876,6 +1892,241 @@ export default function ParticipantesModal({
     }
   };
 
+  // ─── Multi-Selection & Massive Educational Unit Handlers ───
+  const handleToggleSelectAll = () => {
+    const validFilteredCis = filteredInscripciones
+      .map(i => i.participantes?.ci)
+      .filter((ci): ci is string => Boolean(ci));
+
+    if (validFilteredCis.length === 0) return;
+
+    const allSelected = validFilteredCis.every(ci => selectedCis.has(ci));
+    if (allSelected) {
+      setSelectedCis(new Set());
+    } else {
+      setSelectedCis(new Set(validFilteredCis));
+    }
+  };
+
+  const handleToggleSelectCi = (ci: string) => {
+    setSelectedCis(prev => {
+      const next = new Set(prev);
+      if (next.has(ci)) {
+        next.delete(ci);
+      } else {
+        next.add(ci);
+      }
+      return next;
+    });
+  };
+
+  const handleClearSelection = () => {
+    setSelectedCis(new Set());
+  };
+
+  const handleBulkPaymentForSelected = async (newStatus: 'Pagado' | 'Pendiente') => {
+    if (selectedCis.size === 0) return;
+    const selectedEnrollmentIds = inscripciones
+      .filter(ins => ins.participantes && selectedCis.has(ins.participantes.ci))
+      .map(ins => ins.id);
+
+    if (selectedEnrollmentIds.length === 0) return;
+
+    try {
+      const { error } = await supabase
+        .from('inscripcion_ciclo')
+        .update({ pagos: newStatus })
+        .in('id', selectedEnrollmentIds);
+
+      if (error) throw error;
+
+      Swal.fire({
+        icon: 'success',
+        title: '¡Actualizado!',
+        text: `Se marcaron ${selectedEnrollmentIds.length} participante${selectedEnrollmentIds.length !== 1 ? 's' : ''} como "${newStatus}".`,
+        timer: 2000,
+        showConfirmButton: false,
+        toast: true,
+        position: 'top-end'
+      });
+
+      fetchParticipantes();
+    } catch (err: any) {
+      Swal.fire('Error', err.message || 'No se pudieron actualizar los estados de pago', 'error');
+    }
+  };
+
+  // Search UE suggestions in catalog sie_ue and existing participants
+  const handleSearchUeSuggestions = async (query: string) => {
+    if (!query || query.trim().length < 2) {
+      setUeSuggestions([]);
+      setShowSuggestions(false);
+      return;
+    }
+    try {
+      const q = query.trim();
+      const suggestionsMap = new Map<string, { codigo_sie?: string; unidad_educativa: string }>();
+
+      // 1. Search in catalog sie_ue
+      const { data: sieData } = await supabase
+        .from('sie_ue')
+        .select('codigo_sie, unidad_educativa')
+        .ilike('unidad_educativa', `%${q}%`)
+        .limit(6);
+
+      (sieData || []).forEach((item: any) => {
+        if (item.unidad_educativa) {
+          suggestionsMap.set(item.unidad_educativa.trim().toUpperCase(), {
+            codigo_sie: item.codigo_sie || undefined,
+            unidad_educativa: item.unidad_educativa.trim().toUpperCase(),
+          });
+        }
+      });
+
+      // 2. Search in existing participants
+      const { data: partData } = await supabase
+        .from('participantes')
+        .select('unidad_educativa, sie')
+        .ilike('unidad_educativa', `%${q}%`)
+        .limit(6);
+
+      (partData || []).forEach((item: any) => {
+        if (item.unidad_educativa) {
+          const norm = item.unidad_educativa.trim().toUpperCase();
+          if (!suggestionsMap.has(norm)) {
+            suggestionsMap.set(norm, {
+              codigo_sie: item.sie || undefined,
+              unidad_educativa: norm,
+            });
+          }
+        }
+      });
+
+      const list = Array.from(suggestionsMap.values()).slice(0, 8);
+      setUeSuggestions(list);
+      setShowSuggestions(list.length > 0);
+    } catch (err) {
+      console.error('Error fetching UE suggestions:', err);
+    }
+  };
+
+  // Helper for computing target participants for massive UE assignment
+  const getTargetParticipants = () => {
+    if (massiveScope === 'selected') {
+      return inscripciones
+        .filter(ins => ins.participantes && selectedCis.has(ins.participantes.ci))
+        .map(ins => ins.participantes!.ci);
+    }
+    if (massiveScope === 'empty') {
+      return inscripciones
+        .filter(ins => ins.participantes && (!ins.participantes.unidad_educativa || !ins.participantes.unidad_educativa.trim()))
+        .map(ins => ins.participantes!.ci);
+    }
+    return inscripciones
+      .filter(ins => ins.participantes && ins.participantes.ci)
+      .map(ins => ins.participantes!.ci);
+  };
+
+  // Apply massive Unidad Educativa to Supabase and UI
+  const handleApplyMassiveUe = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const ueTrimmed = massiveUeName.trim().toUpperCase();
+    if (!ueTrimmed) {
+      Swal.fire('Campo requerido', 'Por favor ingresa el nombre de la Unidad Educativa', 'warning');
+      return;
+    }
+
+    const targetCis = getTargetParticipants();
+    if (targetCis.length === 0) {
+      Swal.fire('Sin participantes', 'No hay participantes para actualizar según el alcance seleccionado.', 'info');
+      return;
+    }
+
+    setSavingMassiveUe(true);
+    try {
+      const updatePayload: { unidad_educativa: string; sie?: string | null } = {
+        unidad_educativa: ueTrimmed,
+      };
+      if (massiveSieCode.trim()) {
+        updatePayload.sie = massiveSieCode.trim();
+      }
+
+      const { error } = await supabase
+        .from('participantes')
+        .update(updatePayload)
+        .in('ci', targetCis);
+
+      if (error) throw error;
+
+      // Optimistically update local state
+      setInscripciones(prev =>
+        prev.map(ins => {
+          if (ins.participantes && targetCis.includes(ins.participantes.ci)) {
+            return {
+              ...ins,
+              participantes: {
+                ...ins.participantes,
+                unidad_educativa: ueTrimmed,
+                ...(massiveSieCode.trim() ? { sie: massiveSieCode.trim() } : {}),
+              },
+            };
+          }
+          return ins;
+        })
+      );
+
+      Swal.fire({
+        icon: 'success',
+        title: '¡Unidad Educativa Asignada!',
+        text: `Se asignó "${ueTrimmed}" a ${targetCis.length} participante${targetCis.length !== 1 ? 's' : ''}.`,
+        timer: 2500,
+        showConfirmButton: false,
+        toast: true,
+        position: 'top-end'
+      });
+
+      setShowMassiveUeModal(false);
+      setMassiveUeName('');
+      setMassiveSieCode('');
+      setSelectedCis(new Set());
+      onRefresh();
+      fetchParticipantes();
+    } catch (err: any) {
+      console.error('Error applying massive UE:', err);
+      Swal.fire('Error', err.message || 'No se pudo actualizar la Unidad Educativa masivamente', 'error');
+    } finally {
+      setSavingMassiveUe(false);
+    }
+  };
+
+  // Importer preview bulk assign
+  const handleApplyMassiveUeToPreview = () => {
+    const ue = importerMassiveUe.trim().toUpperCase();
+    if (!ue) {
+      Swal.fire('Campo requerido', 'Ingresa la Unidad Educativa para la lista.', 'warning');
+      return;
+    }
+    const sie = importerMassiveSie.trim();
+
+    setPreviewList(prev =>
+      prev.map(item => ({
+        ...item,
+        unidad_educativa: ue,
+        ...(sie ? { sie } : {}),
+      }))
+    );
+
+    Swal.fire({
+      icon: 'success',
+      title: '¡Aplicado a la vista previa!',
+      text: `Se asignó "${ue}" a los ${previewList.length} participantes detectados.`,
+      timer: 2000,
+      showConfirmButton: false,
+      toast: true,
+      position: 'top-end'
+    });
+  };
+
   // ─── Migration handlers ─────────────────────────────────
   const handleFetchMigrationPreview = async () => {
     if (!migrSourceId.trim()) {
@@ -2409,6 +2660,9 @@ export default function ParticipantesModal({
               <button type="button" className="btn btn-secondary btn-sm" onClick={handlePrintPlanilla} title="Imprimir Planilla de Asistencia y Material">
                 <Printer size={14} /> Planilla
               </button>
+              <button type="button" className="btn btn-sm" onClick={() => { setMassiveScope(selectedCis.size > 0 ? 'selected' : 'all'); setShowMassiveUeModal(true); }} title="Asignar Unidad Educativa masivamente" style={{ background: 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)', color: '#fff', border: 'none', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '5px', boxShadow: '0 2px 8px rgba(2,132,199,0.25)' }}>
+                <School size={14} /> Asignar U.E. Masiva
+              </button>
               <button type="button" className="btn btn-sm" onClick={() => handleBulkPaymentUpdate('Pagado')} title="Marcar todos los participantes como Pagados" style={{ background: 'linear-gradient(135deg, #059669 0%, #10b981 100%)', color: '#fff', border: 'none', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '5px', boxShadow: '0 2px 8px rgba(16,185,129,0.25)' }}>
                 <CheckCircle2 size={14} /> Marcar Todos Pagados
               </button>
@@ -2447,6 +2701,66 @@ export default function ParticipantesModal({
                 <UserPlus size={14} /> {showImporter ? 'Cerrar Importador' : 'Importar Excel / CSV'}
               </button>
             </div>
+
+            {/* Selection Bar when 1+ participants are selected */}
+            {selectedCis.size > 0 && (
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                background: 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)',
+                color: '#ffffff',
+                padding: '8px 16px',
+                borderRadius: 'var(--radius-sm)',
+                boxShadow: '0 4px 14px rgba(0,0,0,0.18)',
+                gap: '12px',
+                flexWrap: 'wrap',
+                animation: 'slideDown 0.2s ease'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span style={{ background: '#0284c7', color: '#fff', padding: '2px 8px', borderRadius: '12px', fontSize: '0.78rem', fontWeight: 800 }}>
+                    {selectedCis.size}
+                  </span>
+                  <span style={{ fontSize: '0.84rem', fontWeight: 600 }}>
+                    participante{selectedCis.size !== 1 ? 's' : ''} seleccionado{selectedCis.size !== 1 ? 's' : ''}
+                  </span>
+                </div>
+                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
+                  <button
+                    type="button"
+                    className="btn btn-sm"
+                    onClick={() => { setMassiveScope('selected'); setShowMassiveUeModal(true); }}
+                    style={{ background: '#0284c7', color: '#fff', border: 'none', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '5px', fontSize: '0.78rem', padding: '5px 12px' }}
+                  >
+                    <School size={13} /> Asignar U.E. a Seleccionados
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-sm"
+                    onClick={() => handleBulkPaymentForSelected('Pagado')}
+                    style={{ background: '#059669', color: '#fff', border: 'none', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '5px', fontSize: '0.78rem', padding: '5px 12px' }}
+                  >
+                    <CheckCircle2 size={13} /> Marcar Pagados
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-sm"
+                    onClick={() => handleBulkPaymentForSelected('Pendiente')}
+                    style={{ background: '#d97706', color: '#fff', border: 'none', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '5px', fontSize: '0.78rem', padding: '5px 12px' }}
+                  >
+                    <AlertTriangle size={13} /> Marcar Pendientes
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-ghost btn-sm"
+                    onClick={handleClearSelection}
+                    style={{ color: '#94a3b8', border: '1px solid #475569', fontSize: '0.78rem', padding: '5px 10px' }}
+                  >
+                    <X size={12} /> Limpiar Selección
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Unified Smart Importer Panel (Collapsible) */}
@@ -2782,6 +3096,51 @@ export default function ParticipantesModal({
                     </div>
                   </div>
 
+                  {/* Quick bulk UE assigner for entire preview */}
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    background: '#f0f9ff',
+                    border: '1.5px solid #bae6fd',
+                    borderRadius: 'var(--radius-sm)',
+                    padding: '10px 14px',
+                    gap: '10px',
+                    flexWrap: 'wrap'
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <School size={16} style={{ color: '#0284c7' }} />
+                      <span style={{ fontSize: '0.8rem', fontWeight: 800, color: '#0369a1' }}>
+                        Asignar Unidad Educativa a toda la nómina en vista previa:
+                      </span>
+                    </div>
+                    <div style={{ display: 'flex', gap: '8px', flex: 1, minWidth: '280px', maxWidth: '640px', alignItems: 'center' }}>
+                      <input
+                        type="text"
+                        placeholder="Nombre de la Unidad Educativa (ej: COLEGIO NACIONAL FLORIDA)"
+                        value={importerMassiveUe}
+                        onChange={(e) => setImporterMassiveUe(e.target.value.toUpperCase())}
+                        style={{ flex: 2, padding: '5px 10px', fontSize: '0.78rem', border: '1px solid #7dd3fc', borderRadius: '4px', textTransform: 'uppercase', background: '#ffffff' }}
+                      />
+                      <input
+                        type="text"
+                        placeholder="SIE (Opc.)"
+                        value={importerMassiveSie}
+                        onChange={(e) => setImporterMassiveSie(e.target.value)}
+                        style={{ width: '90px', padding: '5px 8px', fontSize: '0.78rem', border: '1px solid #7dd3fc', borderRadius: '4px', background: '#ffffff' }}
+                      />
+                      <button
+                        type="button"
+                        className="btn btn-sm"
+                        onClick={handleApplyMassiveUeToPreview}
+                        disabled={!importerMassiveUe.trim()}
+                        style={{ background: '#0284c7', color: '#fff', border: 'none', fontWeight: 700, whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.78rem', padding: '5px 12px' }}
+                      >
+                        <Check size={13} /> Aplicar a todos ({previewList.length})
+                      </button>
+                    </div>
+                  </div>
+
                   {/* Preview Table */}
                   <div style={{ overflowX: 'auto', border: '1px solid var(--gray-200)', borderRadius: 'var(--radius-sm)', background: 'var(--white)' }}>
                     <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem', textAlign: 'left' }}>
@@ -3036,6 +3395,15 @@ export default function ParticipantesModal({
               <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
                 <thead>
                   <tr style={{ background: 'var(--primary-900)', color: 'var(--white)' }}>
+                    <th style={{ padding: '12px 10px', width: '40px', textAlign: 'center' }}>
+                      <input
+                        type="checkbox"
+                        checked={filteredInscripciones.length > 0 && selectedCis.size === filteredInscripciones.length}
+                        onChange={handleToggleSelectAll}
+                        style={{ cursor: 'pointer', transform: 'scale(1.15)', accentColor: '#0284c7' }}
+                        title="Seleccionar todos los participantes de la lista"
+                      />
+                    </th>
                     <th style={{ padding: '12px 16px', fontSize: '0.9rem', textTransform: 'uppercase', width: '50px', textAlign: 'center' }}>Nro</th>
                     <th style={{ padding: '12px 16px', fontSize: '0.9rem', textTransform: 'uppercase', width: '130px' }}>C.I.</th>
                     <th style={{ padding: '12px 16px', fontSize: '0.9rem', textTransform: 'uppercase', width: '110px' }}>RDA</th>
@@ -3059,6 +3427,8 @@ export default function ParticipantesModal({
                         p={p}
                         visualIndex={index + 1}
                         cursoId={curso.id}
+                        isSelected={p?.ci ? selectedCis.has(p.ci) : false}
+                        onToggleSelect={handleToggleSelectCi}
                         onSave={handleUpdateEnrollment}
                         onDelete={handleDeleteEnrollment}
                         onEditCore={setEditingPart}
@@ -3274,6 +3644,261 @@ export default function ParticipantesModal({
         </div>
       </div>
     )}
+
+    {/* Massive Unidad Educativa Modal */}
+    {showMassiveUeModal && (
+      <div className="modal-overlay" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', backgroundColor: 'rgba(11,21,32,0.65)', backdropFilter: 'blur(8px)', zIndex: 1150, padding: '20px' }}>
+        <div className="modal-container" style={{ background: 'var(--white)', borderRadius: '16px', width: '100%', maxWidth: '560px', boxShadow: 'var(--shadow-xl)', display: 'flex', flexDirection: 'column', animation: 'slideUp 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)', overflow: 'hidden', border: '1px solid var(--gray-200)' }}>
+          
+          {/* Header */}
+          <div className="modal-header" style={{ padding: '18px 24px', background: 'linear-gradient(135deg, #0369a1 0%, #0284c7 100%)', color: 'var(--white)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '3px solid #38bdf8' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <div style={{ background: 'rgba(255,255,255,0.2)', padding: '6px', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <School size={20} style={{ color: '#ffffff' }} />
+              </div>
+              <div>
+                <h4 style={{ margin: 0, fontSize: '1.08rem', fontWeight: 800, color: 'var(--white)', letterSpacing: '0.02em' }}>Asignación Masiva de Unidad Educativa</h4>
+                <span style={{ fontSize: '0.74rem', opacity: 0.9, display: 'block', marginTop: '2px' }}>
+                  Ciclo: {curso.ciclo_nombre || curso.id}
+                </span>
+              </div>
+            </div>
+            <button type="button" className="btn btn-icon btn-ghost" onClick={() => setShowMassiveUeModal(false)} style={{ color: 'rgba(255,255,255,0.8)', padding: '6px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(255,255,255,0.1)', border: 'none', cursor: 'pointer' }}>
+              <X size={16} />
+            </button>
+          </div>
+
+          {/* Form */}
+          <form onSubmit={handleApplyMassiveUe} style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '18px' }}>
+            
+            {/* Scope selector */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              <label style={{ fontSize: '0.78rem', fontWeight: 800, color: 'var(--gray-700)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                1. ¿A quiénes deseas aplicar la Unidad Educativa?
+              </label>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '8px' }}>
+                <label style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '10px',
+                  padding: '10px 14px',
+                  border: `1.5px solid ${massiveScope === 'all' ? '#0284c7' : 'var(--gray-200)'}`,
+                  background: massiveScope === 'all' ? '#f0f9ff' : 'var(--white)',
+                  borderRadius: '8px',
+                  cursor: 'pointer',
+                  transition: 'all 0.15s ease'
+                }}>
+                  <input
+                    type="radio"
+                    name="massiveScope"
+                    value="all"
+                    checked={massiveScope === 'all'}
+                    onChange={() => setMassiveScope('all')}
+                  />
+                  <div>
+                    <span style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--gray-800)', display: 'block' }}>
+                      👥 A todos los inscritos de este ciclo ({inscripciones.length} participantes)
+                    </span>
+                    <span style={{ fontSize: '0.74rem', color: 'var(--gray-500)' }}>
+                      Asignará o sobrescribirá la Unidad Educativa para toda la lista.
+                    </span>
+                  </div>
+                </label>
+
+                <label style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '10px',
+                  padding: '10px 14px',
+                  border: `1.5px solid ${massiveScope === 'selected' ? '#0284c7' : 'var(--gray-200)'}`,
+                  background: massiveScope === 'selected' ? '#f0f9ff' : selectedCis.size === 0 ? 'var(--gray-50)' : 'var(--white)',
+                  borderRadius: '8px',
+                  cursor: selectedCis.size === 0 ? 'not-allowed' : 'pointer',
+                  opacity: selectedCis.size === 0 ? 0.6 : 1,
+                  transition: 'all 0.15s ease'
+                }}>
+                  <input
+                    type="radio"
+                    name="massiveScope"
+                    value="selected"
+                    checked={massiveScope === 'selected'}
+                    disabled={selectedCis.size === 0}
+                    onChange={() => setMassiveScope('selected')}
+                  />
+                  <div>
+                    <span style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--gray-800)', display: 'block' }}>
+                      🎯 Solo a los participantes seleccionados ({selectedCis.size} participantes)
+                    </span>
+                    <span style={{ fontSize: '0.74rem', color: 'var(--gray-500)' }}>
+                      {selectedCis.size === 0 ? 'No tienes casillas marcadas en la tabla.' : 'Aplicará solo a las casillas actualmente seleccionadas.'}
+                    </span>
+                  </div>
+                </label>
+
+                <label style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '10px',
+                  padding: '10px 14px',
+                  border: `1.5px solid ${massiveScope === 'empty' ? '#0284c7' : 'var(--gray-200)'}`,
+                  background: massiveScope === 'empty' ? '#f0f9ff' : 'var(--white)',
+                  borderRadius: '8px',
+                  cursor: 'pointer',
+                  transition: 'all 0.15s ease'
+                }}>
+                  <input
+                    type="radio"
+                    name="massiveScope"
+                    value="empty"
+                    checked={massiveScope === 'empty'}
+                    onChange={() => setMassiveScope('empty')}
+                  />
+                  <div>
+                    <span style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--gray-800)', display: 'block' }}>
+                      🔍 Solo a quienes NO tienen Unidad Educativa ({inscripciones.filter(i => !i.participantes?.unidad_educativa?.trim()).length} participantes)
+                    </span>
+                    <span style={{ fontSize: '0.74rem', color: 'var(--gray-500)' }}>
+                      Rellenará solo los registros vacíos, respetando los que ya tienen colegio.
+                    </span>
+                  </div>
+                </label>
+              </div>
+            </div>
+
+            {/* Inputs */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              <label style={{ fontSize: '0.78rem', fontWeight: 800, color: 'var(--gray-700)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                2. Datos de la Institución Educativa
+              </label>
+
+              {/* Autocomplete Input UE */}
+              <div style={{ position: 'relative' }}>
+                <label style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--gray-600)', display: 'block', marginBottom: '4px' }}>
+                  Nombre de la Unidad Educativa *
+                </label>
+                <input
+                  type="text"
+                  required
+                  autoFocus
+                  value={massiveUeName}
+                  onChange={(e) => {
+                    const val = e.target.value.toUpperCase();
+                    setMassiveUeName(val);
+                    handleSearchUeSuggestions(val);
+                  }}
+                  onFocus={() => {
+                    if (massiveUeName.trim()) handleSearchUeSuggestions(massiveUeName);
+                  }}
+                  placeholder="EJ: COLEGIO NACIONAL FLORIDA"
+                  style={{ width: '100%', padding: '9px 12px', fontSize: '0.88rem', border: '1.5px solid #0284c7', borderRadius: '8px', textTransform: 'uppercase', fontWeight: 700, background: '#fff' }}
+                />
+
+                {/* Suggestions dropdown */}
+                {showSuggestions && ueSuggestions.length > 0 && (
+                  <div style={{
+                    position: 'absolute',
+                    top: '100%',
+                    left: 0,
+                    right: 0,
+                    zIndex: 30,
+                    background: '#ffffff',
+                    border: '1px solid var(--gray-300)',
+                    borderRadius: '8px',
+                    boxShadow: '0 8px 24px rgba(0,0,0,0.15)',
+                    maxHeight: '180px',
+                    overflowY: 'auto',
+                    marginTop: '4px'
+                  }}>
+                    {ueSuggestions.map((sug, i) => (
+                      <div
+                        key={i}
+                        onClick={() => {
+                          setMassiveUeName(sug.unidad_educativa);
+                          if (sug.codigo_sie) setMassiveSieCode(sug.codigo_sie);
+                          setShowSuggestions(false);
+                        }}
+                        style={{
+                          padding: '8px 12px',
+                          cursor: 'pointer',
+                          borderBottom: i < ueSuggestions.length - 1 ? '1px solid var(--gray-100)' : 'none',
+                          fontSize: '0.82rem',
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                          transition: 'background 0.15s ease'
+                        }}
+                        onMouseEnter={(e) => e.currentTarget.style.background = '#f0f9ff'}
+                        onMouseLeave={(e) => e.currentTarget.style.background = '#ffffff'}
+                      >
+                        <span style={{ fontWeight: 700, color: 'var(--gray-800)' }}>{sug.unidad_educativa}</span>
+                        {sug.codigo_sie && (
+                          <span style={{ fontSize: '0.72rem', background: '#e0f2fe', color: '#0369a1', padding: '2px 6px', borderRadius: '4px', fontWeight: 700 }}>
+                            SIE: {sug.codigo_sie}
+                          </span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Código SIE (Opcional) */}
+              <div>
+                <label style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--gray-600)', display: 'block', marginBottom: '4px' }}>
+                  Código SIE (Opcional)
+                </label>
+                <input
+                  type="text"
+                  value={massiveSieCode}
+                  onChange={(e) => setMassiveSieCode(e.target.value)}
+                  placeholder="Ej: 80730001 (si se deja vacío, no alterará los códigos SIE existentes)"
+                  style={{ width: '100%', padding: '8px 12px', fontSize: '0.84rem', border: '1px solid var(--gray-300)', borderRadius: '8px' }}
+                />
+              </div>
+            </div>
+
+            {/* Dynamic impact preview */}
+            <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '10px 14px', fontSize: '0.78rem', color: '#475569' }}>
+              💡 Se actualizarán <b>{getTargetParticipants().length}</b> participantes con la Unidad Educativa: <b style={{ color: '#0284c7' }}>{massiveUeName.trim() || '[Sin especificar]'}</b>.
+            </div>
+
+            {/* Action Buttons */}
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '4px' }}>
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => setShowMassiveUeModal(false)}
+                disabled={savingMassiveUe}
+              >
+                Cancelar
+              </button>
+              <button
+                type="submit"
+                className="btn"
+                disabled={savingMassiveUe || !massiveUeName.trim() || getTargetParticipants().length === 0}
+                style={{
+                  background: 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)',
+                  color: '#ffffff',
+                  border: 'none',
+                  fontWeight: 700,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  padding: '9px 20px',
+                  borderRadius: '8px',
+                  boxShadow: '0 2px 8px rgba(2,132,199,0.3)'
+                }}
+              >
+                {savingMassiveUe ? <Loader2 size={15} className="spin" /> : <Check size={15} />}
+                {savingMassiveUe ? 'Asignando...' : `Asignar a ${getTargetParticipants().length} Participantes`}
+              </button>
+            </div>
+
+          </form>
+
+        </div>
+      </div>
+    )}
   </>
 );
 }
@@ -3284,6 +3909,8 @@ interface RowComponentProps {
   p: Participante;
   visualIndex: number;
   cursoId: string;
+  isSelected: boolean;
+  onToggleSelect: (ci: string) => void;
   onSave: (id: number, pagos: string, observaciones: string) => Promise<void>;
   onDelete: (id: number) => Promise<void>;
   onEditCore: (p: Participante) => void;
@@ -3301,6 +3928,8 @@ function RowComponent({
   p,
   visualIndex,
   cursoId,
+  isSelected,
+  onToggleSelect,
   onSave,
   onDelete,
   onEditCore,
@@ -3566,7 +4195,23 @@ function RowComponent({
   };
 
   return (
-    <tr style={{ borderBottom: '1px solid #000000', transition: 'background var(--transition-fast)' }} className="hover-row">
+    <tr
+      style={{
+        borderBottom: '1px solid #000000',
+        transition: 'background var(--transition-fast)',
+        background: isSelected ? '#f0f9ff' : undefined
+      }}
+      className="hover-row"
+    >
+      {/* Checkbox Selection */}
+      <td style={{ padding: '12px 10px', textAlign: 'center', width: '40px' }}>
+        <input
+          type="checkbox"
+          checked={isSelected}
+          onChange={() => onToggleSelect(p.ci)}
+          style={{ cursor: 'pointer', transform: 'scale(1.15)', accentColor: '#0284c7' }}
+        />
+      </td>
 
       {/* Nro */}
       <td style={{ padding: '12px 16px', fontSize: '0.9rem', color: 'var(--gray-600)', fontWeight: 600, textAlign: 'center' }}>
