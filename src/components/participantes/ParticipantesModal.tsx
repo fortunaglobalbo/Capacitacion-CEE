@@ -257,6 +257,23 @@ export default function ParticipantesModal({
   // Importer bulk UE state
   const [importerMassiveUe, setImporterMassiveUe] = useState('');
   const [importerMassiveSie, setImporterMassiveSie] = useState('');
+  const [importerUeSuggestions, setImporterUeSuggestions] = useState<Array<{ codigo_sie: string; unidad_educativa: string }>>([]);
+  const [showImporterUeSuggestions, setShowImporterUeSuggestions] = useState(false);
+
+  // Dedicated UE Match & Search Modal for single participant (4000+ catalog)
+  const [ueMatchTargetPart, setUeMatchTargetPart] = useState<Participante | null>(null);
+  const [ueMatchQuery, setUeMatchQuery] = useState('');
+  const [ueMatchResults, setUeMatchResults] = useState<Array<{ codigo_sie: string; unidad_educativa: string; similarityScore?: number }>>([]);
+  const [searchingUeMatch, setSearchingUeMatch] = useState(false);
+  const [linkingUe, setLinkingUe] = useState(false);
+
+  // Suggestions for Manual Add form
+  const [addUeSuggestions, setAddUeSuggestions] = useState<Array<{ codigo_sie: string; unidad_educativa: string }>>([]);
+  const [showAddUeSuggestions, setShowAddUeSuggestions] = useState(false);
+
+  // Suggestions for Edit Core form
+  const [editUeSuggestions, setEditUeSuggestions] = useState<Array<{ codigo_sie: string; unidad_educativa: string }>>([]);
+  const [showEditUeSuggestions, setShowEditUeSuggestions] = useState(false);
 
   // Fetch enrolled participants
   const fetchParticipantes = useCallback(async () => {
@@ -1956,57 +1973,228 @@ export default function ParticipantesModal({
     }
   };
 
-  // Search UE suggestions in catalog sie_ue and existing participants
+  // ─── Search Engine for 4,000+ Unidades Educativas (`sie_ue`) with Scoring ───
+  const searchUeCatalog = useCallback(async (query: string, maxResults = 30) => {
+    if (!query || !query.trim()) return [];
+    const rawQuery = query.trim();
+    const cleanQ = cleanNameString(rawQuery);
+    const isNumeric = /^\d+$/.test(rawQuery);
+
+    try {
+      if (isNumeric) {
+        const { data, error } = await supabase
+          .from('sie_ue')
+          .select('codigo_sie, unidad_educativa')
+          .ilike('codigo_sie', `%${rawQuery}%`)
+          .limit(maxResults);
+
+        if (error || !data) return [];
+        return data.map(item => ({
+          codigo_sie: item.codigo_sie,
+          unidad_educativa: item.unidad_educativa.trim().toUpperCase(),
+          similarityScore: 100
+        }));
+      }
+
+      // Filter stop words to find the most distinctive keyword
+      const stopWords = ['DEL', 'LOS', 'LAS', 'SAN', 'STA', 'SANTA', 'DON', 'COL', 'COLEGIO', 'ESCUELA', 'UNIDAD', 'EDUCATIVA', 'UE', 'U.E.', 'DE', 'LA', 'EL', 'Y', 'EN', 'FE', 'ALEGRIA'];
+      const words = cleanQ
+        .split(/\s+/)
+        .filter(w => w.length >= 3 && !stopWords.includes(w));
+
+      const mainWord = words.length > 0 ? words.sort((a, b) => b.length - a.length)[0] : cleanQ.split(/\s+/)[0] || cleanQ;
+
+      // Query sie_ue with main distinctive word
+      const { data: sieData, error: sieErr } = await supabase
+        .from('sie_ue')
+        .select('codigo_sie, unidad_educativa')
+        .ilike('unidad_educativa', `%${mainWord}%`)
+        .limit(60);
+
+      const map = new Map<string, { codigo_sie: string; unidad_educativa: string; similarityScore?: number }>();
+
+      if (!sieErr && sieData) {
+        sieData.forEach(item => {
+          if (item?.codigo_sie && item?.unidad_educativa) {
+            map.set(item.codigo_sie, {
+              codigo_sie: item.codigo_sie,
+              unidad_educativa: item.unidad_educativa.trim().toUpperCase()
+            });
+          }
+        });
+      }
+
+      // If needed, also search in registered participants for any schools not yet in sie_ue
+      const { data: partData } = await supabase
+        .from('participantes')
+        .select('sie, unidad_educativa')
+        .ilike('unidad_educativa', `%${mainWord}%`)
+        .limit(20);
+
+      if (partData) {
+        partData.forEach(item => {
+          if (item?.unidad_educativa && !map.has(item.sie || item.unidad_educativa)) {
+            map.set(item.sie || item.unidad_educativa, {
+              codigo_sie: item.sie || '',
+              unidad_educativa: item.unidad_educativa.trim().toUpperCase()
+            });
+          }
+        });
+      }
+
+      // Score and rank results by similarity with the query
+      const scored = Array.from(map.values()).map(item => {
+        const cleanItem = cleanNameString(item.unidad_educativa);
+        const diffRatio = calculateDifferenceRatio(cleanQ, cleanItem);
+        const rawSim = Math.max(0, Math.round((1 - diffRatio) * 100));
+
+        let boost = 0;
+        words.forEach(w => {
+          if (cleanItem.includes(w)) boost += 18;
+        });
+        if (cleanItem.includes(cleanQ)) boost += 35;
+        if (cleanQ.includes(cleanItem)) boost += 25;
+
+        return {
+          ...item,
+          similarityScore: Math.min(100, rawSim + boost)
+        };
+      });
+
+      scored.sort((a, b) => (b.similarityScore || 0) - (a.similarityScore || 0));
+      return scored.slice(0, maxResults);
+    } catch (err) {
+      console.error('Error searching UE catalog:', err);
+      return [];
+    }
+  }, []);
+
+  // Search UE suggestions for Massive Modal
   const handleSearchUeSuggestions = async (query: string) => {
     if (!query || query.trim().length < 2) {
       setUeSuggestions([]);
       setShowSuggestions(false);
       return;
     }
+    const list = await searchUeCatalog(query, 12);
+    setUeSuggestions(list);
+    setShowSuggestions(list.length > 0);
+  };
+
+  // Search UE suggestions for Manual Add form
+  const handleSearchAddUeSuggestions = async (query: string) => {
+    if (!query || query.trim().length < 2) {
+      setAddUeSuggestions([]);
+      setShowAddUeSuggestions(false);
+      return;
+    }
+    const list = await searchUeCatalog(query, 10);
+    setAddUeSuggestions(list);
+    setShowAddUeSuggestions(list.length > 0);
+  };
+
+  // Search UE suggestions for Edit Core form
+  const handleSearchEditUeSuggestions = async (query: string) => {
+    if (!query || query.trim().length < 2) {
+      setEditUeSuggestions([]);
+      setShowEditUeSuggestions(false);
+      return;
+    }
+    const list = await searchUeCatalog(query, 10);
+    setEditUeSuggestions(list);
+    setShowEditUeSuggestions(list.length > 0);
+  };
+
+  // Search UE suggestions for Importer preview
+  const handleSearchImporterUeSuggestions = async (query: string) => {
+    if (!query || query.trim().length < 2) {
+      setImporterUeSuggestions([]);
+      setShowImporterUeSuggestions(false);
+      return;
+    }
+    const list = await searchUeCatalog(query, 10);
+    setImporterUeSuggestions(list);
+    setShowImporterUeSuggestions(list.length > 0);
+  };
+
+  // Open UE match search modal for a specific participant
+  const handleOpenUeMatchModal = async (p: Participante) => {
+    setUeMatchTargetPart(p);
+    const initialText = p.unidad_educativa?.trim() || '';
+    setUeMatchQuery(initialText);
+    setSearchingUeMatch(true);
+
+    const results = await searchUeCatalog(initialText || 'COLEGIO');
+    setUeMatchResults(results);
+    setSearchingUeMatch(false);
+  };
+
+  // Search inside the match modal as technician types
+  const handleUeMatchSearchChange = async (query: string) => {
+    setUeMatchQuery(query);
+    if (!query.trim()) {
+      setUeMatchResults([]);
+      return;
+    }
+    setSearchingUeMatch(true);
+    const results = await searchUeCatalog(query);
+    setUeMatchResults(results);
+    setSearchingUeMatch(false);
+  };
+
+  // Confirm linking a selected UE to the participant
+  const handleConfirmLinkUe = async (ue: { codigo_sie: string; unidad_educativa: string }) => {
+    if (!ueMatchTargetPart) return;
+    setLinkingUe(true);
     try {
-      const q = query.trim();
-      const suggestionsMap = new Map<string, { codigo_sie?: string; unidad_educativa: string }>();
+      const updateData: { unidad_educativa: string; sie?: string | null } = {
+        unidad_educativa: ue.unidad_educativa.trim().toUpperCase(),
+        sie: ue.codigo_sie || null
+      };
 
-      // 1. Search in catalog sie_ue
-      const { data: sieData } = await supabase
-        .from('sie_ue')
-        .select('codigo_sie, unidad_educativa')
-        .ilike('unidad_educativa', `%${q}%`)
-        .limit(6);
-
-      (sieData || []).forEach((item: any) => {
-        if (item.unidad_educativa) {
-          suggestionsMap.set(item.unidad_educativa.trim().toUpperCase(), {
-            codigo_sie: item.codigo_sie || undefined,
-            unidad_educativa: item.unidad_educativa.trim().toUpperCase(),
-          });
-        }
-      });
-
-      // 2. Search in existing participants
-      const { data: partData } = await supabase
+      const { error } = await supabase
         .from('participantes')
-        .select('unidad_educativa, sie')
-        .ilike('unidad_educativa', `%${q}%`)
-        .limit(6);
+        .update(updateData)
+        .eq('ci', ueMatchTargetPart.ci);
 
-      (partData || []).forEach((item: any) => {
-        if (item.unidad_educativa) {
-          const norm = item.unidad_educativa.trim().toUpperCase();
-          if (!suggestionsMap.has(norm)) {
-            suggestionsMap.set(norm, {
-              codigo_sie: item.sie || undefined,
-              unidad_educativa: norm,
-            });
+      if (error) throw error;
+
+      // Update in-memory state
+      setInscripciones(prev =>
+        prev.map(ins => {
+          if (ins.participantes && ins.participantes.ci === ueMatchTargetPart.ci) {
+            return {
+              ...ins,
+              participantes: {
+                ...ins.participantes,
+                unidad_educativa: ue.unidad_educativa.trim().toUpperCase(),
+                sie: ue.codigo_sie || null
+              }
+            };
           }
-        }
+          return ins;
+        })
+      );
+
+      Swal.fire({
+        icon: 'success',
+        title: '¡Unidad Educativa Vinculada!',
+        html: `<p>Se vinculó a <b>${ueMatchTargetPart.apellidos} ${ueMatchTargetPart.nombres}</b> con:</p><p style="color: #0d9488; font-weight: bold; font-size: 1.05rem;">${ue.unidad_educativa}</p>${ue.codigo_sie ? `<p><b>Código SIE:</b> ${ue.codigo_sie}</p>` : ''}`,
+        timer: 3000,
+        showConfirmButton: false,
+        toast: true,
+        position: 'top-end'
       });
 
-      const list = Array.from(suggestionsMap.values()).slice(0, 8);
-      setUeSuggestions(list);
-      setShowSuggestions(list.length > 0);
-    } catch (err) {
-      console.error('Error fetching UE suggestions:', err);
+      setUeMatchTargetPart(null);
+      setUeMatchQuery('');
+      setUeMatchResults([]);
+      fetchParticipantes();
+    } catch (err: any) {
+      console.error('Error linking UE:', err);
+      Swal.fire('Error', err.message || 'No se pudo vincular la Unidad Educativa', 'error');
+    } finally {
+      setLinkingUe(false);
     }
   };
 
@@ -3009,15 +3197,69 @@ export default function ParticipantesModal({
                       />
                     </div>
 
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', gridColumn: 'span 2' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', gridColumn: 'span 2', position: 'relative' }}>
                       <label style={{ fontSize: '0.72rem', fontWeight: 800, color: 'var(--gray-600)' }}>Unidad Educativa</label>
                       <input
                         type="text"
                         value={addUnidadEducativa}
-                        onChange={(e) => setAddUnidadEducativa(e.target.value.toUpperCase())}
-                        placeholder="UNIDAD EDUCATIVA"
+                        onChange={(e) => {
+                          const val = e.target.value.toUpperCase();
+                          setAddUnidadEducativa(val);
+                          handleSearchAddUeSuggestions(val);
+                        }}
+                        onFocus={() => {
+                          if (addUnidadEducativa.trim()) handleSearchAddUeSuggestions(addUnidadEducativa);
+                        }}
+                        placeholder="Escribe para buscar en 4,000+ U.E. del catálogo..."
                         style={{ padding: '6px 10px', fontSize: '0.82rem', border: '1px solid var(--gray-300)', borderRadius: 'var(--radius-sm)', textTransform: 'uppercase', background: 'var(--white)' }}
                       />
+
+                      {/* Dropdown suggestions */}
+                      {showAddUeSuggestions && addUeSuggestions.length > 0 && (
+                        <div style={{
+                          position: 'absolute',
+                          top: '100%',
+                          left: 0,
+                          right: 0,
+                          zIndex: 40,
+                          background: '#ffffff',
+                          border: '1px solid var(--gray-300)',
+                          borderRadius: '6px',
+                          boxShadow: '0 8px 20px rgba(0,0,0,0.15)',
+                          maxHeight: '180px',
+                          overflowY: 'auto',
+                          marginTop: '2px'
+                        }}>
+                          {addUeSuggestions.map((sug, i) => (
+                            <div
+                              key={i}
+                              onClick={() => {
+                                setAddUnidadEducativa(sug.unidad_educativa);
+                                if (sug.codigo_sie) setAddSie(sug.codigo_sie);
+                                setShowAddUeSuggestions(false);
+                              }}
+                              style={{
+                                padding: '8px 12px',
+                                cursor: 'pointer',
+                                borderBottom: i < addUeSuggestions.length - 1 ? '1px solid var(--gray-100)' : 'none',
+                                fontSize: '0.8rem',
+                                display: 'flex',
+                                justifyContent: 'space-between',
+                                alignItems: 'center'
+                              }}
+                              onMouseEnter={(e) => e.currentTarget.style.background = '#f0fdfa'}
+                              onMouseLeave={(e) => e.currentTarget.style.background = '#ffffff'}
+                            >
+                              <span style={{ fontWeight: 700, color: 'var(--gray-800)' }}>{sug.unidad_educativa}</span>
+                              {sug.codigo_sie && (
+                                <span style={{ fontSize: '0.7rem', background: '#ccfbf1', color: '#0f766e', padding: '2px 6px', borderRadius: '4px', fontWeight: 700 }}>
+                                  SIE: {sug.codigo_sie}
+                                </span>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   </div>
 
@@ -3114,14 +3356,70 @@ export default function ParticipantesModal({
                         Asignar Unidad Educativa a toda la nómina en vista previa:
                       </span>
                     </div>
-                    <div style={{ display: 'flex', gap: '8px', flex: 1, minWidth: '280px', maxWidth: '640px', alignItems: 'center' }}>
-                      <input
-                        type="text"
-                        placeholder="Nombre de la Unidad Educativa (ej: COLEGIO NACIONAL FLORIDA)"
-                        value={importerMassiveUe}
-                        onChange={(e) => setImporterMassiveUe(e.target.value.toUpperCase())}
-                        style={{ flex: 2, padding: '5px 10px', fontSize: '0.78rem', border: '1px solid #7dd3fc', borderRadius: '4px', textTransform: 'uppercase', background: '#ffffff' }}
-                      />
+                    <div style={{ display: 'flex', gap: '8px', flex: 1, minWidth: '280px', maxWidth: '640px', alignItems: 'center', position: 'relative' }}>
+                      <div style={{ flex: 2, position: 'relative' }}>
+                        <input
+                          type="text"
+                          placeholder="Nombre de la Unidad Educativa (ej: COLEGIO NACIONAL FLORIDA)"
+                          value={importerMassiveUe}
+                          onChange={(e) => {
+                            const val = e.target.value.toUpperCase();
+                            setImporterMassiveUe(val);
+                            handleSearchImporterUeSuggestions(val);
+                          }}
+                          onFocus={() => {
+                            if (importerMassiveUe.trim()) handleSearchImporterUeSuggestions(importerMassiveUe);
+                          }}
+                          style={{ width: '100%', padding: '5px 10px', fontSize: '0.78rem', border: '1px solid #7dd3fc', borderRadius: '4px', textTransform: 'uppercase', background: '#ffffff' }}
+                        />
+
+                        {/* Importer suggestions dropdown */}
+                        {showImporterUeSuggestions && importerUeSuggestions.length > 0 && (
+                          <div style={{
+                            position: 'absolute',
+                            top: '100%',
+                            left: 0,
+                            right: 0,
+                            zIndex: 40,
+                            background: '#ffffff',
+                            border: '1px solid var(--gray-300)',
+                            borderRadius: '6px',
+                            boxShadow: '0 8px 20px rgba(0,0,0,0.15)',
+                            maxHeight: '180px',
+                            overflowY: 'auto',
+                            marginTop: '2px'
+                          }}>
+                            {importerUeSuggestions.map((sug, i) => (
+                              <div
+                                key={i}
+                                onClick={() => {
+                                  setImporterMassiveUe(sug.unidad_educativa);
+                                  if (sug.codigo_sie) setImporterMassiveSie(sug.codigo_sie);
+                                  setShowImporterUeSuggestions(false);
+                                }}
+                                style={{
+                                  padding: '7px 10px',
+                                  cursor: 'pointer',
+                                  borderBottom: i < importerUeSuggestions.length - 1 ? '1px solid var(--gray-100)' : 'none',
+                                  fontSize: '0.78rem',
+                                  display: 'flex',
+                                  justifyContent: 'space-between',
+                                  alignItems: 'center'
+                                }}
+                                onMouseEnter={(e) => e.currentTarget.style.background = '#f0fdfa'}
+                                onMouseLeave={(e) => e.currentTarget.style.background = '#ffffff'}
+                              >
+                                <span style={{ fontWeight: 700, color: 'var(--gray-800)' }}>{sug.unidad_educativa}</span>
+                                {sug.codigo_sie && (
+                                  <span style={{ fontSize: '0.68rem', background: '#ccfbf1', color: '#0f766e', padding: '1px 5px', borderRadius: '3px', fontWeight: 700 }}>
+                                    SIE: {sug.codigo_sie}
+                                  </span>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
                       <input
                         type="text"
                         placeholder="SIE (Opc.)"
@@ -3429,6 +3727,7 @@ export default function ParticipantesModal({
                         cursoId={curso.id}
                         isSelected={p?.ci ? selectedCis.has(p.ci) : false}
                         onToggleSelect={handleToggleSelectCi}
+                        onSearchUe={handleOpenUeMatchModal}
                         onSave={handleUpdateEnrollment}
                         onDelete={handleDeleteEnrollment}
                         onEditCore={setEditingPart}
@@ -3582,7 +3881,7 @@ export default function ParticipantesModal({
                 </div>
               </div>
 
-              <div className="premium-form-group">
+              <div className="premium-form-group" style={{ position: 'relative' }}>
                 <label className="premium-form-label">
                   <School size={13} /> Unidad Educativa
                 </label>
@@ -3590,12 +3889,69 @@ export default function ParticipantesModal({
                   <input 
                     type="text" 
                     value={editingPart.unidad_educativa || ''} 
-                    onChange={(e) => setEditingPart({ ...editingPart, unidad_educativa: e.target.value.toUpperCase() })} 
+                    onChange={(e) => {
+                      const val = e.target.value.toUpperCase();
+                      setEditingPart({ ...editingPart, unidad_educativa: val });
+                      handleSearchEditUeSuggestions(val);
+                    }} 
+                    onFocus={() => {
+                      if (editingPart.unidad_educativa?.trim()) handleSearchEditUeSuggestions(editingPart.unidad_educativa);
+                    }}
                     className="premium-form-input"
-                    placeholder="Nombre de la Institución"
+                    placeholder="Escribe para buscar en 4,000+ U.E...."
                   />
                   <School className="premium-input-icon" size={16} />
                 </div>
+
+                {/* Edit suggestions dropdown */}
+                {showEditUeSuggestions && editUeSuggestions.length > 0 && (
+                  <div style={{
+                    position: 'absolute',
+                    top: '100%',
+                    left: 0,
+                    right: 0,
+                    zIndex: 50,
+                    background: '#ffffff',
+                    border: '1px solid var(--gray-300)',
+                    borderRadius: '8px',
+                    boxShadow: '0 8px 24px rgba(0,0,0,0.18)',
+                    maxHeight: '190px',
+                    overflowY: 'auto',
+                    marginTop: '4px'
+                  }}>
+                    {editUeSuggestions.map((sug, i) => (
+                      <div
+                        key={i}
+                        onClick={() => {
+                          setEditingPart({
+                            ...editingPart,
+                            unidad_educativa: sug.unidad_educativa,
+                            sie: sug.codigo_sie || editingPart.sie || ''
+                          });
+                          setShowEditUeSuggestions(false);
+                        }}
+                        style={{
+                          padding: '8px 12px',
+                          cursor: 'pointer',
+                          borderBottom: i < editUeSuggestions.length - 1 ? '1px solid var(--gray-100)' : 'none',
+                          fontSize: '0.82rem',
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center'
+                        }}
+                        onMouseEnter={(e) => e.currentTarget.style.background = '#f0fdfa'}
+                        onMouseLeave={(e) => e.currentTarget.style.background = '#ffffff'}
+                      >
+                        <span style={{ fontWeight: 700, color: 'var(--gray-800)' }}>{sug.unidad_educativa}</span>
+                        {sug.codigo_sie && (
+                          <span style={{ fontSize: '0.72rem', background: '#ccfbf1', color: '#0f766e', padding: '2px 6px', borderRadius: '4px', fontWeight: 700 }}>
+                            SIE: {sug.codigo_sie}
+                          </span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
 
@@ -3899,6 +4255,186 @@ export default function ParticipantesModal({
         </div>
       </div>
     )}
+
+    {/* Search & Match UE Modal for a Participant (4,000+ U.E. Catalog) */}
+    {ueMatchTargetPart && (
+      <div className="modal-overlay" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', backgroundColor: 'rgba(11,21,32,0.65)', backdropFilter: 'blur(8px)', zIndex: 1200, padding: '20px' }}>
+        <div className="modal-container" style={{ background: 'var(--white)', borderRadius: '16px', width: '100%', maxWidth: '640px', maxHeight: '90vh', boxShadow: 'var(--shadow-xl)', display: 'flex', flexDirection: 'column', animation: 'slideUp 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)', overflow: 'hidden', border: '1px solid var(--gray-200)' }}>
+          
+          {/* Header */}
+          <div className="modal-header" style={{ padding: '18px 24px', background: 'linear-gradient(135deg, #0f766e 0%, #0d9488 100%)', color: 'var(--white)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '3px solid #2dd4bf' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <div style={{ background: 'rgba(255,255,255,0.2)', padding: '6px', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <School size={20} style={{ color: '#ffffff' }} />
+              </div>
+              <div>
+                <h4 style={{ margin: 0, fontSize: '1.08rem', fontWeight: 800, color: 'var(--white)' }}>Buscar Coincidencia de Unidad Educativa</h4>
+                <span style={{ fontSize: '0.74rem', opacity: 0.9, display: 'block', marginTop: '2px' }}>
+                  Catálogo oficial (+4,000 U.E. y códigos SIE)
+                </span>
+              </div>
+            </div>
+            <button type="button" className="btn btn-icon btn-ghost" onClick={() => setUeMatchTargetPart(null)} style={{ color: 'rgba(255,255,255,0.8)', padding: '6px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(255,255,255,0.1)', border: 'none', cursor: 'pointer' }}>
+              <X size={16} />
+            </button>
+          </div>
+
+          {/* Body */}
+          <div style={{ padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: '16px', overflowY: 'auto', flex: 1 }}>
+            
+            {/* Participant card info */}
+            <div style={{ background: '#f0fdfa', border: '1.5px solid #99f6e4', borderRadius: '10px', padding: '12px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
+              <div>
+                <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#0f766e', textTransform: 'uppercase', letterSpacing: '0.5px', display: 'block' }}>
+                  Participante
+                </span>
+                <span style={{ fontSize: '0.92rem', fontWeight: 900, color: '#134e4a' }}>
+                  {ueMatchTargetPart.apellidos} {ueMatchTargetPart.nombres}
+                </span>
+                <span style={{ fontSize: '0.76rem', color: '#115e59', display: 'block' }}>
+                  C.I. {ueMatchTargetPart.ci} {ueMatchTargetPart.celular ? `• Cel: ${ueMatchTargetPart.celular}` : ''}
+                </span>
+              </div>
+              <div style={{ textAlign: 'right' }}>
+                <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#0f766e', textTransform: 'uppercase', display: 'block' }}>
+                  Escrito en Formulario:
+                </span>
+                <span style={{ fontSize: '0.84rem', fontWeight: 800, color: '#042f2e', background: '#ccfbf1', padding: '3px 8px', borderRadius: '6px', display: 'inline-block' }}>
+                  {ueMatchTargetPart.unidad_educativa || '(Vacío)'}
+                </span>
+              </div>
+            </div>
+
+            {/* Live Search Input */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+              <label style={{ fontSize: '0.76rem', fontWeight: 800, color: 'var(--gray-700)', textTransform: 'uppercase' }}>
+                Buscar en Catálogo Oficial (+4,000 U.E. o por Código SIE)
+              </label>
+              <div style={{ position: 'relative' }}>
+                <input
+                  type="text"
+                  value={ueMatchQuery}
+                  onChange={(e) => handleUeMatchSearchChange(e.target.value)}
+                  placeholder="Escribe el nombre de la escuela, colegio o código SIE..."
+                  autoFocus
+                  style={{ width: '100%', padding: '10px 14px 10px 36px', fontSize: '0.88rem', border: '1.5px solid #0d9488', borderRadius: '8px', background: '#fff', textTransform: 'uppercase', fontWeight: 700 }}
+                />
+                <Search size={16} style={{ position: 'absolute', left: '12px', top: '12px', color: '#0d9488' }} />
+                {searchingUeMatch && (
+                  <Loader2 size={16} className="spin" style={{ position: 'absolute', right: '12px', top: '12px', color: '#0d9488' }} />
+                )}
+              </div>
+            </div>
+
+            {/* Results Header */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--gray-200)', paddingBottom: '6px' }}>
+              <span style={{ fontSize: '0.78rem', fontWeight: 800, color: 'var(--gray-600)' }}>
+                {searchingUeMatch ? 'Buscando coincidencias...' : `${ueMatchResults.length} Coincidencias Encontradas:`}
+              </span>
+              <span style={{ fontSize: '0.72rem', color: 'var(--gray-400)' }}>
+                Haz clic en "Vincular U.E." para asignar
+              </span>
+            </div>
+
+            {/* Results List */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '320px', overflowY: 'auto' }}>
+              {ueMatchResults.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '24px', background: 'var(--gray-50)', borderRadius: '8px', border: '1px dashed var(--gray-300)' }}>
+                  <School size={28} style={{ color: 'var(--gray-400)', margin: '0 auto 8px' }} />
+                  <p style={{ margin: 0, fontSize: '0.84rem', fontWeight: 700, color: 'var(--gray-600)' }}>
+                    No se encontraron coincidencias para "{ueMatchQuery}"
+                  </p>
+                  <p style={{ margin: '4px 0 0', fontSize: '0.75rem', color: 'var(--gray-400)' }}>
+                    Intenta buscar solo una palabra clave principal del colegio (ej: "FLORIDA", "BOLIVAR", "SAN ROQUE").
+                  </p>
+                </div>
+              ) : (
+                ueMatchResults.map((ue, idx) => (
+                  <div
+                    key={idx}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      padding: '10px 14px',
+                      background: idx === 0 && (ue.similarityScore || 0) > 70 ? '#f0fdf4' : '#ffffff',
+                      border: idx === 0 && (ue.similarityScore || 0) > 70 ? '1.5px solid #86efac' : '1px solid var(--gray-200)',
+                      borderRadius: '8px',
+                      gap: '12px',
+                      transition: 'all 0.15s ease'
+                    }}
+                  >
+                    <div style={{ flex: 1 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                        <span style={{ fontSize: '0.86rem', fontWeight: 800, color: 'var(--gray-900)' }}>
+                          {ue.unidad_educativa}
+                        </span>
+                        {ue.similarityScore && ue.similarityScore > 50 && (
+                          <span style={{
+                            fontSize: '0.68rem',
+                            fontWeight: 800,
+                            padding: '2px 6px',
+                            borderRadius: '4px',
+                            background: ue.similarityScore >= 80 ? '#dcfce7' : '#fef9c3',
+                            color: ue.similarityScore >= 80 ? '#15803d' : '#854d0e',
+                            border: ue.similarityScore >= 80 ? '1px solid #bbf7d0' : '1px solid #fef08a'
+                          }}>
+                            {ue.similarityScore >= 80 ? '⭐ Mejor Coincidencia' : 'Similar'}
+                          </span>
+                        )}
+                      </div>
+                      <div style={{ marginTop: '2px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <span style={{ fontSize: '0.74rem', fontWeight: 700, color: '#0f766e', background: '#ccfbf1', padding: '1px 6px', borderRadius: '4px' }}>
+                          SIE: {ue.codigo_sie || 'Sin código'}
+                        </span>
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      className="btn btn-sm"
+                      onClick={() => handleConfirmLinkUe(ue)}
+                      disabled={linkingUe}
+                      style={{
+                        background: 'linear-gradient(135deg, #0f766e 0%, #0d9488 100%)',
+                        color: '#ffffff',
+                        border: 'none',
+                        fontWeight: 700,
+                        fontSize: '0.78rem',
+                        padding: '6px 14px',
+                        borderRadius: '6px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '5px',
+                        flexShrink: 0,
+                        boxShadow: '0 2px 6px rgba(13,148,136,0.25)',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      {linkingUe ? <Loader2 size={13} className="spin" /> : <Check size={13} />}
+                      Vincular U.E.
+                    </button>
+                  </div>
+                ))
+              )}
+            </div>
+
+          </div>
+
+          {/* Footer */}
+          <div style={{ padding: '12px 24px', borderTop: '1px solid var(--gray-200)', background: 'var(--gray-50)', display: 'flex', justifyContent: 'flex-end' }}>
+            <button
+              type="button"
+              className="btn btn-secondary btn-sm"
+              onClick={() => setUeMatchTargetPart(null)}
+            >
+              Cerrar
+            </button>
+          </div>
+
+        </div>
+      </div>
+    )}
   </>
 );
 }
@@ -3911,6 +4447,7 @@ interface RowComponentProps {
   cursoId: string;
   isSelected: boolean;
   onToggleSelect: (ci: string) => void;
+  onSearchUe: (p: Participante) => void;
   onSave: (id: number, pagos: string, observaciones: string) => Promise<void>;
   onDelete: (id: number) => Promise<void>;
   onEditCore: (p: Participante) => void;
@@ -3930,6 +4467,7 @@ function RowComponent({
   cursoId,
   isSelected,
   onToggleSelect,
+  onSearchUe,
   onSave,
   onDelete,
   onEditCore,
@@ -4281,15 +4819,42 @@ function RowComponent({
       </td>
 
       {/* SIE / UE */}
-      <td style={{ padding: '12px 16px', fontSize: '0.9rem', color: 'var(--gray-600)', lineHeight: 1.3 }}>
-        {p.unidad_educativa ? (
-          <div>
-            <b>{p.unidad_educativa}</b><br />
-            {p.sie && <span style={{ opacity: 0.8 }}>SIE: {p.sie}</span>}
+      <td style={{ padding: '10px 14px', fontSize: '0.9rem', color: 'var(--gray-600)', lineHeight: 1.3 }}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '8px' }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            {p.unidad_educativa ? (
+              <div>
+                <b style={{ color: 'var(--gray-900)', wordBreak: 'break-word' }}>{p.unidad_educativa}</b><br />
+                {p.sie && <span style={{ opacity: 0.85, fontSize: '0.78rem', color: 'var(--gray-600)' }}>SIE: {p.sie}</span>}
+              </div>
+            ) : (
+              <span style={{ color: 'var(--gray-400)', fontStyle: 'italic', fontSize: '0.8rem' }}>Sin Unidad Educativa</span>
+            )}
           </div>
-        ) : (
-          <span style={{ color: 'var(--gray-400)' }}>—</span>
-        )}
+          <button
+            type="button"
+            className="btn btn-xs"
+            onClick={() => onSearchUe(p)}
+            title="🔍 Buscar coincidencia oficial en catálogo de +4,000 U.E."
+            style={{
+              padding: '3px 8px',
+              background: '#e0f2fe',
+              color: '#0284c7',
+              border: '1px solid #bae6fd',
+              borderRadius: '4px',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '4px',
+              fontSize: '0.72rem',
+              fontWeight: 800,
+              flexShrink: 0,
+              cursor: 'pointer',
+              boxShadow: '0 1px 3px rgba(2,132,199,0.1)'
+            }}
+          >
+            <Search size={11} /> U.E.
+          </button>
+        </div>
       </td>
 
       {/* Validación SIE */}
