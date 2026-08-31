@@ -164,87 +164,108 @@ export async function POST(request: Request) {
       });
     }
 
-    // 3. Obtain CSRF token for programming
-    const progRes = await fetch(`${BASE_URL}/events/programming`, {
-      headers: {
-        'Cookie': cookieHeader,
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-      },
-    });
+    // 3. CSRF token for programming requests (using session CSRF from cookie directly)
+    const progCsrf = loggedCsrf || csrfToken;
 
-    const progHtml = await progRes.text();
-    const progCsrfMatches = [...progHtml.matchAll(/name=["']csrfmiddlewaretoken["']\s+value=["']([^"']+)["']/g)];
-    const progCsrf = progCsrfMatches.length > 0 ? progCsrfMatches[progCsrfMatches.length - 1][1] : csrfToken;
-
-    // 4. Months to fetch: 5 (Mayo), 6 (Junio), 7 (Julio), + current month
-    const months = [5, 6, 7];
+    // 4. Months to fetch: Allow custom list from request or default to relevant active months [5, 6, 7, 8]
+    const customMonths = Array.isArray(body.months) ? body.months : (body.month ? [Number(body.month)] : null);
     const currentMonth = new Date().getMonth() + 1;
-    if (!months.includes(currentMonth)) months.push(currentMonth);
+    const months: number[] = customMonths && customMonths.length > 0
+      ? customMonths
+      : [5, 6, 7, 8];
+
+    if (!months.includes(currentMonth) && currentMonth >= 1 && currentMonth <= 12) {
+      months.push(currentMonth);
+    }
 
     const monthsDisplay = months.map(m => MONTH_NAMES[m] || m).join(' - ');
-    console.log(`Extrayendo meses: ${monthsDisplay}`);
+    console.log(`[SIE Reporte] Extrayendo meses: ${monthsDisplay}`);
 
+    // Fetch all month programming indexes in parallel
+    const allRawCourses: any[] = [];
+    await Promise.all(months.map(async (monthVal) => {
+      try {
+        const monthName = MONTH_NAMES[monthVal] || `${monthVal}`;
+        const indexUrl = `${BASE_URL}/events/programming/index?csrfmiddlewaretoken=${progCsrf}&phase_filter=15&departament=9&profile=0&month=${monthVal}&modality=0`;
+        const idxRes = await fetch(indexUrl, {
+          headers: {
+            'Cookie': cookieHeader,
+            'Referer': `${BASE_URL}/events/programming`,
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+          },
+          signal: AbortSignal.timeout(15000),
+        });
+
+        if (!idxRes.ok) {
+          console.warn(`[SIE Reporte] Error HTTP ${idxRes.status} al consultar mes ${monthName}`);
+          return;
+        }
+
+        const idxHtml = await idxRes.text();
+        const tableMatch = idxHtml.match(/<table[^>]*>[\s\S]*?<\/table>/i);
+        if (!tableMatch) return;
+
+        const rowMatches = tableMatch[0].match(/<tr[^>]*>[\s\S]*?<\/tr>/gi) || [];
+        for (const rowHtml of rowMatches) {
+          const celdas = rowHtml.match(/<td[^>]*>[\s\S]*?<\/td>/gi) || [];
+          if (celdas.length < 11) continue;
+
+          const txt = celdas.map(c => c.replace(/<[^>]+>/g, '').trim());
+          if (!/^\d+$/.test(txt[0])) continue;
+
+          const detailMatch = rowHtml.match(/href=["'](\/events\/\d+\/detail)["']/i);
+          if (detailMatch) {
+            allRawCourses.push({
+              monthName,
+              num: txt[0],
+              curso: txt[1],
+              lugar: txt[2],
+              inicio: txt[4],
+              socializacion: txt[5],
+              facilitador: txt[8],
+              prev: txt[9],
+              parts: txt[10],
+              url_detalle: detailMatch[1],
+            });
+          }
+        }
+      } catch (err: any) {
+        console.warn(`[SIE Reporte] Error al consultar mes ${monthVal}:`, err.message);
+      }
+    }));
+
+    // Deduplicate event URLs upfront so the same event is never scraped twice
+    const uniqueCoursesMap = new Map<string, any>();
+    for (const c of allRawCourses) {
+      if (c.url_detalle && !uniqueCoursesMap.has(c.url_detalle)) {
+        uniqueCoursesMap.set(c.url_detalle, c);
+      }
+    }
+    const uniqueCourses = Array.from(uniqueCoursesMap.values());
+    console.log(`[SIE Reporte] Encontrados ${uniqueCourses.length} eventos únicos a procesar (de ${allRawCourses.length} registros).`);
+
+    // Process unique events with parallel batching
+    const BATCH_SIZE = 6;
     const allEvents: any[] = [];
 
-    for (const monthVal of months) {
-      const monthName = MONTH_NAMES[monthVal] || `${monthVal}`;
-      console.log(`Procesando mes ${monthName}...`);
-
-      const indexUrl = `${BASE_URL}/events/programming/index?csrfmiddlewaretoken=${progCsrf}&phase_filter=15&departament=9&profile=0&month=${monthVal}&modality=0`;
-      const idxRes = await fetch(indexUrl, {
-        headers: {
-          'Cookie': cookieHeader,
-          'Referer': `${BASE_URL}/events/programming`,
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-        },
-      });
-
-      const idxHtml = await idxRes.text();
-      const tableMatch = idxHtml.match(/<table[^>]*>[\s\S]*?<\/table>/i);
-      if (!tableMatch) continue;
-
-      const rowMatches = tableMatch[0].match(/<tr[^>]*>[\s\S]*?<\/tr>/gi) || [];
-      const courses: any[] = [];
-
-      for (const rowHtml of rowMatches) {
-        const celdas = rowHtml.match(/<td[^>]*>[\s\S]*?<\/td>/gi) || [];
-        if (celdas.length < 11) continue;
-
-        const txt = celdas.map(c => c.replace(/<[^>]+>/g, '').trim());
-        if (!/^\d+$/.test(txt[0])) continue;
-
-        const detailMatch = rowHtml.match(/href=["'](\/events\/\d+\/detail)["']/i);
-        courses.push({
-          num: txt[0],
-          curso: txt[1],
-          lugar: txt[2],
-          inicio: txt[4],
-          socializacion: txt[5],
-          facilitador: txt[8],
-          prev: txt[9],
-          parts: txt[10],
-          url_detalle: detailMatch ? detailMatch[1] : '',
-        });
-      }
-
-      console.log(`Encontrados ${courses.length} eventos en ${monthName}`);
-
-      for (const c of courses) {
-        if (!c.url_detalle) continue;
-
+    for (let i = 0; i < uniqueCourses.length; i += BATCH_SIZE) {
+      const batch = uniqueCourses.slice(i, i + BATCH_SIZE);
+      const batchResults = await Promise.all(batch.map(async (c) => {
         try {
-          // Detail page fetch
+          if (!c.url_detalle) return null;
+
           const detailUrl = c.url_detalle.startsWith('http') ? c.url_detalle : BASE_URL + c.url_detalle;
           const detRes = await fetch(detailUrl, {
             headers: {
               'Cookie': cookieHeader,
               'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
             },
+            signal: AbortSignal.timeout(12000),
           });
 
           if (!detRes.ok) {
-            console.warn(`[SIE Reporte] Error HTTP ${detRes.status} al cargar evento: ${c.url_detalle}. Pasando al siguiente.`);
-            continue;
+            console.warn(`[SIE Reporte] Error HTTP ${detRes.status} en evento: ${c.url_detalle}. Saltando.`);
+            return null;
           }
 
           const detHtml = await detRes.text();
@@ -257,10 +278,9 @@ export async function POST(request: Request) {
           const courseCards = [...detHtml.matchAll(/<span[^>]*class=["']badge[^"]*badge-primary[^"']*["'][^>]*>([\s\S]*?)<\/span>\s*<h6[^>]*class=["']mb-0[^>]*>([\s\S]*?)<\/h6>/gi)];
           const courseIds = [...detHtml.matchAll(/id=["']date-course-update-(\d+)["']/gi)].map(m => m[1]);
 
-          // Si el evento está vacío (no tiene cursos programados), saltar limpiamente al siguiente evento
+          // Si el evento está vacío (sin cursos programados), saltar limpiamente
           if (!courseIds || courseIds.length === 0) {
-            console.log(`[SIE Reporte] Evento sin cursos programados (${c.url_detalle} - ${c.curso || 'Sin título'}). Saltando al siguiente evento.`);
-            continue;
+            return null;
           }
 
           const courseDates: Record<string, string> = {};
@@ -270,14 +290,10 @@ export async function POST(request: Request) {
           }
 
           const courseNamesList = courseCards.map(m => m[2].replace(/<[^>]+>/g, '').trim());
-
-          const evCourses: any[] = [];
           let fechaStr = '';
 
-          for (let idx = 0; idx < courseIds.length; idx++) {
-            const cid = courseIds[idx];
-            if (!cid) continue;
-
+          // Fetch all courses in this event in parallel
+          const evCourses = await Promise.all(courseIds.map(async (cid, idx) => {
             const cursoName = courseNamesList[idx] || '';
             const fstr = courseDates[cid] || '';
             if (idx === 0) fechaStr = fstr;
@@ -293,73 +309,7 @@ export async function POST(request: Request) {
             const deadline = endDate ? new Date(endDate.getTime() + 5 * 24 * 3600 * 1000) : null;
             const afterDeadline = deadline ? new Date() > deadline : false;
 
-            // 1. Check grades (Informe Evaluación / Notas Docente) from /inscription/${cid}
-            let totalStd = 0, failed = 0, evalNotasResp = 0;
-            try {
-              const gRes = await fetch(`${BASE_URL}/inscription/${cid}`, { headers: { 'Cookie': cookieHeader } });
-              if (gRes.ok) {
-                const gHtml = await gRes.text();
-                const gTableMatch = gHtml.match(/<table[^>]*>[\s\S]*?<\/table>/i);
-                if (gTableMatch) {
-                  const gRows = gTableMatch[0].match(/<tr[^>]*>[\s\S]*?<\/tr>/gi) || [];
-                  let evaluatedCount = 0;
-                  let failCount = 0;
-                  let totalParticipants = 0;
-
-                  for (const r of gRows) {
-                    const c = (r.match(/<td[^>]*>[\s\S]*?<\/td>/gi) || []).map(td => td.replace(/<[^>]+>/g, '').trim());
-                    if (c.length >= 10 && /^\d+$/.test(c[0])) {
-                      totalParticipants++;
-
-                      const pPresencial = parseFloat(c[7]) || 0;
-                      const pConcrecion = parseFloat(c[8]) || 0;
-                      const pSocializacion = parseFloat(c[9]) || 0;
-                      const pApropiacionMatch = (c[10] || '').match(/(\d+(?:[.,]\d+)?)\s*pts/i);
-                      const pApropiacion = pApropiacionMatch ? parseFloat(pApropiacionMatch[1].replace(',', '.')) : 0;
-                      const notaFinal = parseFloat(c[11]) || (pPresencial + pConcrecion + pSocializacion + pApropiacion);
-
-                      const isEvaluated = pPresencial > 0 || pConcrecion > 0 || pSocializacion > 0 || pApropiacion > 0 || notaFinal > 0;
-                      if (isEvaluated) {
-                        evaluatedCount++;
-                        if (notaFinal > 0 && notaFinal < 70) {
-                          failCount++;
-                        }
-                      }
-                    }
-                  }
-
-                  totalStd = totalParticipants;
-                  failed = failCount;
-                  evalNotasResp = evaluatedCount;
-                }
-              }
-            } catch (e) {}
-
-            // 2. Check Valoración (Encuesta de Valoración de Estudiantes en SIE) from /events/ficha-valoracion/${cid}
-            let responded = 0, totalVal = totalStd, valPct = 0, valDisabled = false;
-            try {
-              const vRes = await fetch(`${BASE_URL}/events/ficha-valoracion/${cid}`, { headers: { 'Cookie': cookieHeader } });
-              if (vRes.ok) {
-                const vHtml = await vRes.text();
-                
-                if (vHtml.includes('EVALUACIÓN DESHABILITADA') || vHtml.includes('NO HABILITADA')) {
-                  valDisabled = true;
-                  responded = 0;
-                  valPct = 0;
-                } else {
-                  const pCards = (vHtml.match(/class=["']participant-card["']/gi) || []).length;
-                  const sinVal = (vHtml.match(/Sin valoraci/gi) || []).length;
-                  const tv = pCards > 0 ? pCards : totalStd;
-                  if (tv > 0) {
-                    totalVal = tv;
-                    responded = Math.max(0, totalVal - sinVal);
-                    valPct = Math.round((responded / totalVal) * 1000) / 10;
-                  }
-                }
-              }
-            } catch (e) {}
-
-            // Check Plan & Report Docs
+            // Check Plan & Report Docs in HTML
             let hasPlan = false, hasReport = false, docid = '';
             try {
               const cardRegex = new RegExp(`date-course-update-${cid}.*?card-footer.*?</div>`, 'is');
@@ -371,20 +321,70 @@ export async function POST(request: Request) {
               docid = docm ? docm[1] : '';
             } catch (e) {}
 
-            // Check Document details
-            let planifDateStr = '', informeDateStr = '', conform = false;
-            if (docid) {
-              try {
-                const docRes = await fetch(`${BASE_URL}/events/reportes/documentos-sede/${docid}`, { headers: { 'Cookie': cookieHeader } });
-                if (docRes.ok) {
-                  const docHtml = await docRes.text();
-                  const mInf = docHtml.match(/Fecha de Cierre:\s*([^<]+)/i);
-                  informeDateStr = mInf ? mInf[1].trim() : '';
-                  const mPlan = docHtml.match(/Fecha de Planificaci[oó]n:\s*([^<]+)/i);
-                  planifDateStr = mPlan ? mPlan[1].trim() : '';
-                  conform = docHtml.includes('/facilitador/informe-conformidad/');
+            // Fetch grades, valoración, and document details in parallel with timeout
+            const [gRes, vRes, docRes] = await Promise.allSettled([
+              fetch(`${BASE_URL}/inscription/${cid}`, { headers: { 'Cookie': cookieHeader }, signal: AbortSignal.timeout(8000) }).then(r => r.ok ? r.text() : ''),
+              fetch(`${BASE_URL}/events/ficha-valoracion/${cid}`, { headers: { 'Cookie': cookieHeader }, signal: AbortSignal.timeout(8000) }).then(r => r.ok ? r.text() : ''),
+              docid ? fetch(`${BASE_URL}/events/reportes/documentos-sede/${docid}`, { headers: { 'Cookie': cookieHeader }, signal: AbortSignal.timeout(8000) }).then(r => r.ok ? r.text() : '') : Promise.resolve('')
+            ]);
+
+            const gHtml = gRes.status === 'fulfilled' ? gRes.value : '';
+            const vHtml = vRes.status === 'fulfilled' ? vRes.value : '';
+            const docHtml = docRes.status === 'fulfilled' ? docRes.value : '';
+
+            // Process grades
+            let totalStd = 0, failed = 0, evalNotasResp = 0;
+            if (gHtml) {
+              const gTableMatch = gHtml.match(/<table[^>]*>[\s\S]*?<\/table>/i);
+              if (gTableMatch) {
+                const gRows = gTableMatch[0].match(/<tr[^>]*>[\s\S]*?<\/tr>/gi) || [];
+                for (const r of gRows) {
+                  const cells = (r.match(/<td[^>]*>[\s\S]*?<\/td>/gi) || []).map(td => td.replace(/<[^>]+>/g, '').trim());
+                  if (cells.length >= 10 && /^\d+$/.test(cells[0])) {
+                    totalStd++;
+                    const pPresencial = parseFloat(cells[7]) || 0;
+                    const pConcrecion = parseFloat(cells[8]) || 0;
+                    const pSocializacion = parseFloat(cells[9]) || 0;
+                    const pApropiacionMatch = (cells[10] || '').match(/(\d+(?:[.,]\d+)?)\s*pts/i);
+                    const pApropiacion = pApropiacionMatch ? parseFloat(pApropiacionMatch[1].replace(',', '.')) : 0;
+                    const notaFinal = parseFloat(cells[11]) || (pPresencial + pConcrecion + pSocializacion + pApropiacion);
+
+                    if (pPresencial > 0 || pConcrecion > 0 || pSocializacion > 0 || pApropiacion > 0 || notaFinal > 0) {
+                      evalNotasResp++;
+                      if (notaFinal > 0 && notaFinal < 70) failed++;
+                    }
+                  }
                 }
-              } catch (e) {}
+              }
+            }
+
+            // Process valoración
+            let responded = 0, totalVal = totalStd, valPct = 0, valDisabled = false;
+            if (vHtml) {
+              if (vHtml.includes('EVALUACIÓN DESHABILITADA') || vHtml.includes('NO HABILITADA')) {
+                valDisabled = true;
+                responded = 0;
+                valPct = 0;
+              } else {
+                const pCards = (vHtml.match(/class=["']participant-card["']/gi) || []).length;
+                const sinVal = (vHtml.match(/Sin valoraci/gi) || []).length;
+                const tv = pCards > 0 ? pCards : totalStd;
+                if (tv > 0) {
+                  totalVal = tv;
+                  responded = Math.max(0, totalVal - sinVal);
+                  valPct = Math.round((responded / totalVal) * 1000) / 10;
+                }
+              }
+            }
+
+            // Process document details
+            let planifDateStr = '', informeDateStr = '', conform = false;
+            if (docHtml) {
+              const mInf = docHtml.match(/Fecha de Cierre:\s*([^<]+)/i);
+              informeDateStr = mInf ? mInf[1].trim() : '';
+              const mPlan = docHtml.match(/Fecha de Planificaci[oó]n:\s*([^<]+)/i);
+              planifDateStr = mPlan ? mPlan[1].trim() : '';
+              conform = docHtml.includes('/facilitador/informe-conformidad/');
             }
 
             const planifDate = parseSpanishDate(planifDateStr);
@@ -399,7 +399,7 @@ export async function POST(request: Request) {
 
             const todoOk = hasPlan && evalNotasResp >= 1 && hasReport && planifOk && informeOk && conformOk;
 
-            evCourses.push({
+            return {
               cid,
               name: cursoName,
               dates: fstr,
@@ -423,13 +423,10 @@ export async function POST(request: Request) {
               conform_pend: conformPend,
               todo_ok: todoOk,
               vencido: afterDeadline ? 'SI' : 'NO',
-            });
-          }
+            };
+          }));
 
-          if (evCourses.length === 0) {
-            console.log(`[SIE Reporte] Ningún curso válido extraído en evento ${c.url_detalle}. Saltando.`);
-            continue;
-          }
+          if (!evCourses || evCourses.length === 0) return null;
 
           let fInicio = '', fFin = '';
           if (fechaStr && fechaStr.includes(' - ')) {
@@ -442,12 +439,12 @@ export async function POST(request: Request) {
           const allOk = evCourses.every((cr: any) => cr.todo_ok);
           const anyVencido = evCourses.some((cr: any) => cr.vencido === 'SI');
 
-          allEvents.push({
-            mes: monthName,
+          return {
+            mes: c.monthName,
             ciclo: ciclo || c.curso || 'Ciclo General',
             sede: c.lugar,
             facilitador: c.facilitador,
-            url_evento: c.url_detalle.startsWith('http') ? c.url_detalle : BASE_URL + c.url_detalle,
+            url_evento: detailUrl,
             fecha_rango: fechaStr,
             fecha_inicio: fInicio,
             fecha_fin: fFin,
@@ -455,11 +452,15 @@ export async function POST(request: Request) {
             after_deadline: anyVencido ? 'SI' : 'NO',
             courses: evCourses,
             all_ok: allOk,
-          });
-        } catch (eventErr) {
-          console.warn(`[SIE Reporte] Error procesando evento (${c.url_detalle}). Saltando al siguiente:`, eventErr);
-          continue;
+          };
+        } catch (eventErr: any) {
+          console.warn(`[SIE Reporte] Error procesando evento individual (${c.url_detalle}):`, eventErr.message);
+          return null;
         }
+      }));
+
+      for (const res of batchResults) {
+        if (res) allEvents.push(res);
       }
     }
 
