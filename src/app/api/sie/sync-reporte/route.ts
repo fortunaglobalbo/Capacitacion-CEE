@@ -232,207 +232,234 @@ export async function POST(request: Request) {
       for (const c of courses) {
         if (!c.url_detalle) continue;
 
-        // Detail page fetch
-        const detailUrl = c.url_detalle.startsWith('http') ? c.url_detalle : BASE_URL + c.url_detalle;
-        const detRes = await fetch(detailUrl, {
-          headers: {
-            'Cookie': cookieHeader,
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-          },
-        });
+        try {
+          // Detail page fetch
+          const detailUrl = c.url_detalle.startsWith('http') ? c.url_detalle : BASE_URL + c.url_detalle;
+          const detRes = await fetch(detailUrl, {
+            headers: {
+              'Cookie': cookieHeader,
+              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+            },
+          });
 
-        const detHtml = await detRes.text();
-
-        // Parse Cycle
-        const cicloMatch = detHtml.match(/CICLO:\s*(.*?)<\/span>/i);
-        const ciclo = cicloMatch ? cicloMatch[1].replace(/<[^>]+>/g, '').trim() : '';
-
-        // Parse course cards & date update IDs
-        const courseCards = [...detHtml.matchAll(/<span[^>]*class=["']badge[^"]*badge-primary[^"']*["'][^>]*>([\s\S]*?)<\/span>\s*<h6[^>]*class=["']mb-0[^>]*>([\s\S]*?)<\/h6>/gi)];
-        const courseIds = [...detHtml.matchAll(/id=["']date-course-update-(\d+)["']/gi)].map(m => m[1]);
-
-        const courseDates: Record<string, string> = {};
-        for (const cid of courseIds) {
-          const dm = detHtml.match(new RegExp(`id=["']date-course-update-${cid}["']>(.*?)<\/strong>`, 'i'));
-          courseDates[cid] = dm ? dm[1].replace(/<[^>]+>/g, '').trim() : '';
-        }
-
-        const courseNamesList = courseCards.map(m => m[2].replace(/<[^>]+>/g, '').trim());
-
-        const evCourses: any[] = [];
-        let fechaStr = '';
-
-        for (let idx = 0; idx < courseIds.length; idx++) {
-          const cid = courseIds[idx];
-          const cursoName = courseNamesList[idx] || '';
-          const fstr = courseDates[cid] || '';
-          if (idx === 0) fechaStr = fstr;
-
-          let cInicio = '', cFin = '';
-          if (fstr.includes(' - ')) {
-            const parts = fstr.split(' - ');
-            cInicio = parts[0];
-            cFin = parts[1] || '';
+          if (!detRes.ok) {
+            console.warn(`[SIE Reporte] Error HTTP ${detRes.status} al cargar evento: ${c.url_detalle}. Pasando al siguiente.`);
+            continue;
           }
 
-          const endDate = parseCourseDates(fstr);
-          const deadline = endDate ? new Date(endDate.getTime() + 5 * 24 * 3600 * 1000) : null;
-          const afterDeadline = deadline ? new Date() > deadline : false;
+          const detHtml = await detRes.text();
 
-          // 1. Check grades (Informe Evaluación / Notas Docente) from /inscription/${cid}
-          let totalStd = 0, failed = 0, evalNotasResp = 0;
-          try {
-            const gRes = await fetch(`${BASE_URL}/inscription/${cid}`, { headers: { 'Cookie': cookieHeader } });
-            const gHtml = await gRes.text();
-            const gTableMatch = gHtml.match(/<table[^>]*>[\s\S]*?<\/table>/i);
-            if (gTableMatch) {
-              const gRows = gTableMatch[0].match(/<tr[^>]*>[\s\S]*?<\/tr>/gi) || [];
-              let evaluatedCount = 0;
-              let failCount = 0;
-              let totalParticipants = 0;
+          // Parse Cycle
+          const cicloMatch = detHtml.match(/CICLO:\s*(.*?)<\/span>/i);
+          const ciclo = cicloMatch ? cicloMatch[1].replace(/<[^>]+>/g, '').trim() : '';
 
-              for (const r of gRows) {
-                const c = (r.match(/<td[^>]*>[\s\S]*?<\/td>/gi) || []).map(td => td.replace(/<[^>]+>/g, '').trim());
-                if (c.length >= 10 && /^\d+$/.test(c[0])) {
-                  totalParticipants++;
+          // Parse course cards & date update IDs
+          const courseCards = [...detHtml.matchAll(/<span[^>]*class=["']badge[^"]*badge-primary[^"']*["'][^>]*>([\s\S]*?)<\/span>\s*<h6[^>]*class=["']mb-0[^>]*>([\s\S]*?)<\/h6>/gi)];
+          const courseIds = [...detHtml.matchAll(/id=["']date-course-update-(\d+)["']/gi)].map(m => m[1]);
 
-                  const pPresencial = parseFloat(c[7]) || 0;
-                  const pConcrecion = parseFloat(c[8]) || 0;
-                  const pSocializacion = parseFloat(c[9]) || 0;
-                  const pApropiacionMatch = (c[10] || '').match(/(\d+(?:[.,]\d+)?)\s*pts/i);
-                  const pApropiacion = pApropiacionMatch ? parseFloat(pApropiacionMatch[1].replace(',', '.')) : 0;
-                  const notaFinal = parseFloat(c[11]) || (pPresencial + pConcrecion + pSocializacion + pApropiacion);
+          // Si el evento está vacío (no tiene cursos programados), saltar limpiamente al siguiente evento
+          if (!courseIds || courseIds.length === 0) {
+            console.log(`[SIE Reporte] Evento sin cursos programados (${c.url_detalle} - ${c.curso || 'Sin título'}). Saltando al siguiente evento.`);
+            continue;
+          }
 
-                  const isEvaluated = pPresencial > 0 || pConcrecion > 0 || pSocializacion > 0 || pApropiacion > 0 || notaFinal > 0;
-                  if (isEvaluated) {
-                    evaluatedCount++;
-                    if (notaFinal > 0 && notaFinal < 70) {
-                      failCount++;
+          const courseDates: Record<string, string> = {};
+          for (const cid of courseIds) {
+            const dm = detHtml.match(new RegExp(`id=["']date-course-update-${cid}["']>(.*?)<\/strong>`, 'i'));
+            courseDates[cid] = dm ? dm[1].replace(/<[^>]+>/g, '').trim() : '';
+          }
+
+          const courseNamesList = courseCards.map(m => m[2].replace(/<[^>]+>/g, '').trim());
+
+          const evCourses: any[] = [];
+          let fechaStr = '';
+
+          for (let idx = 0; idx < courseIds.length; idx++) {
+            const cid = courseIds[idx];
+            if (!cid) continue;
+
+            const cursoName = courseNamesList[idx] || '';
+            const fstr = courseDates[cid] || '';
+            if (idx === 0) fechaStr = fstr;
+
+            let cInicio = '', cFin = '';
+            if (fstr && fstr.includes(' - ')) {
+              const parts = fstr.split(' - ');
+              cInicio = parts[0] ? parts[0].trim() : '';
+              cFin = parts[1] ? parts[1].trim() : '';
+            }
+
+            const endDate = parseCourseDates(fstr);
+            const deadline = endDate ? new Date(endDate.getTime() + 5 * 24 * 3600 * 1000) : null;
+            const afterDeadline = deadline ? new Date() > deadline : false;
+
+            // 1. Check grades (Informe Evaluación / Notas Docente) from /inscription/${cid}
+            let totalStd = 0, failed = 0, evalNotasResp = 0;
+            try {
+              const gRes = await fetch(`${BASE_URL}/inscription/${cid}`, { headers: { 'Cookie': cookieHeader } });
+              if (gRes.ok) {
+                const gHtml = await gRes.text();
+                const gTableMatch = gHtml.match(/<table[^>]*>[\s\S]*?<\/table>/i);
+                if (gTableMatch) {
+                  const gRows = gTableMatch[0].match(/<tr[^>]*>[\s\S]*?<\/tr>/gi) || [];
+                  let evaluatedCount = 0;
+                  let failCount = 0;
+                  let totalParticipants = 0;
+
+                  for (const r of gRows) {
+                    const c = (r.match(/<td[^>]*>[\s\S]*?<\/td>/gi) || []).map(td => td.replace(/<[^>]+>/g, '').trim());
+                    if (c.length >= 10 && /^\d+$/.test(c[0])) {
+                      totalParticipants++;
+
+                      const pPresencial = parseFloat(c[7]) || 0;
+                      const pConcrecion = parseFloat(c[8]) || 0;
+                      const pSocializacion = parseFloat(c[9]) || 0;
+                      const pApropiacionMatch = (c[10] || '').match(/(\d+(?:[.,]\d+)?)\s*pts/i);
+                      const pApropiacion = pApropiacionMatch ? parseFloat(pApropiacionMatch[1].replace(',', '.')) : 0;
+                      const notaFinal = parseFloat(c[11]) || (pPresencial + pConcrecion + pSocializacion + pApropiacion);
+
+                      const isEvaluated = pPresencial > 0 || pConcrecion > 0 || pSocializacion > 0 || pApropiacion > 0 || notaFinal > 0;
+                      if (isEvaluated) {
+                        evaluatedCount++;
+                        if (notaFinal > 0 && notaFinal < 70) {
+                          failCount++;
+                        }
+                      }
                     }
+                  }
+
+                  totalStd = totalParticipants;
+                  failed = failCount;
+                  evalNotasResp = evaluatedCount;
+                }
+              }
+            } catch (e) {}
+
+            // 2. Check Valoración (Encuesta de Valoración de Estudiantes en SIE) from /events/ficha-valoracion/${cid}
+            let responded = 0, totalVal = totalStd, valPct = 0, valDisabled = false;
+            try {
+              const vRes = await fetch(`${BASE_URL}/events/ficha-valoracion/${cid}`, { headers: { 'Cookie': cookieHeader } });
+              if (vRes.ok) {
+                const vHtml = await vRes.text();
+                
+                if (vHtml.includes('EVALUACIÓN DESHABILITADA') || vHtml.includes('NO HABILITADA')) {
+                  valDisabled = true;
+                  responded = 0;
+                  valPct = 0;
+                } else {
+                  const pCards = (vHtml.match(/class=["']participant-card["']/gi) || []).length;
+                  const sinVal = (vHtml.match(/Sin valoraci/gi) || []).length;
+                  const tv = pCards > 0 ? pCards : totalStd;
+                  if (tv > 0) {
+                    totalVal = tv;
+                    responded = Math.max(0, totalVal - sinVal);
+                    valPct = Math.round((responded / totalVal) * 1000) / 10;
                   }
                 }
               }
-
-              totalStd = totalParticipants;
-              failed = failCount;
-              evalNotasResp = evaluatedCount;
-            }
-          } catch (e) {}
-
-          // 2. Check Valoración (Encuesta de Valoración de Estudiantes en SIE) from /events/ficha-valoracion/${cid}
-          let responded = 0, totalVal = totalStd, valPct = 0, valDisabled = false;
-          try {
-            const vRes = await fetch(`${BASE_URL}/events/ficha-valoracion/${cid}`, { headers: { 'Cookie': cookieHeader } });
-            const vHtml = await vRes.text();
-            
-            if (vHtml.includes('EVALUACIÓN DESHABILITADA') || vHtml.includes('NO HABILITADA')) {
-              valDisabled = true;
-              responded = 0;
-              valPct = 0;
-            } else {
-              const pCards = (vHtml.match(/class=["']participant-card["']/gi) || []).length;
-              const sinVal = (vHtml.match(/Sin valoraci/gi) || []).length;
-              const tv = pCards > 0 ? pCards : totalStd;
-              if (tv > 0) {
-                totalVal = tv;
-                responded = Math.max(0, totalVal - sinVal);
-                valPct = Math.round((responded / totalVal) * 1000) / 10;
-              }
-            }
-          } catch (e) {}
-
-          // Check Plan & Report Docs
-          let hasPlan = false, hasReport = false, docid = '';
-          try {
-            const cardRegex = new RegExp(`date-course-update-${cid}.*?card-footer.*?</div>`, 'is');
-            const cardMatch = detHtml.match(cardRegex);
-            const cardContent = cardMatch ? cardMatch[0] : detHtml;
-            hasPlan = /\/events\/sede\/planning\/report\/\d+\/1/i.test(cardContent);
-            const docm = cardContent.match(/\/events\/reportes\/documentos-sede\/(\d+)/i);
-            hasReport = !!docm;
-            docid = docm ? docm[1] : '';
-          } catch (e) {}
-
-          // Check Document details
-          let planifDateStr = '', informeDateStr = '', conform = false;
-          if (docid) {
-            try {
-              const docRes = await fetch(`${BASE_URL}/events/reportes/documentos-sede/${docid}`, { headers: { 'Cookie': cookieHeader } });
-              const docHtml = await docRes.text();
-              const mInf = docHtml.match(/Fecha de Cierre:\s*([^<]+)/i);
-              informeDateStr = mInf ? mInf[1].trim() : '';
-              const mPlan = docHtml.match(/Fecha de Planificaci[oó]n:\s*([^<]+)/i);
-              planifDateStr = mPlan ? mPlan[1].trim() : '';
-              conform = docHtml.includes('/facilitador/informe-conformidad/');
             } catch (e) {}
+
+            // Check Plan & Report Docs
+            let hasPlan = false, hasReport = false, docid = '';
+            try {
+              const cardRegex = new RegExp(`date-course-update-${cid}.*?card-footer.*?</div>`, 'is');
+              const cardMatch = detHtml.match(cardRegex);
+              const cardContent = cardMatch ? cardMatch[0] : detHtml;
+              hasPlan = /\/events\/sede\/planning\/report\/\d+\/1/i.test(cardContent);
+              const docm = cardContent.match(/\/events\/reportes\/documentos-sede\/(\d+)/i);
+              hasReport = !!docm;
+              docid = docm ? docm[1] : '';
+            } catch (e) {}
+
+            // Check Document details
+            let planifDateStr = '', informeDateStr = '', conform = false;
+            if (docid) {
+              try {
+                const docRes = await fetch(`${BASE_URL}/events/reportes/documentos-sede/${docid}`, { headers: { 'Cookie': cookieHeader } });
+                if (docRes.ok) {
+                  const docHtml = await docRes.text();
+                  const mInf = docHtml.match(/Fecha de Cierre:\s*([^<]+)/i);
+                  informeDateStr = mInf ? mInf[1].trim() : '';
+                  const mPlan = docHtml.match(/Fecha de Planificaci[oó]n:\s*([^<]+)/i);
+                  planifDateStr = mPlan ? mPlan[1].trim() : '';
+                  conform = docHtml.includes('/facilitador/informe-conformidad/');
+                }
+              } catch (e) {}
+            }
+
+            const planifDate = parseSpanishDate(planifDateStr);
+            const cierreDate = parseSpanishDate(informeDateStr);
+            const inicioDt = parseStartDate(fstr);
+            const finDt = parseCourseDates(fstr);
+
+            const planifOk = validPlanif(planifDate, inicioDt);
+            const informeOk = validInforme(cierreDate, finDt);
+            const conformOk = conform;
+            const conformPend = !conformOk && !!informeDateStr;
+
+            const todoOk = hasPlan && evalNotasResp >= 1 && hasReport && planifOk && informeOk && conformOk;
+
+            evCourses.push({
+              cid,
+              name: cursoName,
+              dates: fstr,
+              fecha_inicio: cInicio,
+              fecha_fin: cFin,
+              deadline: deadline ? `${deadline.getDate().toString().padStart(2, '0')}/${(deadline.getMonth() + 1).toString().padStart(2, '0')}/${deadline.getFullYear()}` : '',
+              plan: hasPlan ? 'SI' : 'NO',
+              eval_notas_resp: evalNotasResp,
+              eval_notas_total: totalStd,
+              val_pct: valPct,
+              val_resp: responded,
+              val_total: totalVal,
+              val_disabled: valDisabled,
+              repr: failed,
+              rep: hasReport ? 'SI' : 'NO',
+              planif_date: formatDtShort(planifDate),
+              planif_ok: planifOk,
+              informe_date: formatDtShort(cierreDate),
+              informe_ok: informeOk,
+              conform: conformOk ? 'SI' : 'NO',
+              conform_pend: conformPend,
+              todo_ok: todoOk,
+              vencido: afterDeadline ? 'SI' : 'NO',
+            });
           }
 
-          const planifDate = parseSpanishDate(planifDateStr);
-          const cierreDate = parseSpanishDate(informeDateStr);
-          const inicioDt = parseStartDate(fstr);
-          const finDt = parseCourseDates(fstr);
+          if (evCourses.length === 0) {
+            console.log(`[SIE Reporte] Ningún curso válido extraído en evento ${c.url_detalle}. Saltando.`);
+            continue;
+          }
 
-          const planifOk = validPlanif(planifDate, inicioDt);
-          const informeOk = validInforme(cierreDate, finDt);
-          const conformOk = conform;
-          const conformPend = !conformOk && !!informeDateStr;
+          let fInicio = '', fFin = '';
+          if (fechaStr && fechaStr.includes(' - ')) {
+            const parts = fechaStr.split(' - ');
+            fInicio = parts[0] ? parts[0].trim() : '';
+            fFin = parts[1] ? parts[1].trim() : '';
+          }
+          const eDate = parseCourseDates(fechaStr);
+          const dl = eDate ? new Date(eDate.getTime() + 5 * 24 * 3600 * 1000) : null;
+          const allOk = evCourses.every((cr: any) => cr.todo_ok);
+          const anyVencido = evCourses.some((cr: any) => cr.vencido === 'SI');
 
-          const todoOk = hasPlan && evalNotasResp >= 1 && hasReport && planifOk && informeOk && conformOk;
-
-          evCourses.push({
-            cid,
-            name: cursoName,
-            dates: fstr,
-            fecha_inicio: cInicio,
-            fecha_fin: cFin,
-            deadline: deadline ? `${deadline.getDate().toString().padStart(2, '0')}/${(deadline.getMonth() + 1).toString().padStart(2, '0')}/${deadline.getFullYear()}` : '',
-            plan: hasPlan ? 'SI' : 'NO',
-            eval_notas_resp: evalNotasResp,
-            eval_notas_total: totalStd,
-            val_pct: valPct,
-            val_resp: responded,
-            val_total: totalVal,
-            val_disabled: valDisabled,
-            repr: failed,
-            rep: hasReport ? 'SI' : 'NO',
-            planif_date: formatDtShort(planifDate),
-            planif_ok: planifOk,
-            informe_date: formatDtShort(cierreDate),
-            informe_ok: informeOk,
-            conform: conformOk ? 'SI' : 'NO',
-            conform_pend: conformPend,
-            todo_ok: todoOk,
-            vencido: afterDeadline ? 'SI' : 'NO',
+          allEvents.push({
+            mes: monthName,
+            ciclo: ciclo || c.curso || 'Ciclo General',
+            sede: c.lugar,
+            facilitador: c.facilitador,
+            url_evento: c.url_detalle.startsWith('http') ? c.url_detalle : BASE_URL + c.url_detalle,
+            fecha_rango: fechaStr,
+            fecha_inicio: fInicio,
+            fecha_fin: fFin,
+            deadline: dl ? `${dl.getDate().toString().padStart(2, '0')}/${(dl.getMonth() + 1).toString().padStart(2, '0')}/${dl.getFullYear()}` : '',
+            after_deadline: anyVencido ? 'SI' : 'NO',
+            courses: evCourses,
+            all_ok: allOk,
           });
+        } catch (eventErr) {
+          console.warn(`[SIE Reporte] Error procesando evento (${c.url_detalle}). Saltando al siguiente:`, eventErr);
+          continue;
         }
-
-        if (evCourses.length === 0) continue;
-
-        let fInicio = '', fFin = '';
-        if (fechaStr.includes(' - ')) {
-          const parts = fechaStr.split(' - ');
-          fInicio = parts[0];
-          fFin = parts[1] || '';
-        }
-        const eDate = parseCourseDates(fechaStr);
-        const dl = eDate ? new Date(eDate.getTime() + 5 * 24 * 3600 * 1000) : null;
-        const allOk = evCourses.every((cr: any) => cr.todo_ok);
-        const anyVencido = evCourses.some((cr: any) => cr.vencido === 'SI');
-
-        allEvents.push({
-          mes: monthName,
-          ciclo,
-          sede: c.lugar,
-          facilitador: c.facilitador,
-          url_evento: c.url_detalle.startsWith('http') ? c.url_detalle : BASE_URL + c.url_detalle,
-          fecha_rango: fechaStr,
-          fecha_inicio: fInicio,
-          fecha_fin: fFin,
-          deadline: dl ? `${dl.getDate().toString().padStart(2, '0')}/${(dl.getMonth() + 1).toString().padStart(2, '0')}/${dl.getFullYear()}` : '',
-          after_deadline: anyVencido ? 'SI' : 'NO',
-          courses: evCourses,
-          all_ok: allOk,
-        });
       }
     }
 
