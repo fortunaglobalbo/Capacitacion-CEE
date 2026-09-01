@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { supabase } from '@/lib/supabase/client';
 import * as XLSX from 'xlsx';
 import { Curso } from '@/types';
@@ -62,26 +62,23 @@ function getLevenshteinDistance(a: string, b: string): number {
 
   for (let i = 1; i <= a.length; i++) {
     for (let j = 1; j <= b.length; j++) {
-      if (a[i - 1] === b[j - 1]) {
-        matrix[i][j] = matrix[i - 1][j - 1];
-      } else {
-        matrix[i][j] = Math.min(
-          matrix[i - 1][j] + 1,
-          matrix[i][j - 1] + 1,
-          matrix[i - 1][j - 1] + 1
-        );
-      }
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+      matrix[i][j] = Math.min(
+        matrix[i - 1][j] + 1,
+        matrix[i][j - 1] + 1,
+        matrix[i - 1][j - 1] + cost
+      );
     }
   }
   return matrix[a.length][b.length];
 }
 
 function cleanNameString(name: string): string {
-  return name
+  return (name || '')
     .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "") // Remove accents
-    .replace(/[^A-Za-z0-9\s]/g, "") // Remove punctuation/symbols (dots, commas, etc.)
-    .replace(/\s+/g, " ")           // Collapse multiple spaces
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^A-Za-z0-9\s]/g, "")
+    .replace(/\s+/g, " ")
     .trim()
     .toUpperCase();
 }
@@ -96,6 +93,17 @@ function calculateDifferenceRatio(str1: string, str2: string): number {
   return distance / maxLen;
 }
 
+function calculateStringSimilarity(str1: string, str2: string): number {
+  const s1 = (str1 || '').toLowerCase().trim();
+  const s2 = (str2 || '').toLowerCase().trim();
+  if (!s1 && !s2) return 1;
+  if (!s1 || !s2) return 0;
+  if (s1 === s2) return 1;
+  const maxLen = Math.max(s1.length, s2.length);
+  const distance = getLevenshteinDistance(s1, s2);
+  return 1 - distance / maxLen;
+}
+
 export default function ParticipantesModal({
   curso,
   onClose,
@@ -104,6 +112,32 @@ export default function ParticipantesModal({
   const [inscripciones, setInscripciones] = useState<Inscripcion[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
+
+  // Lock background body scroll while modal is open
+  useEffect(() => {
+    const originalOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = originalOverflow;
+    };
+  }, []);
+
+  // Direct Inline Manual Row at top (Fila 1) states
+  const [showQuickAddRow, setShowQuickAddRow] = useState(false);
+  const [quickCi, setQuickCi] = useState('');
+  const [quickRda, setQuickRda] = useState('');
+  const [quickNombres, setQuickNombres] = useState('');
+  const [quickApellidos, setQuickApellidos] = useState('');
+  const [quickCelular, setQuickCelular] = useState('');
+  const [quickUe, setQuickUe] = useState('');
+  const [quickSie, setQuickSie] = useState('');
+  const [quickPago, setQuickPago] = useState<'Pendiente' | 'Pagado'>('Pendiente');
+  const [quickSearchingCi, setQuickSearchingCi] = useState(false);
+  const [quickCiExists, setQuickCiExists] = useState(false);
+  const [quickSaving, setQuickSaving] = useState(false);
+  const [quickUeSuggestions, setQuickUeSuggestions] = useState<Array<{ codigo_sie: string; unidad_educativa: string }>>([]);
+  const [showQuickUeSuggestions, setShowQuickUeSuggestions] = useState(false);
+  const [newlyCreatedPartCis, setNewlyCreatedPartCis] = useState<Set<string>>(new Set());
 
   // Importer Panel states
   const [showImporter, setShowImporter] = useState(false);
@@ -450,6 +484,190 @@ export default function ParticipantesModal({
       } catch (err: any) {
         Swal.fire('Error', err.message || 'No se pudo eliminar la inscripción', 'error');
       }
+    }
+  };
+
+  // Quick Add Row Handlers (Fila 1 en tabla)
+  const handleQuickCiCheck = async (ciVal: string) => {
+    if (!ciVal.trim()) return;
+    setQuickSearchingCi(true);
+    try {
+      const { data } = await supabase
+        .from('participantes')
+        .select('*')
+        .eq('ci', ciVal.trim())
+        .maybeSingle();
+
+      if (data) {
+        setQuickNombres(data.nombres !== 'POR VALIDAR' ? data.nombres : '');
+        setQuickApellidos(data.apellidos !== 'POR VALIDAR' ? data.apellidos : '');
+        setQuickRda(data.rda || '');
+        setQuickCelular(data.celular || '');
+        setQuickSie(data.sie || '');
+        setQuickUe(data.unidad_educativa || '');
+        setQuickCiExists(true);
+      } else {
+        setQuickCiExists(false);
+      }
+    } catch (err) {
+      setQuickCiExists(false);
+    } finally {
+      setQuickSearchingCi(false);
+    }
+  };
+
+  const handleSearchQuickUeSuggestions = async (val: string) => {
+    if (!val.trim() || val.length < 2) {
+      setQuickUeSuggestions([]);
+      setShowQuickUeSuggestions(false);
+      return;
+    }
+    try {
+      const cleanQuery = val.trim().replace(/[%_]/g, '');
+      const { data } = await supabase
+        .from('catalogo_unidades_educativas')
+        .select('codigo_sie, unidad_educativa')
+        .or(`unidad_educativa.ilike.%${cleanQuery}%,codigo_sie.ilike.%${cleanQuery}%`)
+        .limit(10);
+      if (data && data.length > 0) {
+        setQuickUeSuggestions(data);
+        setShowQuickUeSuggestions(true);
+      } else {
+        setQuickUeSuggestions([]);
+        setShowQuickUeSuggestions(false);
+      }
+    } catch (err) {
+      setQuickUeSuggestions([]);
+    }
+  };
+
+  const handleQuickAddSubmit = async () => {
+    const cleanCi = quickCi.trim();
+    if (!cleanCi) {
+      Swal.fire({
+        icon: 'warning',
+        title: 'Carnet Requerido',
+        text: 'Por favor ingresa el número de Carnet de Identidad (C.I.)',
+        toast: true,
+        position: 'top-end',
+        timer: 3000,
+        showConfirmButton: false
+      });
+      return;
+    }
+
+    const isEnrolled = inscripciones.some(
+      (ins) => ins.participantes?.ci.trim() === cleanCi
+    );
+    if (isEnrolled) {
+      Swal.fire({
+        icon: 'warning',
+        title: 'Ya Registrado',
+        text: 'Este participante ya se encuentra inscrito en este curso.',
+        toast: true,
+        position: 'top-end',
+        timer: 3000,
+        showConfirmButton: false
+      });
+      return;
+    }
+
+    setQuickSaving(true);
+    try {
+      // 1. Get next serial number
+      const { data: countData } = await supabase
+        .from('inscripcion_ciclo')
+        .select('nro')
+        .eq('curso_id', curso.id)
+        .order('nro', { ascending: false })
+        .limit(1);
+      const nextNro = countData && countData.length > 0 ? (countData[0].nro + 1) : 1;
+
+      // Fetch existing participant record to merge and update if edited
+      const { data: dbPart } = await supabase
+        .from('participantes')
+        .select('*')
+        .eq('ci', cleanCi)
+        .maybeSingle();
+
+      const finalNombres = quickNombres.trim() ? quickNombres.trim().toUpperCase() : (dbPart?.nombres || 'POR VALIDAR');
+      const finalApellidos = quickApellidos.trim() ? quickApellidos.trim().toUpperCase() : (dbPart?.apellidos || 'POR VALIDAR');
+      const finalRda = quickRda.trim() ? quickRda.trim() : (dbPart?.rda || null);
+      const finalCelular = quickCelular.trim() ? quickCelular.trim() : (dbPart?.celular || null);
+      const finalSie = quickSie.trim() ? quickSie.trim() : (dbPart?.sie || null);
+      const finalUe = quickUe.trim() ? quickUe.trim().toUpperCase() : (dbPart?.unidad_educativa || null);
+
+      // 2. Upsert participant
+      const { error: partError } = await supabase
+        .from('participantes')
+        .upsert({
+          ci: cleanCi,
+          nombres: finalNombres,
+          apellidos: finalApellidos,
+          rda: finalRda,
+          celular: finalCelular,
+          sie: finalSie,
+          unidad_educativa: finalUe,
+          validado: dbPart?.validado ?? false,
+          observaciones_sie: dbPart?.observaciones_sie || null
+        }, { onConflict: 'ci' });
+
+      if (partError) throw partError;
+
+      // 3. Insert enrollment
+      const { error: relationError } = await supabase
+        .from('inscripcion_ciclo')
+        .insert({
+          curso_id: curso.id,
+          participante_ci: cleanCi,
+          nro: nextNro,
+          pagos: quickPago,
+          observaciones: null
+        });
+
+      if (relationError) throw relationError;
+
+      // 4. Update course count
+      const { count } = await supabase
+        .from('inscripcion_ciclo')
+        .select('*', { count: 'exact', head: true })
+        .eq('curso_id', curso.id);
+
+      await supabase
+        .from('cursos')
+        .update({ inscritos_formulario: count || 0 })
+        .eq('id', curso.id);
+
+      // Pin to TOP until validated
+      setNewlyCreatedPartCis(prev => new Set([...prev, cleanCi]));
+
+      Swal.fire({
+        icon: 'success',
+        title: 'Participante Inscrito',
+        text: `Se agregó a ${cleanCi} arriba en la Fila #1 para su validación rápida con SIE.`,
+        toast: true,
+        position: 'top-end',
+        timer: 3500,
+        showConfirmButton: false
+      });
+
+      // Reset fields for next quick entry
+      setQuickCi('');
+      setQuickRda('');
+      setQuickNombres('');
+      setQuickApellidos('');
+      setQuickCelular('');
+      setQuickUe('');
+      setQuickSie('');
+      setQuickPago('Pendiente');
+      setQuickCiExists(false);
+
+      onRefresh();
+      fetchParticipantes();
+    } catch (err: any) {
+      Swal.fire('Error', err.message || 'No se pudo inscribir al participante', 'error');
+    } finally {
+      setQuickSaving(false);
     }
   };
 
@@ -2464,6 +2682,17 @@ export default function ParticipantesModal({
     );
   });
 
+  // Sort newly created participants that are unvalidated to the TOP (Fila 1 priority)
+  const sortedInscripciones = useMemo(() => {
+    return [...filteredInscripciones].sort((a, b) => {
+      const aIsNewUnval = newlyCreatedPartCis.has(a.participantes?.ci || '') && !a.participantes?.validado;
+      const bIsNewUnval = newlyCreatedPartCis.has(b.participantes?.ci || '') && !b.participantes?.validado;
+      if (aIsNewUnval && !bIsNewUnval) return -1;
+      if (!aIsNewUnval && bIsNewUnval) return 1;
+      return 0;
+    });
+  }, [filteredInscripciones, newlyCreatedPartCis]);
+
   // Print official 2-up Letter Ficha de Inscripción for a participant
   const handlePrintFichaForParticipant = (p: Participante) => {
     const printWindow = window.open('', '_blank');
@@ -3445,26 +3674,49 @@ export default function ParticipantesModal({
                 <ArrowRight size={16} /> {showMigrator ? 'Cerrar Migrador' : 'Migrar Participantes'}
               </button>
 
-              {/* Group 5: Primary Action - Inscribir / Importar */}
+              {/* Group 5: Fila Rápida Superior (Fila 1) */}
+              <button
+                type="button"
+                onClick={() => setShowQuickAddRow(!showQuickAddRow)}
+                style={{
+                  background: showQuickAddRow ? '#047857' : 'linear-gradient(135deg, #059669 0%, #10b981 100%)',
+                  color: '#ffffff',
+                  border: 'none',
+                  borderRadius: '8px',
+                  padding: '8px 15px',
+                  fontSize: '0.88rem',
+                  fontWeight: 900,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  cursor: 'pointer',
+                  boxShadow: '0 2px 8px rgba(16,185,129,0.25)'
+                }}
+                title="Inserta una fila vacía editable en la parte superior (Fila 1) para inscribir rápido con C.I."
+              >
+                <Plus size={18} /> {showQuickAddRow ? 'Ocultar Fila 1' : '➕ Inscribir Manual (Fila 1)'}
+              </button>
+
+              {/* Group 6: Primary Action - Inscribir / Importar Lote */}
               <button
                 type="button"
                 onClick={() => setShowImporter(!showImporter)}
                 style={{
-                  background: showImporter ? '#e2e8f0' : 'linear-gradient(135deg, #059669 0%, #10b981 100%)',
+                  background: showImporter ? '#e2e8f0' : 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)',
                   color: showImporter ? '#1e293b' : '#ffffff',
                   border: 'none',
                   borderRadius: '8px',
-                  padding: '8px 16px',
+                  padding: '8px 15px',
                   fontSize: '0.88rem',
                   fontWeight: 900,
                   display: 'flex',
                   alignItems: 'center',
                   gap: '8px',
                   cursor: 'pointer',
-                  boxShadow: showImporter ? 'none' : '0 2px 8px rgba(16,185,129,0.3)'
+                  boxShadow: showImporter ? 'none' : '0 2px 8px rgba(2,132,199,0.25)'
                 }}
               >
-                <UserPlus size={17} /> {showImporter ? 'Cerrar Importador' : '➕ Inscribir / Importar'}
+                <UserPlus size={17} /> {showImporter ? 'Cerrar Importador' : 'Importar Lote / Excel'}
               </button>
 
             </div>
@@ -4285,11 +4537,11 @@ export default function ParticipantesModal({
               <Loader2 className="spin" size={36} style={{ color: 'var(--primary-500)' }} />
               <span style={{ fontSize: '0.88rem', color: 'var(--gray-500)', fontWeight: 600 }}>Cargando lista de participantes inscritos...</span>
             </div>
-          ) : filteredInscripciones.length === 0 ? (
+          ) : (!showQuickAddRow && filteredInscripciones.length === 0) ? (
             <div style={{ textAlign: 'center', padding: '40px', background: 'var(--gray-50)', borderRadius: 'var(--radius-md)', border: '1px dashed var(--gray-300)' }}>
               <span style={{ fontSize: '2rem', display: 'block', marginBottom: '10px' }}>📋</span>
               <p style={{ margin: 0, fontWeight: 700, color: 'var(--gray-600)' }}>No se encontraron participantes en este ciclo.</p>
-              <p style={{ margin: '4px 0 0 0', fontSize: '0.82rem', color: 'var(--gray-400)' }}>Inscribe participantes con el formulario público o con el botón "Importar Lote".</p>
+              <p style={{ margin: '4px 0 0 0', fontSize: '0.82rem', color: 'var(--gray-400)' }}>Inscribe participantes con la fila superior o con el botón "Importar Lote".</p>
             </div>
           ) : (
             <div style={{ overflowX: 'auto', border: '1.5px solid #cbd5e1', borderRadius: '10px', background: '#ffffff', boxShadow: '0 2px 6px rgba(0,0,0,0.06)' }}>
@@ -4317,7 +4569,262 @@ export default function ParticipantesModal({
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredInscripciones.map((ins, index) => {
+                  {/* Fila Superior 1: Registro Rápido Inline */}
+                  {showQuickAddRow && (
+                    <tr style={{ background: '#f0fdf4', borderBottom: '2.5px solid #10b981', boxShadow: '0 3px 8px rgba(16,185,129,0.12)' }}>
+                      <td style={{ padding: '8px 10px', textAlign: 'center' }}>
+                        <span style={{ fontSize: '1.1rem' }} title="Fila de Registro Rápido Superior">✨</span>
+                      </td>
+                      <td style={{ padding: '8px 6px', textAlign: 'center' }}>
+                        <span style={{ background: '#059669', color: '#ffffff', padding: '2px 6px', borderRadius: '4px', fontSize: '0.72rem', fontWeight: 900 }}>
+                          NUEVO
+                        </span>
+                      </td>
+                      {/* C.I. */}
+                      <td style={{ padding: '8px 6px' }}>
+                        <div style={{ position: 'relative' }}>
+                          <input
+                            type="text"
+                            value={quickCi}
+                            onChange={(e) => setQuickCi(e.target.value.trim().toUpperCase())}
+                            onBlur={(e) => handleQuickCiCheck(e.target.value)}
+                            onKeyDown={(e) => { if (e.key === 'Enter') handleQuickAddSubmit(); }}
+                            placeholder="Carnet *"
+                            autoFocus
+                            style={{
+                              width: '100%',
+                              padding: '7px 8px',
+                              fontSize: '0.88rem',
+                              fontWeight: 800,
+                              color: '#0f172a',
+                              border: '2px solid #059669',
+                              borderRadius: '6px',
+                              background: '#ffffff',
+                              outline: 'none'
+                            }}
+                          />
+                          {quickSearchingCi && (
+                            <Loader2 size={12} className="spin" style={{ position: 'absolute', right: '6px', top: '10px', color: '#059669' }} />
+                          )}
+                        </div>
+                        {quickCiExists && (
+                          <span style={{ fontSize: '0.68rem', color: '#047857', fontWeight: 800, display: 'block', marginTop: '2px' }}>
+                            ✓ Registrado en BD
+                          </span>
+                        )}
+                      </td>
+                      {/* RDA */}
+                      <td style={{ padding: '8px 6px' }}>
+                        <input
+                          type="text"
+                          value={quickRda}
+                          onChange={(e) => setQuickRda(e.target.value)}
+                          onKeyDown={(e) => { if (e.key === 'Enter') handleQuickAddSubmit(); }}
+                          placeholder="RDA"
+                          style={{
+                            width: '100%',
+                            padding: '7px 8px',
+                            fontSize: '0.85rem',
+                            fontWeight: 700,
+                            border: '1.5px solid #cbd5e1',
+                            borderRadius: '6px',
+                            background: '#ffffff'
+                          }}
+                        />
+                      </td>
+                      {/* Apellidos y Nombres */}
+                      <td style={{ padding: '8px 6px' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                          <input
+                            type="text"
+                            value={quickApellidos}
+                            onChange={(e) => setQuickApellidos(e.target.value.toUpperCase())}
+                            onKeyDown={(e) => { if (e.key === 'Enter') handleQuickAddSubmit(); }}
+                            placeholder="APELLIDOS (Opcional)"
+                            style={{
+                              width: '100%',
+                              padding: '5px 8px',
+                              fontSize: '0.82rem',
+                              fontWeight: 700,
+                              border: '1.5px solid #cbd5e1',
+                              borderRadius: '4px',
+                              background: '#ffffff'
+                            }}
+                          />
+                          <input
+                            type="text"
+                            value={quickNombres}
+                            onChange={(e) => setQuickNombres(e.target.value.toUpperCase())}
+                            onKeyDown={(e) => { if (e.key === 'Enter') handleQuickAddSubmit(); }}
+                            placeholder="NOMBRES (Opcional)"
+                            style={{
+                              width: '100%',
+                              padding: '5px 8px',
+                              fontSize: '0.82rem',
+                              fontWeight: 700,
+                              border: '1.5px solid #cbd5e1',
+                              borderRadius: '4px',
+                              background: '#ffffff'
+                            }}
+                          />
+                        </div>
+                      </td>
+                      {/* Celular */}
+                      <td style={{ padding: '8px 6px' }}>
+                        <input
+                          type="text"
+                          value={quickCelular}
+                          onChange={(e) => setQuickCelular(e.target.value)}
+                          onKeyDown={(e) => { if (e.key === 'Enter') handleQuickAddSubmit(); }}
+                          placeholder="Celular"
+                          style={{
+                            width: '100%',
+                            padding: '7px 8px',
+                            fontSize: '0.85rem',
+                            fontWeight: 700,
+                            border: '1.5px solid #cbd5e1',
+                            borderRadius: '6px',
+                            background: '#ffffff'
+                          }}
+                        />
+                      </td>
+                      {/* Unidad Educativa */}
+                      <td style={{ padding: '8px 6px', position: 'relative' }}>
+                        <input
+                          type="text"
+                          value={quickUe}
+                          onChange={(e) => {
+                            const val = e.target.value.toUpperCase();
+                            setQuickUe(val);
+                            handleSearchQuickUeSuggestions(val);
+                          }}
+                          onFocus={() => {
+                            if (quickUe.trim()) handleSearchQuickUeSuggestions(quickUe);
+                          }}
+                          onKeyDown={(e) => { if (e.key === 'Enter') handleQuickAddSubmit(); }}
+                          placeholder="Buscar Unidad Educativa..."
+                          style={{
+                            width: '100%',
+                            padding: '7px 8px',
+                            fontSize: '0.84rem',
+                            fontWeight: 700,
+                            border: '1.5px solid #cbd5e1',
+                            borderRadius: '6px',
+                            background: '#ffffff'
+                          }}
+                        />
+                        {showQuickUeSuggestions && quickUeSuggestions.length > 0 && (
+                          <div style={{
+                            position: 'absolute',
+                            top: '100%',
+                            left: '6px',
+                            right: '6px',
+                            zIndex: 100,
+                            background: '#ffffff',
+                            border: '1.5px solid #0284c7',
+                            borderRadius: '6px',
+                            boxShadow: '0 8px 20px rgba(0,0,0,0.18)',
+                            maxHeight: '180px',
+                            overflowY: 'auto'
+                          }}>
+                            {quickUeSuggestions.map((sug, i) => (
+                              <div
+                                key={i}
+                                onClick={() => {
+                                  setQuickUe(sug.unidad_educativa);
+                                  if (sug.codigo_sie) setQuickSie(sug.codigo_sie);
+                                  setShowQuickUeSuggestions(false);
+                                }}
+                                style={{
+                                  padding: '8px 10px',
+                                  fontSize: '0.80rem',
+                                  cursor: 'pointer',
+                                  borderBottom: '1px solid #f1f5f9',
+                                  color: '#0f172a',
+                                  fontWeight: 600
+                                }}
+                                onMouseOver={(e) => e.currentTarget.style.background = '#f0f9ff'}
+                                onMouseOut={(e) => e.currentTarget.style.background = '#ffffff'}
+                              >
+                                🏫 <b>{sug.unidad_educativa}</b> {sug.codigo_sie && <span style={{ color: '#0284c7' }}>(SIE: {sug.codigo_sie})</span>}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </td>
+                      {/* Validación SIE */}
+                      <td style={{ padding: '8px 6px', textAlign: 'center' }}>
+                        <span style={{ fontSize: '0.74rem', background: '#fef3c7', color: '#92400e', padding: '4px 8px', borderRadius: '6px', fontWeight: 800, border: '1px solid #fde68a' }}>
+                          ⚡ Por Validar
+                        </span>
+                      </td>
+                      {/* Estado Pago */}
+                      <td style={{ padding: '8px 6px' }}>
+                        <select
+                          value={quickPago}
+                          onChange={(e) => setQuickPago(e.target.value as any)}
+                          style={{
+                            width: '100%',
+                            padding: '7px 8px',
+                            fontSize: '0.84rem',
+                            fontWeight: 800,
+                            borderRadius: '6px',
+                            border: '1.5px solid #cbd5e1',
+                            background: quickPago === 'Pagado' ? '#ecfdf5' : '#fffbeb',
+                            color: quickPago === 'Pagado' ? '#065f46' : '#92400e'
+                          }}
+                        >
+                          <option value="Pendiente">Pendiente</option>
+                          <option value="Pagado">Pagado</option>
+                        </select>
+                      </td>
+                      {/* Acciones */}
+                      <td style={{ padding: '8px 6px', textAlign: 'center' }}>
+                        <div style={{ display: 'flex', gap: '6px', justifyContent: 'center' }}>
+                          <button
+                            type="button"
+                            onClick={handleQuickAddSubmit}
+                            disabled={quickSaving}
+                            style={{
+                              background: 'linear-gradient(135deg, #059669 0%, #10b981 100%)',
+                              color: '#ffffff',
+                              border: 'none',
+                              borderRadius: '6px',
+                              padding: '7px 12px',
+                              fontSize: '0.82rem',
+                              fontWeight: 900,
+                              cursor: 'pointer',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '4px',
+                              boxShadow: '0 2px 6px rgba(16,185,129,0.3)'
+                            }}
+                            title="Inscribir en este curso y colocar en la lista superior"
+                          >
+                            {quickSaving ? <Loader2 size={13} className="spin" /> : <Save size={13} />}
+                            {quickSaving ? 'Guardando...' : 'Inscribir'}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setShowQuickAddRow(false)}
+                            style={{
+                              background: '#f1f5f9',
+                              color: '#64748b',
+                              border: '1px solid #cbd5e1',
+                              borderRadius: '6px',
+                              padding: '7px 9px',
+                              cursor: 'pointer'
+                            }}
+                            title="Cancelar fila rápida"
+                          >
+                            <X size={13} />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+
+                  {sortedInscripciones.map((ins, index) => {
                     const p = ins.participantes;
                     if (!p) return null;
 
