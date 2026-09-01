@@ -2982,19 +2982,19 @@ export default function ParticipantesModal({
         {/* Modal Body */}
         <div className="modal-body" style={{ padding: '16px 20px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '14px', flex: 1, background: '#f8fafc' }}>
 
-          {/* Quick KPI Status Filter Tabs */}
+          {/* Quick KPI Status Filter Tabs — Large & High Readability */}
           <div style={{
             display: 'flex',
             alignItems: 'center',
-            gap: '8px',
+            gap: '10px',
             flexWrap: 'wrap',
             background: '#ffffff',
-            padding: '8px 12px',
+            padding: '10px 16px',
             borderRadius: '10px',
-            border: '1px solid #e2e8f0',
-            boxShadow: '0 1px 3px rgba(0,0,0,0.04)'
+            border: '1px solid #cbd5e1',
+            boxShadow: '0 1px 4px rgba(0,0,0,0.05)'
           }}>
-            <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', marginRight: '4px' }}>
+            <span style={{ fontSize: '0.86rem', fontWeight: 800, color: '#475569', textTransform: 'uppercase', marginRight: '6px' }}>
               Filtro Rápido:
             </span>
 
@@ -3005,14 +3005,14 @@ export default function ParticipantesModal({
               style={{
                 display: 'inline-flex',
                 alignItems: 'center',
-                gap: '6px',
-                padding: '5px 12px',
+                gap: '8px',
+                padding: '7px 14px',
                 borderRadius: '8px',
-                fontSize: '0.8rem',
-                fontWeight: 700,
-                border: filterTab === 'all' ? '1px solid #0284c7' : '1px solid #e2e8f0',
+                fontSize: '0.90rem',
+                fontWeight: 800,
+                border: filterTab === 'all' ? '2px solid #0284c7' : '1px solid #cbd5e1',
                 background: filterTab === 'all' ? '#e0f2fe' : '#f8fafc',
-                color: filterTab === 'all' ? '#0369a1' : '#475569',
+                color: filterTab === 'all' ? '#0369a1' : '#334155',
                 cursor: 'pointer',
                 transition: 'all 0.15s ease'
               }}
@@ -3020,11 +3020,11 @@ export default function ParticipantesModal({
               <span>👥 Todos</span>
               <span style={{
                 background: filterTab === 'all' ? '#0284c7' : '#e2e8f0',
-                color: filterTab === 'all' ? '#fff' : '#64748b',
-                padding: '1px 6px',
-                borderRadius: '10px',
-                fontSize: '0.72rem',
-                fontWeight: 800
+                color: filterTab === 'all' ? '#fff' : '#475569',
+                padding: '2px 8px',
+                borderRadius: '12px',
+                fontSize: '0.82rem',
+                fontWeight: 900
               }}>
                 {statsTotal}
               </span>
@@ -3037,14 +3037,14 @@ export default function ParticipantesModal({
               style={{
                 display: 'inline-flex',
                 alignItems: 'center',
-                gap: '6px',
-                padding: '5px 12px',
+                gap: '8px',
+                padding: '7px 14px',
                 borderRadius: '8px',
-                fontSize: '0.8rem',
-                fontWeight: 700,
-                border: filterTab === 'pagados' ? '1px solid #10b981' : '1px solid #e2e8f0',
+                fontSize: '0.90rem',
+                fontWeight: 800,
+                border: filterTab === 'pagados' ? '2px solid #059669' : '1px solid #cbd5e1',
                 background: filterTab === 'pagados' ? '#d1fae5' : '#f8fafc',
-                color: filterTab === 'pagados' ? '#065f46' : '#475569',
+                color: filterTab === 'pagados' ? '#065f46' : '#334155',
                 cursor: 'pointer',
                 transition: 'all 0.15s ease'
               }}
@@ -3052,11 +3052,11 @@ export default function ParticipantesModal({
               <span>💰 Pagados</span>
               <span style={{
                 background: filterTab === 'pagados' ? '#059669' : '#e2e8f0',
-                color: filterTab === 'pagados' ? '#fff' : '#64748b',
-                padding: '1px 6px',
-                borderRadius: '10px',
-                fontSize: '0.72rem',
-                fontWeight: 800
+                color: filterTab === 'pagados' ? '#fff' : '#475569',
+                padding: '2px 8px',
+                borderRadius: '12px',
+                fontSize: '0.82rem',
+                fontWeight: 900
               }}>
                 {statsPagados}
               </span>
@@ -3069,14 +3069,14 @@ export default function ParticipantesModal({
               style={{
                 display: 'inline-flex',
                 alignItems: 'center',
-                gap: '6px',
-                padding: '5px 12px',
+                gap: '8px',
+                padding: '7px 14px',
                 borderRadius: '8px',
-                fontSize: '0.8rem',
-                fontWeight: 700,
-                border: filterTab === 'pendientes' ? '1px solid #f59e0b' : '1px solid #e2e8f0',
+                fontSize: '0.90rem',
+                fontWeight: 800,
+                border: filterTab === 'pendientes' ? '2px solid #d97706' : '1px solid #cbd5e1',
                 background: filterTab === 'pendientes' ? '#fef3c7' : '#f8fafc',
-                color: filterTab === 'pendientes' ? '#92400e' : '#475569',
+                color: filterTab === 'pendientes' ? '#92400e' : '#334155',
                 cursor: 'pointer',
                 transition: 'all 0.15s ease'
               }}
@@ -3084,11 +3084,11 @@ export default function ParticipantesModal({
               <span>⏳ Pendientes</span>
               <span style={{
                 background: filterTab === 'pendientes' ? '#d97706' : '#e2e8f0',
-                color: filterTab === 'pendientes' ? '#fff' : '#64748b',
-                padding: '1px 6px',
-                borderRadius: '10px',
-                fontSize: '0.72rem',
-                fontWeight: 800
+                color: filterTab === 'pendientes' ? '#fff' : '#475569',
+                padding: '2px 8px',
+                borderRadius: '12px',
+                fontSize: '0.82rem',
+                fontWeight: 900
               }}>
                 {statsPendientes}
               </span>
@@ -3101,14 +3101,14 @@ export default function ParticipantesModal({
               style={{
                 display: 'inline-flex',
                 alignItems: 'center',
-                gap: '6px',
-                padding: '5px 12px',
+                gap: '8px',
+                padding: '7px 14px',
                 borderRadius: '8px',
-                fontSize: '0.8rem',
-                fontWeight: 700,
-                border: filterTab === 'sin_ue' ? '1px solid #6366f1' : '1px solid #e2e8f0',
+                fontSize: '0.90rem',
+                fontWeight: 800,
+                border: filterTab === 'sin_ue' ? '2px solid #4f46e5' : '1px solid #cbd5e1',
                 background: filterTab === 'sin_ue' ? '#e0e7ff' : '#f8fafc',
-                color: filterTab === 'sin_ue' ? '#3730a3' : '#475569',
+                color: filterTab === 'sin_ue' ? '#3730a3' : '#334155',
                 cursor: 'pointer',
                 transition: 'all 0.15s ease'
               }}
@@ -3116,11 +3116,11 @@ export default function ParticipantesModal({
               <span>🏫 Sin U.E.</span>
               <span style={{
                 background: filterTab === 'sin_ue' ? '#4f46e5' : '#e2e8f0',
-                color: filterTab === 'sin_ue' ? '#fff' : '#64748b',
-                padding: '1px 6px',
-                borderRadius: '10px',
-                fontSize: '0.72rem',
-                fontWeight: 800
+                color: filterTab === 'sin_ue' ? '#fff' : '#475569',
+                padding: '2px 8px',
+                borderRadius: '12px',
+                fontSize: '0.82rem',
+                fontWeight: 900
               }}>
                 {statsSinUe}
               </span>
@@ -3134,12 +3134,12 @@ export default function ParticipantesModal({
                 style={{
                   display: 'inline-flex',
                   alignItems: 'center',
-                  gap: '6px',
-                  padding: '5px 12px',
+                  gap: '8px',
+                  padding: '7px 14px',
                   borderRadius: '8px',
-                  fontSize: '0.8rem',
-                  fontWeight: 700,
-                  border: filterTab === 'discrepancias' ? '1px solid #ef4444' : '1px solid #fee2e2',
+                  fontSize: '0.90rem',
+                  fontWeight: 800,
+                  border: filterTab === 'discrepancias' ? '2px solid #ef4444' : '1px solid #fee2e2',
                   background: filterTab === 'discrepancias' ? '#fee2e2' : '#fff5f5',
                   color: filterTab === 'discrepancias' ? '#991b1b' : '#b91c1c',
                   cursor: 'pointer',
@@ -3150,10 +3150,10 @@ export default function ParticipantesModal({
                 <span style={{
                   background: '#ef4444',
                   color: '#fff',
-                  padding: '1px 6px',
-                  borderRadius: '10px',
-                  fontSize: '0.72rem',
-                  fontWeight: 800
+                  padding: '2px 8px',
+                  borderRadius: '12px',
+                  fontSize: '0.82rem',
+                  fontWeight: 900
                 }}>
                   {statsDiscrepancias}
                 </span>
@@ -3169,13 +3169,13 @@ export default function ParticipantesModal({
             gap: '12px',
             flexWrap: 'wrap',
             background: '#ffffff',
-            padding: '10px 14px',
+            padding: '12px 16px',
             borderRadius: '10px',
-            border: '1px solid #e2e8f0',
-            boxShadow: '0 1px 3px rgba(0,0,0,0.04)'
+            border: '1px solid #cbd5e1',
+            boxShadow: '0 1px 4px rgba(0,0,0,0.05)'
           }}>
-            {/* Search Input */}
-            <div style={{ position: 'relative', flex: 1, maxWidth: '420px', minWidth: '220px' }}>
+            {/* Search Input — Large text */}
+            <div style={{ position: 'relative', flex: 1, maxWidth: '440px', minWidth: '220px' }}>
               <input
                 type="text"
                 value={searchQuery}
@@ -3183,35 +3183,36 @@ export default function ParticipantesModal({
                 placeholder="Buscar por C.I., nombre, RDA, celular o U.E..."
                 style={{
                   width: '100%',
-                  padding: '7px 30px 7px 34px',
-                  fontSize: '0.82rem',
-                  border: '1px solid #cbd5e1',
+                  padding: '9px 32px 9px 38px',
+                  fontSize: '0.92rem',
+                  fontWeight: 600,
+                  border: '1.5px solid #cbd5e1',
                   borderRadius: '8px',
-                  background: '#f8fafc',
+                  background: '#ffffff',
                   color: '#0f172a',
                   outline: 'none',
                   transition: 'all 0.2s'
                 }}
-                onFocus={(e) => { e.currentTarget.style.borderColor = '#0284c7'; e.currentTarget.style.background = '#fff'; }}
-                onBlur={(e) => { e.currentTarget.style.borderColor = '#cbd5e1'; e.currentTarget.style.background = '#f8fafc'; }}
+                onFocus={(e) => { e.currentTarget.style.borderColor = '#0284c7'; e.currentTarget.style.boxShadow = '0 0 0 3px rgba(2,132,199,0.15)'; }}
+                onBlur={(e) => { e.currentTarget.style.borderColor = '#cbd5e1'; e.currentTarget.style.boxShadow = 'none'; }}
               />
-              <Search size={15} style={{ position: 'absolute', left: '11px', top: '9px', color: '#94a3b8' }} />
+              <Search size={18} style={{ position: 'absolute', left: '12px', top: '11px', color: '#64748b' }} />
               {searchQuery && (
                 <button
                   type="button"
                   onClick={() => setSearchQuery('')}
-                  style={{ position: 'absolute', right: '8px', top: '7px', background: 'transparent', border: 'none', color: '#94a3b8', cursor: 'pointer', padding: '2px' }}
+                  style={{ position: 'absolute', right: '10px', top: '9px', background: 'transparent', border: 'none', color: '#64748b', cursor: 'pointer', padding: '2px' }}
                 >
-                  <X size={14} />
+                  <X size={16} />
                 </button>
               )}
             </div>
 
             {/* Right Action Groups */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
               
               {/* Group 1: Export Buttons */}
-              <div style={{ display: 'inline-flex', borderRadius: '8px', border: '1px solid #cbd5e1', overflow: 'hidden', background: '#f8fafc' }}>
+              <div style={{ display: 'inline-flex', borderRadius: '8px', border: '1.5px solid #cbd5e1', overflow: 'hidden', background: '#f8fafc' }}>
                 <button
                   type="button"
                   onClick={handleExportExcel}
@@ -3219,18 +3220,18 @@ export default function ParticipantesModal({
                   style={{
                     display: 'flex',
                     alignItems: 'center',
-                    gap: '4px',
-                    padding: '6px 10px',
-                    fontSize: '0.78rem',
-                    fontWeight: 700,
+                    gap: '5px',
+                    padding: '8px 12px',
+                    fontSize: '0.86rem',
+                    fontWeight: 800,
                     color: '#0f766e',
                     border: 'none',
-                    borderRight: '1px solid #e2e8f0',
+                    borderRight: '1px solid #cbd5e1',
                     background: 'transparent',
                     cursor: 'pointer'
                   }}
                 >
-                  <Download size={13} /> Excel
+                  <Download size={15} /> Excel
                 </button>
                 <button
                   type="button"
@@ -3239,18 +3240,18 @@ export default function ParticipantesModal({
                   style={{
                     display: 'flex',
                     alignItems: 'center',
-                    gap: '4px',
-                    padding: '6px 10px',
-                    fontSize: '0.78rem',
-                    fontWeight: 700,
+                    gap: '5px',
+                    padding: '8px 12px',
+                    fontSize: '0.86rem',
+                    fontWeight: 800,
                     color: '#0369a1',
                     border: 'none',
-                    borderRight: '1px solid #e2e8f0',
+                    borderRight: '1px solid #cbd5e1',
                     background: 'transparent',
                     cursor: 'pointer'
                   }}
                 >
-                  <Printer size={13} /> PDF
+                  <Printer size={15} /> PDF
                 </button>
                 <button
                   type="button"
@@ -3259,17 +3260,17 @@ export default function ParticipantesModal({
                   style={{
                     display: 'flex',
                     alignItems: 'center',
-                    gap: '4px',
-                    padding: '6px 10px',
-                    fontSize: '0.78rem',
-                    fontWeight: 700,
-                    color: '#475569',
+                    gap: '5px',
+                    padding: '8px 12px',
+                    fontSize: '0.86rem',
+                    fontWeight: 800,
+                    color: '#334155',
                     border: 'none',
                     background: 'transparent',
                     cursor: 'pointer'
                   }}
                 >
-                  <Printer size={13} /> Planilla
+                  <Printer size={15} /> Planilla
                 </button>
               </div>
 
@@ -3283,17 +3284,17 @@ export default function ParticipantesModal({
                   color: '#ffffff',
                   border: 'none',
                   borderRadius: '8px',
-                  padding: '6px 12px',
-                  fontSize: '0.78rem',
-                  fontWeight: 700,
+                  padding: '8px 14px',
+                  fontSize: '0.86rem',
+                  fontWeight: 800,
                   display: 'flex',
                   alignItems: 'center',
-                  gap: '5px',
+                  gap: '6px',
                   cursor: 'pointer',
                   boxShadow: '0 2px 6px rgba(2,132,199,0.2)'
                 }}
               >
-                <School size={14} /> Asignar U.E. Masiva
+                <School size={16} /> Asignar U.E. Masiva
               </button>
 
               {/* Group 3: Acciones Masivas Dropdown */}
@@ -3303,15 +3304,15 @@ export default function ParticipantesModal({
                   onClick={() => setShowBulkMenu(!showBulkMenu)}
                   style={{
                     background: '#f1f5f9',
-                    color: '#334155',
-                    border: '1px solid #cbd5e1',
+                    color: '#1e293b',
+                    border: '1.5px solid #cbd5e1',
                     borderRadius: '8px',
-                    padding: '6px 12px',
-                    fontSize: '0.78rem',
-                    fontWeight: 700,
+                    padding: '8px 14px',
+                    fontSize: '0.86rem',
+                    fontWeight: 800,
                     display: 'flex',
                     alignItems: 'center',
-                    gap: '5px',
+                    gap: '6px',
                     cursor: 'pointer'
                   }}
                 >
@@ -3322,84 +3323,84 @@ export default function ParticipantesModal({
                   <div style={{
                     position: 'absolute',
                     right: 0,
-                    top: '36px',
+                    top: '42px',
                     background: '#ffffff',
-                    border: '1px solid #e2e8f0',
+                    border: '1px solid #cbd5e1',
                     borderRadius: '8px',
-                    boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
+                    boxShadow: '0 8px 24px rgba(0,0,0,0.15)',
                     zIndex: 200,
-                    width: '210px',
-                    padding: '4px',
+                    width: '230px',
+                    padding: '6px',
                     display: 'flex',
                     flexDirection: 'column',
-                    gap: '2px'
+                    gap: '3px'
                   }}>
                     <button
                       type="button"
                       onClick={() => { setShowBulkMenu(false); handleBulkPaymentUpdate('Pagado'); }}
                       style={{
-                        padding: '8px 10px',
+                        padding: '9px 12px',
                         border: 'none',
                         background: 'transparent',
                         color: '#059669',
-                        fontSize: '0.78rem',
-                        fontWeight: 700,
+                        fontSize: '0.86rem',
+                        fontWeight: 800,
                         textAlign: 'left',
                         borderRadius: '6px',
                         cursor: 'pointer',
                         display: 'flex',
                         alignItems: 'center',
-                        gap: '6px'
+                        gap: '8px'
                       }}
                       onMouseOver={(e) => e.currentTarget.style.background = '#d1fae5'}
                       onMouseOut={(e) => e.currentTarget.style.background = 'transparent'}
                     >
-                      <CheckCircle2 size={14} /> Marcar Todos Pagados
+                      <CheckCircle2 size={16} /> Marcar Todos Pagados
                     </button>
                     <button
                       type="button"
                       onClick={() => { setShowBulkMenu(false); handleBulkPaymentUpdate('Pendiente'); }}
                       style={{
-                        padding: '8px 10px',
+                        padding: '9px 12px',
                         border: 'none',
                         background: 'transparent',
                         color: '#d97706',
-                        fontSize: '0.78rem',
-                        fontWeight: 700,
+                        fontSize: '0.86rem',
+                        fontWeight: 800,
                         textAlign: 'left',
                         borderRadius: '6px',
                         cursor: 'pointer',
                         display: 'flex',
                         alignItems: 'center',
-                        gap: '6px'
+                        gap: '8px'
                       }}
                       onMouseOver={(e) => e.currentTarget.style.background = '#fef3c7'}
                       onMouseOut={(e) => e.currentTarget.style.background = 'transparent'}
                     >
-                      <AlertTriangle size={14} /> Marcar Todos Pendientes
+                      <AlertTriangle size={16} /> Marcar Todos Pendientes
                     </button>
-                    <div style={{ height: '1px', background: '#e2e8f0', margin: '2px 0' }}></div>
+                    <div style={{ height: '1px', background: '#e2e8f0', margin: '4px 0' }}></div>
                     <button
                       type="button"
                       onClick={() => { setShowBulkMenu(false); handleDeleteAllEnrollments(); }}
                       style={{
-                        padding: '8px 10px',
+                        padding: '9px 12px',
                         border: 'none',
                         background: 'transparent',
                         color: '#ef4444',
-                        fontSize: '0.78rem',
-                        fontWeight: 700,
+                        fontSize: '0.86rem',
+                        fontWeight: 800,
                         textAlign: 'left',
                         borderRadius: '6px',
                         cursor: 'pointer',
                         display: 'flex',
                         alignItems: 'center',
-                        gap: '6px'
+                        gap: '8px'
                       }}
                       onMouseOver={(e) => e.currentTarget.style.background = '#fee2e2'}
                       onMouseOut={(e) => e.currentTarget.style.background = 'transparent'}
                     >
-                      <Trash2 size={14} /> Eliminar Todos del Curso
+                      <Trash2 size={16} /> Eliminar Todos del Curso
                     </button>
                   </div>
                 )}
@@ -3411,20 +3412,20 @@ export default function ParticipantesModal({
                 onClick={() => { setShowMigrator(!showMigrator); if (showMigrator) { setMigrPreview([]); setMigrSourceId(''); } }}
                 style={{
                   background: showMigrator ? '#f1f5f9' : '#6366f1',
-                  color: showMigrator ? '#475569' : '#ffffff',
-                  border: showMigrator ? '1px solid #cbd5e1' : 'none',
+                  color: showMigrator ? '#334155' : '#ffffff',
+                  border: showMigrator ? '1.5px solid #cbd5e1' : 'none',
                   borderRadius: '8px',
-                  padding: '6px 12px',
-                  fontSize: '0.78rem',
-                  fontWeight: 700,
+                  padding: '8px 14px',
+                  fontSize: '0.86rem',
+                  fontWeight: 800,
                   display: 'flex',
                   alignItems: 'center',
-                  gap: '5px',
+                  gap: '6px',
                   cursor: 'pointer',
                   boxShadow: showMigrator ? 'none' : '0 2px 6px rgba(99,102,241,0.2)'
                 }}
               >
-                <ArrowRight size={14} /> {showMigrator ? 'Cerrar Migrador' : 'Migrar Participantes'}
+                <ArrowRight size={16} /> {showMigrator ? 'Cerrar Migrador' : 'Migrar Participantes'}
               </button>
 
               {/* Group 5: Primary Action - Inscribir / Importar */}
@@ -3433,20 +3434,20 @@ export default function ParticipantesModal({
                 onClick={() => setShowImporter(!showImporter)}
                 style={{
                   background: showImporter ? '#e2e8f0' : 'linear-gradient(135deg, #059669 0%, #10b981 100%)',
-                  color: showImporter ? '#334155' : '#ffffff',
+                  color: showImporter ? '#1e293b' : '#ffffff',
                   border: 'none',
                   borderRadius: '8px',
-                  padding: '6px 14px',
-                  fontSize: '0.8rem',
-                  fontWeight: 800,
+                  padding: '8px 16px',
+                  fontSize: '0.88rem',
+                  fontWeight: 900,
                   display: 'flex',
                   alignItems: 'center',
-                  gap: '6px',
+                  gap: '8px',
                   cursor: 'pointer',
                   boxShadow: showImporter ? 'none' : '0 2px 8px rgba(16,185,129,0.3)'
                 }}
               >
-                <UserPlus size={15} /> {showImporter ? 'Cerrar Importador' : '➕ Inscribir / Importar'}
+                <UserPlus size={17} /> {showImporter ? 'Cerrar Importador' : '➕ Inscribir / Importar'}
               </button>
 
             </div>
@@ -4251,28 +4252,28 @@ export default function ParticipantesModal({
               <p style={{ margin: '4px 0 0 0', fontSize: '0.82rem', color: 'var(--gray-400)' }}>Inscribe participantes con el formulario público o con el botón "Importar Lote".</p>
             </div>
           ) : (
-            <div style={{ overflowX: 'auto', border: '1px solid #e2e8f0', borderRadius: '10px', background: '#ffffff', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
+            <div style={{ overflowX: 'auto', border: '1.5px solid #cbd5e1', borderRadius: '10px', background: '#ffffff', boxShadow: '0 2px 6px rgba(0,0,0,0.06)' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
                 <thead>
-                  <tr style={{ background: 'linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%)', borderBottom: '2px solid #cbd5e1', color: '#334155' }}>
-                    <th style={{ padding: '10px 10px', width: '40px', textAlign: 'center' }}>
+                  <tr style={{ background: 'linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%)', borderBottom: '2px solid #94a3b8', color: '#0f172a' }}>
+                    <th style={{ padding: '12px 10px', width: '40px', textAlign: 'center' }}>
                       <input
                         type="checkbox"
                         checked={filteredInscripciones.length > 0 && selectedCis.size === filteredInscripciones.length}
                         onChange={handleToggleSelectAll}
-                        style={{ cursor: 'pointer', transform: 'scale(1.1)', accentColor: '#0284c7' }}
+                        style={{ cursor: 'pointer', transform: 'scale(1.25)', accentColor: '#0284c7' }}
                         title="Seleccionar todos los participantes de la lista"
                       />
                     </th>
-                    <th style={{ padding: '10px 12px', fontSize: '0.76rem', fontWeight: 800, textTransform: 'uppercase', width: '45px', textAlign: 'center', color: '#64748b' }}>N°</th>
-                    <th style={{ padding: '10px 12px', fontSize: '0.76rem', fontWeight: 800, textTransform: 'uppercase', width: '125px', color: '#334155' }}>C.I.</th>
-                    <th style={{ padding: '10px 12px', fontSize: '0.76rem', fontWeight: 800, textTransform: 'uppercase', width: '110px', color: '#334155' }}>RDA</th>
-                    <th style={{ padding: '10px 14px', fontSize: '0.76rem', fontWeight: 800, textTransform: 'uppercase', color: '#334155' }}>Apellidos y Nombres</th>
-                    <th style={{ padding: '10px 12px', fontSize: '0.76rem', fontWeight: 800, textTransform: 'uppercase', width: '135px', color: '#334155' }}>Celular</th>
-                    <th style={{ padding: '10px 14px', fontSize: '0.76rem', fontWeight: 800, textTransform: 'uppercase', width: '220px', color: '#334155' }}>SIE / Unidad Educativa</th>
-                    <th style={{ padding: '10px 12px', fontSize: '0.76rem', fontWeight: 800, textTransform: 'uppercase', width: '130px', textAlign: 'center', color: '#334155' }}>Validación SIE</th>
-                    <th style={{ padding: '10px 12px', fontSize: '0.76rem', fontWeight: 800, textTransform: 'uppercase', width: '125px', color: '#334155' }}>Estado Pago</th>
-                    <th style={{ padding: '10px 12px', fontSize: '0.76rem', fontWeight: 800, textTransform: 'uppercase', width: '150px', textAlign: 'center', color: '#334155' }}>Acciones</th>
+                    <th style={{ padding: '12px 8px', fontSize: '0.86rem', fontWeight: 800, textTransform: 'uppercase', width: '45px', textAlign: 'center', color: '#475569' }}>N°</th>
+                    <th style={{ padding: '12px 10px', fontSize: '0.86rem', fontWeight: 800, textTransform: 'uppercase', width: '130px', color: '#0f172a' }}>C.I.</th>
+                    <th style={{ padding: '12px 10px', fontSize: '0.86rem', fontWeight: 800, textTransform: 'uppercase', width: '115px', color: '#0f172a' }}>RDA</th>
+                    <th style={{ padding: '12px 12px', fontSize: '0.86rem', fontWeight: 800, textTransform: 'uppercase', width: '250px', color: '#0f172a' }}>Apellidos y Nombres</th>
+                    <th style={{ padding: '12px 10px', fontSize: '0.86rem', fontWeight: 800, textTransform: 'uppercase', width: '145px', color: '#0f172a' }}>Celular</th>
+                    <th style={{ padding: '12px 12px', fontSize: '0.86rem', fontWeight: 800, textTransform: 'uppercase', color: '#0f172a' }}>SIE / Unidad Educativa</th>
+                    <th style={{ padding: '12px 10px', fontSize: '0.86rem', fontWeight: 800, textTransform: 'uppercase', width: '140px', textAlign: 'center', color: '#0f172a' }}>Validación SIE</th>
+                    <th style={{ padding: '12px 10px', fontSize: '0.86rem', fontWeight: 800, textTransform: 'uppercase', width: '135px', color: '#0f172a' }}>Estado Pago</th>
+                    <th style={{ padding: '12px 10px', fontSize: '0.86rem', fontWeight: 800, textTransform: 'uppercase', width: '175px', textAlign: 'center', color: '#0f172a' }}>Acciones</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -5297,31 +5298,31 @@ function RowComponent({
   return (
     <tr
       style={{
-        borderBottom: '1px solid #f1f5f9',
+        borderBottom: '1px solid #e2e8f0',
         transition: 'all 0.15s ease',
-        background: isSelected ? '#f0f9ff' : (visualIndex % 2 === 0 ? '#ffffff' : '#fcfdfe')
+        background: isSelected ? '#f0f9ff' : (visualIndex % 2 === 0 ? '#ffffff' : '#f8fafc')
       }}
       className="hover-row"
-      onMouseOver={(e) => { if (!isSelected) e.currentTarget.style.background = '#f8fafc'; }}
-      onMouseOut={(e) => { if (!isSelected) e.currentTarget.style.background = visualIndex % 2 === 0 ? '#ffffff' : '#fcfdfe'; }}
+      onMouseOver={(e) => { if (!isSelected) e.currentTarget.style.background = '#f1f5f9'; }}
+      onMouseOut={(e) => { if (!isSelected) e.currentTarget.style.background = visualIndex % 2 === 0 ? '#ffffff' : '#f8fafc'; }}
     >
       {/* Checkbox Selection */}
-      <td style={{ padding: '8px 10px', textAlign: 'center', width: '40px' }}>
+      <td style={{ padding: '10px 10px', textAlign: 'center', width: '40px' }}>
         <input
           type="checkbox"
           checked={isSelected}
           onChange={() => onToggleSelect(p.ci)}
-          style={{ cursor: 'pointer', transform: 'scale(1.1)', accentColor: '#0284c7' }}
+          style={{ cursor: 'pointer', transform: 'scale(1.25)', accentColor: '#0284c7' }}
         />
       </td>
 
       {/* Nro */}
-      <td style={{ padding: '8px 10px', fontSize: '0.8rem', color: '#64748b', fontWeight: 700, textAlign: 'center' }}>
+      <td style={{ padding: '10px 8px', fontSize: '0.92rem', color: '#475569', fontWeight: 800, textAlign: 'center' }}>
         {visualIndex}
       </td>
 
       {/* CI */}
-      <td style={{ padding: '6px 8px', width: '125px' }}>
+      <td style={{ padding: '8px 10px', width: '130px' }}>
         <input
           type="text"
           value={ci}
@@ -5331,11 +5332,11 @@ function RowComponent({
           disabled={saving}
           style={{
             width: '100%',
-            padding: '5px 8px',
-            fontSize: '0.82rem',
-            border: '1px solid #cbd5e1',
+            padding: '7px 10px',
+            fontSize: '0.95rem',
+            border: '1.5px solid #cbd5e1',
             borderRadius: '6px',
-            fontWeight: 700,
+            fontWeight: 800,
             color: '#0f172a',
             background: '#ffffff',
             outline: 'none',
@@ -5347,7 +5348,7 @@ function RowComponent({
       </td>
 
       {/* RDA */}
-      <td style={{ padding: '6px 8px', width: '110px' }}>
+      <td style={{ padding: '8px 10px', width: '115px' }}>
         <input
           type="text"
           value={rda}
@@ -5358,12 +5359,12 @@ function RowComponent({
           placeholder="RDA"
           style={{
             width: '100%',
-            padding: '5px 8px',
-            fontSize: '0.82rem',
-            border: '1px solid #cbd5e1',
+            padding: '7px 10px',
+            fontSize: '0.95rem',
+            border: '1.5px solid #cbd5e1',
             borderRadius: '6px',
-            fontWeight: 600,
-            color: '#334155',
+            fontWeight: 700,
+            color: '#1e293b',
             background: '#ffffff',
             outline: 'none',
             transition: 'border 0.2s'
@@ -5373,21 +5374,21 @@ function RowComponent({
         />
       </td>
 
-      {/* Apellidos y Nombres */}
-      <td style={{ padding: '8px 12px', fontSize: '0.86rem', color: '#0f172a', lineHeight: 1.25 }}>
+      {/* Apellidos y Nombres (Ajustado para evitar espacio excesivo) */}
+      <td style={{ padding: '10px 12px', width: '250px', maxWidth: '270px', lineHeight: 1.3 }}>
         <div>
-          <span style={{ fontWeight: 800, color: '#0f172a', textTransform: 'uppercase', display: 'block', fontSize: '0.84rem' }}>
+          <span style={{ fontWeight: 900, color: '#0f172a', textTransform: 'uppercase', display: 'block', fontSize: '0.98rem', letterSpacing: '0.01em' }}>
             {p.apellidos}
           </span>
-          <span style={{ fontWeight: 500, color: '#475569', fontSize: '0.8rem' }}>
+          <span style={{ fontWeight: 600, color: '#334155', fontSize: '0.90rem' }}>
             {p.nombres}
           </span>
         </div>
       </td>
 
       {/* Celular - editable inline */}
-      <td style={{ padding: '6px 8px', width: '135px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+      <td style={{ padding: '8px 10px', width: '145px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
           <input
             type="text"
             value={celular}
@@ -5398,11 +5399,12 @@ function RowComponent({
             placeholder="Celular"
             style={{
               width: '100%',
-              padding: '5px 6px',
-              fontSize: '0.82rem',
-              border: '1px solid #cbd5e1',
+              padding: '7px 8px',
+              fontSize: '0.95rem',
+              fontWeight: 700,
+              border: '1.5px solid #cbd5e1',
               borderRadius: '6px',
-              color: '#334155',
+              color: '#0f172a',
               background: '#ffffff',
               outline: 'none'
             }}
@@ -5417,46 +5419,48 @@ function RowComponent({
               style={{
                 color: '#16a34a',
                 display: 'inline-flex',
-                padding: '4px',
-                borderRadius: '4px',
+                padding: '6px',
+                borderRadius: '6px',
                 background: '#dcfce7',
+                border: '1px solid #bbf7d0',
                 flexShrink: 0,
                 transition: 'transform 0.15s'
               }}
               title="Escribir por WhatsApp"
             >
-              <Phone size={12} />
+              <Phone size={15} />
             </a>
           )}
         </div>
       </td>
 
       {/* SIE / UE */}
-      <td style={{ padding: '8px 12px', fontSize: '0.82rem', color: '#334155', lineHeight: 1.3 }}>
-        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '6px' }}>
+      <td style={{ padding: '10px 12px', fontSize: '0.92rem', color: '#1e293b', lineHeight: 1.35 }}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '8px' }}>
           <div style={{ flex: 1, minWidth: 0 }}>
             {p.unidad_educativa ? (
               <div>
-                <span style={{ fontWeight: 800, color: '#0f172a', wordBreak: 'break-word', display: 'block', fontSize: '0.82rem' }}>
+                <span style={{ fontWeight: 800, color: '#0f172a', wordBreak: 'break-word', display: 'block', fontSize: '0.94rem' }}>
                   {p.unidad_educativa}
                 </span>
                 {p.sie && (
                   <span style={{
                     display: 'inline-block',
-                    marginTop: '2px',
-                    fontSize: '0.7rem',
-                    fontWeight: 700,
+                    marginTop: '3px',
+                    fontSize: '0.80rem',
+                    fontWeight: 800,
                     color: '#0369a1',
                     background: '#e0f2fe',
-                    padding: '1px 6px',
-                    borderRadius: '4px'
+                    padding: '2px 8px',
+                    borderRadius: '4px',
+                    border: '1px solid #bae6fd'
                   }}>
                     SIE: {p.sie}
                   </span>
                 )}
               </div>
             ) : (
-              <span style={{ color: '#94a3b8', fontStyle: 'italic', fontSize: '0.78rem' }}>Sin U.E. asignada</span>
+              <span style={{ color: '#94a3b8', fontStyle: 'italic', fontSize: '0.88rem' }}>Sin U.E. asignada</span>
             )}
           </div>
           <button
@@ -5465,52 +5469,52 @@ function RowComponent({
             onClick={() => onSearchUe(p)}
             title="🔍 Buscar coincidencia oficial en catálogo de +4,000 U.E."
             style={{
-              padding: '3px 7px',
+              padding: '4px 9px',
               background: '#f0f9ff',
               color: '#0284c7',
-              border: '1px solid #bae6fd',
-              borderRadius: '5px',
+              border: '1.5px solid #bae6fd',
+              borderRadius: '6px',
               display: 'inline-flex',
               alignItems: 'center',
-              gap: '3px',
-              fontSize: '0.7rem',
+              gap: '4px',
+              fontSize: '0.78rem',
               fontWeight: 800,
               flexShrink: 0,
               cursor: 'pointer',
-              boxShadow: '0 1px 2px rgba(2,132,199,0.08)'
+              boxShadow: '0 1px 3px rgba(2,132,199,0.1)'
             }}
           >
-            <Search size={10} /> U.E.
+            <Search size={12} /> U.E.
           </button>
         </div>
       </td>
 
       {/* Validación SIE */}
-      <td style={{ padding: '8px 10px', textAlign: 'center' }}>
+      <td style={{ padding: '10px 10px', textAlign: 'center', width: '140px' }}>
         {p.validado ? (
           <div style={{
             display: 'inline-flex',
             alignItems: 'center',
-            gap: '4px',
+            gap: '5px',
             background: '#dcfce7',
             color: '#15803d',
-            padding: '3px 8px',
-            borderRadius: '12px',
-            fontSize: '0.72rem',
-            fontWeight: 800,
-            border: '1px solid #bbf7d0'
+            padding: '5px 12px',
+            borderRadius: '14px',
+            fontSize: '0.82rem',
+            fontWeight: 900,
+            border: '1px solid #86efac'
           }}>
-            <Check size={11} /> VALIDADO
+            <Check size={13} /> VALIDADO
           </div>
         ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', alignItems: 'center' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'center' }}>
             <span style={{
               background: p.observaciones_sie ? '#fee2e2' : '#f1f5f9',
-              color: p.observaciones_sie ? '#b91c1c' : '#64748b',
-              border: p.observaciones_sie ? '1px solid #fecaca' : '1px solid #e2e8f0',
-              padding: '2px 7px',
+              color: p.observaciones_sie ? '#b91c1c' : '#475569',
+              border: p.observaciones_sie ? '1px solid #fca5a5' : '1px solid #cbd5e1',
+              padding: '3px 9px',
               borderRadius: '12px',
-              fontSize: '0.7rem',
+              fontSize: '0.78rem',
               fontWeight: 800
             }}>
               {p.observaciones_sie ? '⚠️ DISCREPANCIA' : 'PENDIENTE'}
@@ -5521,9 +5525,9 @@ function RowComponent({
                 className="btn btn-ghost btn-xs"
                 onClick={() => onValidate(ins)}
                 disabled={validating}
-                style={{ padding: '1px 6px', fontSize: '0.7rem', border: '1px solid #bae6fd', color: '#0284c7', borderRadius: '4px', display: 'inline-flex', alignItems: 'center', gap: '2px' }}
+                style={{ padding: '3px 8px', fontSize: '0.78rem', border: '1px solid #bae6fd', color: '#0284c7', borderRadius: '5px', display: 'inline-flex', alignItems: 'center', gap: '3px', fontWeight: 700 }}
               >
-                {validating ? <Loader2 size={9} className="spin" /> : <RefreshCw size={9} />}
+                {validating ? <Loader2 size={11} className="spin" /> : <RefreshCw size={11} />}
                 Validar
               </button>
             )}
@@ -5532,19 +5536,19 @@ function RowComponent({
       </td>
 
       {/* Pago (Auto-save) */}
-      <td style={{ padding: '6px 8px' }}>
+      <td style={{ padding: '8px 10px', width: '135px' }}>
         <select
           value={pagos}
           onChange={(e) => handlePagosChange(e.target.value)}
           disabled={saving}
           style={{
             width: '100%',
-            padding: '5px 8px',
-            fontSize: '0.78rem',
+            padding: '7px 10px',
+            fontSize: '0.90rem',
             fontWeight: 800,
             borderRadius: '6px',
             cursor: 'pointer',
-            border: pagos === 'Pagado' ? '1px solid #86efac' : '1px solid #fde68a',
+            border: pagos === 'Pagado' ? '1.5px solid #86efac' : '1.5px solid #fde68a',
             background: pagos === 'Pagado' ? '#ecfdf5' : '#fffbeb',
             color: pagos === 'Pagado' ? '#15803d' : '#b45309'
           }}
@@ -5554,12 +5558,12 @@ function RowComponent({
         </select>
       </td>
 
-      {/* Acciones */}
-      <td style={{ padding: '6px 10px', textAlign: 'center' }}>
-        <div style={{ display: 'flex', gap: '4px', justifyContent: 'center', alignItems: 'center' }}>
+      {/* Acciones — Botones más grandes y cómodos */}
+      <td style={{ padding: '8px 10px', textAlign: 'center', width: '175px' }}>
+        <div style={{ display: 'flex', gap: '5px', justifyContent: 'center', alignItems: 'center' }}>
           {saving && (
             <span style={{ display: 'inline-flex', alignItems: 'center', color: '#16a34a', marginRight: '2px' }} title="Guardando...">
-              <Loader2 size={11} className="spin" />
+              <Loader2 size={13} className="spin" />
             </span>
           )}
 
@@ -5568,9 +5572,9 @@ function RowComponent({
             type="button"
             onClick={() => onPrintFicha(p)}
             title="📄 Ficha Oficial de Inscripción"
-            style={{ padding: '5px 6px', background: '#10b981', color: '#ffffff', border: 'none', borderRadius: '6px', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 1px 2px rgba(16,185,129,0.2)' }}
+            style={{ padding: '7px 8px', background: '#10b981', color: '#ffffff', border: 'none', borderRadius: '6px', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 1px 3px rgba(16,185,129,0.25)' }}
           >
-            <FileText size={13} />
+            <FileText size={16} />
           </button>
 
           {/* 2. Ver / Imprimir RDA o Certificado de Trabajo */}
@@ -5579,18 +5583,18 @@ function RowComponent({
               type="button"
               onClick={() => onViewDocument(docUrl, `${p.apellidos} ${p.nombres}`)}
               title="🪪 Ver RDA o Certificado de Trabajo"
-              style={{ padding: '5px 6px', background: '#0284c7', color: '#ffffff', border: 'none', borderRadius: '6px', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 1px 2px rgba(2,132,199,0.2)' }}
+              style={{ padding: '7px 8px', background: '#0284c7', color: '#ffffff', border: 'none', borderRadius: '6px', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 1px 3px rgba(2,132,199,0.25)' }}
             >
-              <IdCard size={13} />
+              <IdCard size={16} />
             </button>
           ) : (
             <button
               type="button"
               onClick={() => onViewDocument('', `${p.apellidos} ${p.nombres}`)}
               title="Sin RDA subido"
-              style={{ padding: '5px 6px', background: '#f1f5f9', color: '#94a3b8', border: '1px solid #e2e8f0', borderRadius: '6px', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
+              style={{ padding: '7px 8px', background: '#f1f5f9', color: '#94a3b8', border: '1px solid #cbd5e1', borderRadius: '6px', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
             >
-              <IdCard size={13} />
+              <IdCard size={16} />
             </button>
           )}
 
@@ -5600,18 +5604,18 @@ function RowComponent({
               type="button"
               onClick={() => onViewComprobante(ins.comprobante_url!, `${p.apellidos} ${p.nombres}`)}
               title="💳 Ver Comprobante de Pago"
-              style={{ padding: '5px 6px', background: '#6366f1', color: '#ffffff', border: 'none', borderRadius: '6px', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 1px 2px rgba(99,102,241,0.2)' }}
+              style={{ padding: '7px 8px', background: '#6366f1', color: '#ffffff', border: 'none', borderRadius: '6px', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 1px 3px rgba(99,102,241,0.25)' }}
             >
-              <CreditCard size={13} />
+              <CreditCard size={16} />
             </button>
           ) : (
             <button
               type="button"
               onClick={() => onViewComprobante('', `${p.apellidos} ${p.nombres}`)}
               title="Sin comprobante subido"
-              style={{ padding: '5px 6px', background: '#f1f5f9', color: '#94a3b8', border: '1px solid #e2e8f0', borderRadius: '6px', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
+              style={{ padding: '7px 8px', background: '#f1f5f9', color: '#94a3b8', border: '1px solid #cbd5e1', borderRadius: '6px', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
             >
-              <CreditCard size={13} />
+              <CreditCard size={16} />
             </button>
           )}
 
@@ -5620,19 +5624,19 @@ function RowComponent({
             type="button"
             onClick={() => onEditCore(p)}
             title="✏️ Editar datos personales"
-            style={{ padding: '5px 6px', background: '#fef3c7', color: '#b45309', border: '1px solid #fde68a', borderRadius: '6px', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
+            style={{ padding: '7px 8px', background: '#fef3c7', color: '#b45309', border: '1.5px solid #fde68a', borderRadius: '6px', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
           >
-            <Edit size={13} />
+            <Edit size={16} />
           </button>
 
           {/* 5. Eliminar inscripción */}
           <button
             type="button"
             onClick={() => onDelete(ins.id)}
-            title="Dar de baja de este ciclo"
-            style={{ padding: '6px' }}
+            title="🗑️ Dar de baja de este ciclo"
+            style={{ padding: '7px 8px', background: '#fee2e2', color: '#dc2626', border: '1.5px solid #fecaca', borderRadius: '6px', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
           >
-            <Trash2 size={12} />
+            <Trash2 size={16} />
           </button>
         </div>
       </td>
