@@ -136,7 +136,7 @@ IMPORTANTE: Devuelve ÚNICAMENTE el array JSON válido, sin explicaciones, sin t
   } catch (error: any) {
     console.error('AI Parse Nomina Error:', error);
     return NextResponse.json(
-      { success: false, message: error.message || 'Error al procesar el archivo con Inteligencia Artificial (OpenCode Go)' },
+      { success: false, message: error.message || 'Error al procesar el archivo con Inteligencia Artificial' },
       { status: 500 }
     );
   }

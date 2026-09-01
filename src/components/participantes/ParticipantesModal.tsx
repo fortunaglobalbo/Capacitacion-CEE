@@ -485,13 +485,14 @@ export default function ParticipantesModal({
   // Handle Manual Add Participant Submission
   const handleAddParticipantSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!addCi.trim() || !addNombres.trim() || !addApellidos.trim()) {
-      Swal.fire('Campos requeridos', 'Por favor llena los campos obligatorios (*)', 'warning');
+    const cleanCi = addCi.trim();
+    if (!cleanCi) {
+      Swal.fire('Carnet Requerido', 'Por favor ingresa el número de Carnet de Identidad (C.I.)', 'warning');
       return;
     }
 
     const isEnrolled = inscripciones.some(
-      (ins) => ins.participantes?.ci.trim() === addCi.trim()
+      (ins) => ins.participantes?.ci.trim() === cleanCi
     );
     if (isEnrolled) {
       Swal.fire('Ya registrado', 'Este participante ya está inscrito en este ciclo formativo', 'warning');
@@ -508,26 +509,34 @@ export default function ParticipantesModal({
         .limit(1);
       const nextNro = countData && countData.length > 0 ? (countData[0].nro + 1) : 1;
 
-      // Fetch existing participant record to merge and prevent nulling out existing fields
+      // Fetch existing participant record to merge and update if edited
       const { data: dbPart, error: fetchPartErr } = await supabase
         .from('participantes')
         .select('*')
-        .eq('ci', addCi.trim())
+        .eq('ci', cleanCi)
         .maybeSingle();
 
       if (fetchPartErr) throw fetchPartErr;
+
+      // Determine final fields (allowing technician to overwrite/correct any existing data)
+      const finalNombres = addNombres.trim() ? addNombres.trim().toUpperCase() : (dbPart?.nombres || 'POR VALIDAR');
+      const finalApellidos = addApellidos.trim() ? addApellidos.trim().toUpperCase() : (dbPart?.apellidos || 'POR VALIDAR');
+      const finalRda = addRda.trim() ? addRda.trim() : (dbPart?.rda || null);
+      const finalCelular = addCelular.trim() ? addCelular.trim() : (dbPart?.celular || null);
+      const finalSie = addSie.trim() ? addSie.trim() : (dbPart?.sie || null);
+      const finalUe = addUnidadEducativa.trim() ? addUnidadEducativa.trim().toUpperCase() : (dbPart?.unidad_educativa || null);
 
       // 2. Upsert participant (Core)
       const { error: partError } = await supabase
         .from('participantes')
         .upsert({
-          ci: addCi.trim(),
-          nombres: addNombres.trim().toUpperCase() || dbPart?.nombres,
-          apellidos: addApellidos.trim().toUpperCase() || dbPart?.apellidos,
-          rda: addRda.trim() || dbPart?.rda || null,
-          celular: addCelular.trim() || dbPart?.celular || null,
-          sie: addSie.trim() || dbPart?.sie || null,
-          unidad_educativa: addUnidadEducativa.trim().toUpperCase() || dbPart?.unidad_educativa || null,
+          ci: cleanCi,
+          nombres: finalNombres,
+          apellidos: finalApellidos,
+          rda: finalRda,
+          celular: finalCelular,
+          sie: finalSie,
+          unidad_educativa: finalUe,
           validado: dbPart?.validado ?? false,
           observaciones_sie: dbPart?.observaciones_sie || null
         }, { onConflict: 'ci' });
@@ -539,7 +548,7 @@ export default function ParticipantesModal({
         .from('inscripcion_ciclo')
         .insert({
           curso_id: curso.id,
-          participante_ci: addCi.trim(),
+          participante_ci: cleanCi,
           nro: nextNro,
           pagos: 'Pendiente'
         });
@@ -556,7 +565,15 @@ export default function ParticipantesModal({
         .update({ inscritos_formulario: count || 0 })
         .eq('id', curso.id);
 
-      Swal.fire('Inscripción Manual', 'Participante registrado e inscrito correctamente', 'success');
+      const isOnlyCi = (!addNombres.trim() && !addApellidos.trim() && !dbPart);
+      Swal.fire({
+        icon: 'success',
+        title: isOnlyCi ? 'Inscrito con C.I.' : 'Participante Inscrito y Actualizado',
+        text: isOnlyCi 
+          ? 'Inscrito correctamente. Recuerda presionar "Validar SIE" en la tabla para obtener su nombre y datos oficiales.' 
+          : 'Participante registrado e inscrito correctamente con sus datos actualizados.',
+        timer: 3000
+      });
 
       // Reset form
       setAddCi('');
@@ -749,7 +766,7 @@ export default function ParticipantesModal({
     setCameraActive(false);
   };
 
-  // Capture photo & parse with AI (OpenCode Go)
+  // Capture photo & parse with AI
   const handleCaptureAndParse = async () => {
     if (!videoRef.current || !videoStream) return;
 
@@ -782,7 +799,7 @@ export default function ParticipantesModal({
 
       setPreviewList(resData.data);
       stopCamera();
-      Swal.fire('Escaneo Exitoso', `La IA (OpenCode Go) detectó ${resData.data.length} participantes en la imagen. Revisa la lista abajo.`, 'success');
+      Swal.fire('Escaneo Exitoso', `La Inteligencia Artificial detectó ${resData.data.length} participantes en la imagen. Revisa la lista abajo.`, 'success');
     } catch (err: any) {
       Swal.fire('Error de escaneo IA', err.message || 'No se pudo procesar la nómina con IA.', 'error');
     } finally {
@@ -811,7 +828,7 @@ export default function ParticipantesModal({
           allSheetsText += `\n[Hoja: ${sheetName}]\n${csv}\n`;
         });
 
-        // Send extracted text to OpenCode Go AI endpoint
+        // Send extracted text to AI endpoint
         const res = await fetch('/api/ai/parse-nomina', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -829,7 +846,7 @@ export default function ParticipantesModal({
         setPreviewList(resData.data);
         Swal.fire({
           icon: 'success',
-          title: '¡Análisis con IA (OpenCode Go) Exitoso!',
+          title: '¡Análisis con Inteligencia Artificial Exitoso!',
           text: `La IA procesó el archivo Excel/CSV y extrajo ${resData.data.length} participantes listos para revisar e importar.`,
           timer: 3500
         });
@@ -857,7 +874,7 @@ export default function ParticipantesModal({
             setPreviewList(resData.data);
             Swal.fire({
               icon: 'success',
-              title: '¡Análisis con IA (OpenCode Go) Exitoso!',
+              title: '¡Análisis con Inteligencia Artificial Exitoso!',
               text: `La IA analizó el archivo y detectó ${resData.data.length} participantes listos para revisar e importar.`,
               timer: 3500
             });
@@ -1774,7 +1791,7 @@ export default function ParticipantesModal({
             <td><strong>Distrito:</strong> ${curso.distrito || ''}</td>
           </tr>
           <tr>
-            <td><strong>Responsable Departamental a.i.:</strong> Alfonso Coronel Mamani</td>
+            <td><strong>Responsable Departamental:</strong> Juan Pablo Alba Vaca</td>
             <td><strong>Sede:</strong> ${curso.lugar || ''}</td>
           </tr>
         </table>
@@ -3523,38 +3540,38 @@ export default function ParticipantesModal({
                 </h4>
 
                 {/* Tabs Selector */}
-                <div style={{ display: 'flex', gap: '4px', background: 'rgba(0,0,0,0.05)', padding: '3px', borderRadius: 'var(--radius-sm)', flexWrap: 'wrap' }}>
+                <div style={{ display: 'flex', gap: '6px', background: 'rgba(0,0,0,0.05)', padding: '4px', borderRadius: 'var(--radius-sm)', flexWrap: 'wrap' }}>
                   <button
                     type="button"
                     className="btn btn-xs"
-                    style={{ background: activeImportTab === 'ia' ? 'linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%)' : 'transparent', color: activeImportTab === 'ia' ? '#ffffff' : '#4338ca', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '4px', boxShadow: activeImportTab === 'ia' ? '0 2px 8px rgba(99, 102, 241, 0.35)' : 'none' }}
+                    style={{ background: activeImportTab === 'ia' ? 'linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%)' : 'transparent', color: activeImportTab === 'ia' ? '#ffffff' : '#4338ca', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '4px', padding: '6px 12px', borderRadius: '6px', boxShadow: activeImportTab === 'ia' ? '0 2px 8px rgba(99, 102, 241, 0.35)' : 'none' }}
                     onClick={() => setActiveImportTab('ia')}
                   >
-                    <Sparkles size={13} style={{ color: activeImportTab === 'ia' ? '#fbbf24' : '#6366f1' }} /> Importar con IA (OpenCode Go)
+                    <Sparkles size={14} style={{ color: activeImportTab === 'ia' ? '#fbbf24' : '#6366f1' }} /> Importar con Inteligencia Artificial
                   </button>
                   <button
                     type="button"
                     className="btn btn-xs"
-                    style={{ background: activeImportTab === 'excel' ? 'var(--primary-500)' : 'transparent', color: activeImportTab === 'excel' ? 'var(--white)' : 'var(--gray-700)', display: 'flex', alignItems: 'center', gap: '4px' }}
+                    style={{ background: activeImportTab === 'excel' ? 'var(--primary-500)' : 'transparent', color: activeImportTab === 'excel' ? 'var(--white)' : 'var(--gray-700)', display: 'flex', alignItems: 'center', gap: '4px', padding: '6px 12px', borderRadius: '6px', fontWeight: 700 }}
                     onClick={() => setActiveImportTab('excel')}
                   >
-                    <FileSpreadsheet size={12} /> Excel / CSV Local
+                    <FileSpreadsheet size={14} /> Excel / CSV Local
                   </button>
                   <button
                     type="button"
                     className="btn btn-xs"
-                    style={{ background: activeImportTab === 'individual' ? 'var(--primary-500)' : 'transparent', color: activeImportTab === 'individual' ? 'var(--white)' : 'var(--gray-700)' }}
+                    style={{ background: activeImportTab === 'individual' ? 'var(--primary-500)' : 'transparent', color: activeImportTab === 'individual' ? 'var(--white)' : 'var(--gray-700)', padding: '6px 12px', borderRadius: '6px', fontWeight: 800 }}
                     onClick={() => setActiveImportTab('individual')}
                   >
-                    Registro Individual
+                    ➕ Registro Individual
                   </button>
                 </div>
               </div>
 
-              {/* Tab Content: 1. AI OpenCode Go Importer */}
+              {/* Tab Content: 1. AI Importer */}
               {activeImportTab === 'ia' && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-                  {/* OpenCode Go Banner / Info */}
+                  {/* AI Banner / Info */}
                   <div style={{
                     background: 'linear-gradient(135deg, #e0e7ff 0%, #ede9fe 100%)',
                     border: '1.5px solid #c7d2fe',
@@ -3571,26 +3588,14 @@ export default function ParticipantesModal({
                         <Sparkles size={18} />
                       </div>
                       <div>
-                        <span style={{ fontSize: '0.86rem', fontWeight: 900, color: '#312e81', display: 'block' }}>
-                          Lector Multimodal con Inteligencia Artificial (OpenCode Go)
+                        <span style={{ fontSize: '0.88rem', fontWeight: 900, color: '#312e81', display: 'block' }}>
+                          Lector Multimodal con Inteligencia Artificial
                         </span>
-                        <span style={{ fontSize: '0.74rem', color: '#4338ca', fontWeight: 600 }}>
+                        <span style={{ fontSize: '0.76rem', color: '#4338ca', fontWeight: 600 }}>
                           Analiza y extrae automáticamente listas de participantes desde archivos <b>PDF, Excel (.xlsx/.xls), CSV o Imágenes/Fotos</b>.
                         </span>
                       </div>
                     </div>
-
-                    <span style={{
-                      background: '#4338ca',
-                      color: '#ffffff',
-                      padding: '3px 10px',
-                      borderRadius: '12px',
-                      fontSize: '0.7rem',
-                      fontWeight: 800,
-                      letterSpacing: '0.5px'
-                    }}>
-                      PROVEEDOR: OPENCODE GO
-                    </span>
                   </div>
 
                   {/* Dropzone for AI files */}
@@ -3631,13 +3636,13 @@ export default function ParticipantesModal({
                         Selecciona o Arrastra tu Nómina (PDF, Excel, Imagen o CSV)
                       </span>
                       <span style={{ fontSize: '0.78rem', color: 'var(--gray-500)', display: 'block' }}>
-                        La IA de <b>OpenCode Go</b> analizará el archivo, descifrará los nombres, C.I., RDA, celular y colegio, y los estructurará automáticamente.
+                        La Inteligencia Artificial analizará el archivo, descifrará los nombres, C.I., RDA, celular y colegio, y los estructurará automáticamente.
                       </span>
                     </div>
 
                     {iaLoading ? (
                       <div style={{ display: 'flex', alignItems: 'center', gap: '10px', color: '#4f46e5', fontWeight: 800, fontSize: '0.9rem', padding: '10px 22px', background: '#eef2ff', borderRadius: '8px', border: '1px solid #c7d2fe' }}>
-                        <Loader2 size={20} className="spin" /> Procesando con IA (OpenCode Go)... Por favor espera unos segundos.
+                        <Loader2 size={20} className="spin" /> Procesando con Inteligencia Artificial... Por favor espera unos segundos.
                       </div>
                     ) : (
                       <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', justifyContent: 'center' }}>
@@ -3685,10 +3690,14 @@ export default function ParticipantesModal({
 
               {/* Tab Content: 2. Manual Form */}
               {activeImportTab === 'individual' && (
-                <form onSubmit={handleAddParticipantSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '12px' }}>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                      <label style={{ fontSize: '0.72rem', fontWeight: 800, color: 'var(--gray-600)' }}>C.I. *</label>
+                <form onSubmit={handleAddParticipantSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '14px' }}>
+                    
+                    {/* C.I. */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+                      <label style={{ fontSize: '0.82rem', fontWeight: 800, color: '#1e293b' }}>
+                        C.I. (Carnet de Identidad) <span style={{ color: '#ef4444' }}>*</span>
+                      </label>
                       <div style={{ display: 'flex', gap: '6px' }}>
                         <input
                           type="text"
@@ -3697,71 +3706,79 @@ export default function ParticipantesModal({
                           onChange={(e) => setAddCi(e.target.value)}
                           onBlur={() => checkCiExist(addCi)}
                           placeholder="Ej: 1234567"
-                          style={{ flex: 1, padding: '6px 10px', fontSize: '0.82rem', border: '1px solid var(--gray-300)', borderRadius: 'var(--radius-sm)', background: 'var(--white)' }}
+                          style={{ flex: 1, padding: '8px 12px', fontSize: '0.92rem', fontWeight: 700, border: '1.5px solid #cbd5e1', borderRadius: '6px', background: '#ffffff', color: '#0f172a' }}
                         />
-                        {searchingCi && <Loader2 size={16} className="spin" style={{ alignSelf: 'center' }} />}
+                        {searchingCi && <Loader2 size={18} className="spin" style={{ alignSelf: 'center', color: '#0284c7' }} />}
                       </div>
                     </div>
 
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                      <label style={{ fontSize: '0.72rem', fontWeight: 800, color: 'var(--gray-600)' }}>Nombres *</label>
+                    {/* Nombres */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+                      <label style={{ fontSize: '0.82rem', fontWeight: 800, color: '#1e293b' }}>
+                        Nombres <span style={{ fontSize: '0.72rem', fontWeight: 600, color: '#64748b' }}>(Opcional)</span>
+                      </label>
                       <input
                         type="text"
-                        required
                         value={addNombres}
                         onChange={(e) => setAddNombres(e.target.value.toUpperCase())}
-                        placeholder="NOMBRES"
-                        style={{ padding: '6px 10px', fontSize: '0.82rem', border: '1px solid var(--gray-300)', borderRadius: 'var(--radius-sm)', textTransform: 'uppercase', background: 'var(--white)' }}
+                        placeholder="NOMBRES (o autocompleta con SIE)"
+                        style={{ padding: '8px 12px', fontSize: '0.88rem', fontWeight: 600, border: '1.5px solid #cbd5e1', borderRadius: '6px', textTransform: 'uppercase', background: '#ffffff', color: '#0f172a' }}
                       />
                     </div>
 
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                      <label style={{ fontSize: '0.72rem', fontWeight: 800, color: 'var(--gray-600)' }}>Apellidos *</label>
+                    {/* Apellidos */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+                      <label style={{ fontSize: '0.82rem', fontWeight: 800, color: '#1e293b' }}>
+                        Apellidos <span style={{ fontSize: '0.72rem', fontWeight: 600, color: '#64748b' }}>(Opcional)</span>
+                      </label>
                       <input
                         type="text"
-                        required
                         value={addApellidos}
                         onChange={(e) => setAddApellidos(e.target.value.toUpperCase())}
-                        placeholder="APELLIDOS"
-                        style={{ padding: '6px 10px', fontSize: '0.82rem', border: '1px solid var(--gray-300)', borderRadius: 'var(--radius-sm)', textTransform: 'uppercase', background: 'var(--white)' }}
+                        placeholder="APELLIDOS (o autocompleta con SIE)"
+                        style={{ padding: '8px 12px', fontSize: '0.88rem', fontWeight: 600, border: '1.5px solid #cbd5e1', borderRadius: '6px', textTransform: 'uppercase', background: '#ffffff', color: '#0f172a' }}
                       />
                     </div>
 
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                      <label style={{ fontSize: '0.72rem', fontWeight: 800, color: 'var(--gray-600)' }}>RDA (Opcional)</label>
+                    {/* RDA */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+                      <label style={{ fontSize: '0.82rem', fontWeight: 800, color: '#1e293b' }}>RDA (Opcional)</label>
                       <input
                         type="text"
                         value={addRda}
                         onChange={(e) => setAddRda(e.target.value)}
                         placeholder="RDA"
-                        style={{ padding: '6px 10px', fontSize: '0.82rem', border: '1px solid var(--gray-300)', borderRadius: 'var(--radius-sm)', background: 'var(--white)' }}
+                        style={{ padding: '8px 12px', fontSize: '0.88rem', fontWeight: 600, border: '1.5px solid #cbd5e1', borderRadius: '6px', background: '#ffffff', color: '#0f172a' }}
                       />
                     </div>
 
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                      <label style={{ fontSize: '0.72rem', fontWeight: 800, color: 'var(--gray-600)' }}>Celular</label>
+                    {/* Celular */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+                      <label style={{ fontSize: '0.82rem', fontWeight: 800, color: '#1e293b' }}>Celular</label>
                       <input
                         type="text"
                         value={addCelular}
                         onChange={(e) => setAddCelular(e.target.value)}
                         placeholder="Celular"
-                        style={{ padding: '6px 10px', fontSize: '0.82rem', border: '1px solid var(--gray-300)', borderRadius: 'var(--radius-sm)', background: 'var(--white)' }}
+                        style={{ padding: '8px 12px', fontSize: '0.88rem', fontWeight: 600, border: '1.5px solid #cbd5e1', borderRadius: '6px', background: '#ffffff', color: '#0f172a' }}
                       />
                     </div>
 
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                      <label style={{ fontSize: '0.72rem', fontWeight: 800, color: 'var(--gray-600)' }}>Código SIE (Opcional)</label>
+                    {/* Código SIE */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+                      <label style={{ fontSize: '0.82rem', fontWeight: 800, color: '#1e293b' }}>Código SIE (Opcional)</label>
                       <input
                         type="text"
                         value={addSie}
                         onChange={(e) => setAddSie(e.target.value)}
                         placeholder="SIE"
-                        style={{ padding: '6px 10px', fontSize: '0.82rem', border: '1px solid var(--gray-300)', borderRadius: 'var(--radius-sm)', background: 'var(--white)' }}
+                        style={{ padding: '8px 12px', fontSize: '0.88rem', fontWeight: 600, border: '1.5px solid #cbd5e1', borderRadius: '6px', background: '#ffffff', color: '#0f172a' }}
                       />
                     </div>
 
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', gridColumn: 'span 2', position: 'relative' }}>
-                      <label style={{ fontSize: '0.72rem', fontWeight: 800, color: 'var(--gray-600)' }}>Unidad Educativa</label>
+                    {/* Unidad Educativa */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', gridColumn: 'span 2', position: 'relative' }}>
+                      <label style={{ fontSize: '0.82rem', fontWeight: 800, color: '#1e293b' }}>Unidad Educativa</label>
                       <input
                         type="text"
                         value={addUnidadEducativa}
@@ -3773,8 +3790,8 @@ export default function ParticipantesModal({
                         onFocus={() => {
                           if (addUnidadEducativa.trim()) handleSearchAddUeSuggestions(addUnidadEducativa);
                         }}
-                        placeholder="Escribe para buscar en 4,000+ U.E. del catálogo..."
-                        style={{ padding: '6px 10px', fontSize: '0.82rem', border: '1px solid var(--gray-300)', borderRadius: 'var(--radius-sm)', textTransform: 'uppercase', background: 'var(--white)' }}
+                        placeholder="Escribe para buscar en catálogo de 4,000+ U.E..."
+                        style={{ padding: '8px 12px', fontSize: '0.88rem', fontWeight: 600, border: '1.5px solid #cbd5e1', borderRadius: '6px', textTransform: 'uppercase', background: '#ffffff', color: '#0f172a' }}
                       />
 
                       {/* Dropdown suggestions */}
@@ -3786,12 +3803,12 @@ export default function ParticipantesModal({
                           right: 0,
                           zIndex: 40,
                           background: '#ffffff',
-                          border: '1px solid var(--gray-300)',
-                          borderRadius: '6px',
-                          boxShadow: '0 8px 20px rgba(0,0,0,0.15)',
-                          maxHeight: '180px',
+                          border: '1.5px solid #cbd5e1',
+                          borderRadius: '8px',
+                          boxShadow: '0 8px 24px rgba(0,0,0,0.15)',
+                          maxHeight: '190px',
                           overflowY: 'auto',
-                          marginTop: '2px'
+                          marginTop: '3px'
                         }}>
                           {addUeSuggestions.map((sug, i) => (
                             <div
@@ -3802,10 +3819,10 @@ export default function ParticipantesModal({
                                 setShowAddUeSuggestions(false);
                               }}
                               style={{
-                                padding: '8px 12px',
+                                padding: '9px 14px',
                                 cursor: 'pointer',
-                                borderBottom: i < addUeSuggestions.length - 1 ? '1px solid var(--gray-100)' : 'none',
-                                fontSize: '0.8rem',
+                                borderBottom: i < addUeSuggestions.length - 1 ? '1px solid #f1f5f9' : 'none',
+                                fontSize: '0.85rem',
                                 display: 'flex',
                                 justifyContent: 'space-between',
                                 alignItems: 'center'
@@ -3813,9 +3830,9 @@ export default function ParticipantesModal({
                               onMouseEnter={(e) => e.currentTarget.style.background = '#f0fdfa'}
                               onMouseLeave={(e) => e.currentTarget.style.background = '#ffffff'}
                             >
-                              <span style={{ fontWeight: 700, color: 'var(--gray-800)' }}>{sug.unidad_educativa}</span>
+                              <span style={{ fontWeight: 700, color: '#0f172a' }}>{sug.unidad_educativa}</span>
                               {sug.codigo_sie && (
-                                <span style={{ fontSize: '0.7rem', background: '#ccfbf1', color: '#0f766e', padding: '2px 6px', borderRadius: '4px', fontWeight: 700 }}>
+                                <span style={{ fontSize: '0.74rem', background: '#ccfbf1', color: '#0f766e', padding: '2px 8px', borderRadius: '4px', fontWeight: 800 }}>
                                   SIE: {sug.codigo_sie}
                                 </span>
                               )}
@@ -3826,15 +3843,38 @@ export default function ParticipantesModal({
                     </div>
                   </div>
 
-                  {ciExists && (
-                    <div style={{ fontSize: '0.78rem', color: 'var(--green-600)', background: 'var(--green-100)', padding: '6px 12px', borderRadius: 'var(--radius-sm)', fontWeight: 600 }}>
-                      ✓ El participante ya existe en el sistema. Al confirmar, se le inscribirá a este ciclo automáticamente.
+                  {/* Informative Status Badge */}
+                  {ciExists ? (
+                    <div style={{ fontSize: '0.84rem', color: '#15803d', background: '#dcfce7', border: '1px solid #86efac', padding: '8px 14px', borderRadius: '8px', fontWeight: 700 }}>
+                      ✓ <b>Participante encontrado en el sistema:</b> Puedes modificar o corregir cualquier dato arriba si es necesario; al inscribir se actualizarán automáticamente sus datos.
                     </div>
+                  ) : (
+                    addCi.trim() && (
+                      <div style={{ fontSize: '0.82rem', color: '#0369a1', background: '#e0f2fe', border: '1px solid #bae6fd', padding: '8px 14px', borderRadius: '8px', fontWeight: 600 }}>
+                        💡 <b>Modo Ultrarrápido:</b> Puedes dejar los nombres en blanco y pulsar "Inscribir Participante". Posteriormente podrás usar <b>"Validar SIE"</b> en la tabla para autocompletar su nombre oficial y datos automáticamente.
+                      </div>
+                    )
                   )}
 
-                  <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', marginTop: '10px' }}>
-                    <button type="submit" className="btn btn-success btn-sm">
-                      Inscribir Participante
+                  <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', marginTop: '6px' }}>
+                    <button
+                      type="submit"
+                      style={{
+                        background: 'linear-gradient(135deg, #059669 0%, #10b981 100%)',
+                        color: '#ffffff',
+                        border: 'none',
+                        borderRadius: '8px',
+                        padding: '10px 22px',
+                        fontSize: '0.90rem',
+                        fontWeight: 900,
+                        cursor: 'pointer',
+                        boxShadow: '0 2px 8px rgba(16,185,129,0.3)',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '6px'
+                      }}
+                    >
+                      <UserPlus size={16} /> Inscribir Participante
                     </button>
                   </div>
                 </form>
