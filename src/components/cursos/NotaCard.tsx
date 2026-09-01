@@ -299,6 +299,48 @@ export default function NotaCard({
     });
   };
 
+  // ─── Save all course & organizer info in a single click ────
+  const handleSaveAll = () => {
+    const finalGrupoNombre = editNewGrupoNombre.trim() ? editNewGrupoNombre.trim() : editGrupoNombre;
+    const finalTotalBs = curso.inscritos_formulario * editCosto;
+
+    onUpdate({
+      tecnico_carnet: editTecnico || null,
+      ciclo_id: editCiclo || null,
+      facilitador_carnet: editFacilitador || null,
+      distrito: editDistrito,
+      lugar: editLugar,
+      area_urbano_rural: editArea,
+      segmento: editSegmento,
+      fecha_inicio: editFechaInicio ? editFechaInicio.replace('T', ' ') : '',
+      mes: editMes,
+      costo: editCosto,
+      grupo_nombre: finalGrupoNombre,
+      total_bs: finalTotalBs,
+      observaciones,
+      link_inscripcion_externo: linkExterno,
+      grupo_color: noteColor,
+      prev,
+      organizador_nombre: orgNombre,
+      organizador_telefono: orgTelefono,
+      organizador_maps: orgMaps,
+    });
+
+    setEditNewGrupoNombre('');
+    setEditGrupoNombre(finalGrupoNombre);
+
+    Swal.fire({
+      icon: 'success',
+      title: '¡Guardado con éxito!',
+      text: 'Los datos del curso y organizador se han actualizado correctamente.',
+      confirmButtonText: 'Aceptar',
+      confirmButtonColor: '#0284c7',
+      timer: 2200,
+      timerProgressBar: true,
+      showConfirmButton: true
+    });
+  };
+
   // ─── Save curso info ───────────────────────────────────────
   const handleSaveCursoInfo = () => {
     const finalGrupoNombre = editNewGrupoNombre.trim() ? editNewGrupoNombre.trim() : editGrupoNombre;
@@ -328,7 +370,7 @@ export default function NotaCard({
       title: '¡Guardado con éxito!',
       text: 'Los datos del curso se han actualizado correctamente.',
       confirmButtonText: 'Aceptar',
-      confirmButtonColor: '#bfa05e',
+      confirmButtonColor: '#0284c7',
       timer: 2500,
       timerProgressBar: true,
       showConfirmButton: true
@@ -838,259 +880,236 @@ export default function NotaCard({
       )}
 
       <div className="nota-main-content">
-        {/* ─── Columna Izquierda (Información) ─────────────────────────── */}
-        <div className="nota-col-info">
-          {/* ID + State */}
-          <div className="nota-id-row">
-            <span className="nota-id">ID: {curso.id}</span>
-            {curso.tecnico_nombre && (
-              <span className="nota-tecnico-badge" style={{
-                fontSize: '0.72rem',
-                fontWeight: 700,
-                color: '#1e3a8a',
-                background: '#e0e7ff',
-                padding: '3px 8px',
-                borderRadius: '6px',
-                border: '1px solid #c7d2fe',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '4px',
-                boxShadow: '0 1px 2px rgba(0,0,0,0.02)',
-              }} title={`Técnico encargado: ${curso.tecnico_nombre}`}>
-                <User size={12} />
-                {curso.tecnico_nombre}
-              </span>
-            )}
-            <span className={`nota-confirm-badge ${isConfirmado ? 'confirmado' : 'proyectado'}`} style={{
-              fontSize: '0.72rem',
-              fontWeight: 700,
-              padding: '3px 8px',
-              borderRadius: '6px',
-              border: '1px solid',
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '4px',
-              boxShadow: '0 1px 2px rgba(0,0,0,0.02)',
-              backgroundColor: isConfirmado ? '#ecfdf5' : '#fff7ed',
-              color: isConfirmado ? '#047857' : '#c2410c',
-              borderColor: isConfirmado ? '#a7f3d0' : '#ffedd5',
-              whiteSpace: 'nowrap'
-            }}>
-              {isConfirmado ? '✓ Confirmado' : '⚡ Proyectado'}
-            </span>
-          </div>
+        {/* ─── Columna 1: Datos del Curso, Ubicación y Organizador ─────────────────────────── */}
+        <div className="nota-col-academic-and-org" style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
+          
+          {/* Tarjeta 1: Datos Académicos y del Curso */}
+          <div style={{ background: '#ffffff', border: '1.5px solid #e2e8f0', borderRadius: '10px', padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px', boxShadow: '0 2px 6px rgba(0,0,0,0.03)' }}>
+            
+            {/* Header del Bloque con ID y Estado */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px', borderBottom: '1px solid #f1f5f9', paddingBottom: '10px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <span style={{ fontSize: '1.15rem', fontWeight: 900, color: '#0f172a', letterSpacing: '-0.5px' }}>
+                  ID: #{curso.id}
+                </span>
+                {curso.tecnico_nombre && (
+                  <span style={{ fontSize: '0.80rem', fontWeight: 700, color: '#1e40af', background: '#eff6ff', border: '1px solid #bfdbfe', padding: '3px 10px', borderRadius: '6px', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                    <User size={13} /> {curso.tecnico_nombre}
+                  </span>
+                )}
+              </div>
 
-          {/* Preventivo */}
-          <div className="nota-preventivo">
-            <span className="prev-label">PREV:</span>
-            {readOnly ? (
-              <span style={{ fontSize: '0.82rem', fontWeight: 600, color: '#1e293b' }}>{prev || '—'}</span>
-            ) : (
-              <>
-                <input
-                  type="text"
-                  value={prev}
-                  onChange={(e) => setPrev(e.target.value)}
-                  placeholder="N° preventivo"
-                />
-                <button className="btn btn-success btn-xs" onClick={() => onUpdate({ prev })}>
-                  <Save size={11} />
-                </button>
-              </>
-            )}
-          </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span style={{
+                  fontSize: '0.78rem',
+                  fontWeight: 800,
+                  padding: '4px 10px',
+                  borderRadius: '6px',
+                  backgroundColor: isConfirmado ? '#ecfdf5' : '#fff7ed',
+                  color: isConfirmado ? '#047857' : '#c2410c',
+                  border: `1px solid ${isConfirmado ? '#a7f3d0' : '#ffedd5'}`,
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '4px'
+                }}>
+                  {isConfirmado ? '✓ Confirmado' : '⚡ Proyectado'}
+                </span>
+              </div>
+            </div>
 
-          {/* Formulario de Edición Directa */}
-          <div className="nota-edit-form" style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            <div className="organizador-field">
-              <label>Grupo</label>
+            {/* N° Preventivo */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: '#f8fafc', padding: '8px 12px', borderRadius: '6px', border: '1px solid #e2e8f0' }}>
+              <span style={{ fontSize: '0.84rem', fontWeight: 800, color: '#475569', minWidth: '55px' }}>PREV:</span>
               {readOnly ? (
-                <span style={{ fontSize: '0.82rem', fontWeight: 600 }}>{editGrupoNombre || '—'}</span>
+                <span style={{ fontSize: '0.90rem', fontWeight: 700, color: '#0f172a' }}>{prev || '—'}</span>
               ) : (
-                <>
-                  <select
-                    value={editGrupoNombre}
-                    onChange={(e) => setEditGrupoNombre(e.target.value)}
-                  >
-                    <option value="">Sin grupo</option>
-                    {grupoNames.map((g) => (
-                      <option key={g} value={g}>{g}</option>
-                    ))}
-                  </select>
+                <div style={{ display: 'flex', gap: '6px', flex: 1 }}>
                   <input
                     type="text"
-                    value={editNewGrupoNombre}
-                    onChange={(e) => setEditNewGrupoNombre(e.target.value)}
-                    placeholder="O crear grupo nuevo..."
-                    style={{ marginTop: '4px' }}
+                    value={prev}
+                    onChange={(e) => setPrev(e.target.value)}
+                    placeholder="N° preventivo..."
+                    style={{ flex: 1, padding: '6px 10px', fontSize: '0.90rem', fontWeight: 600, border: '1px solid #cbd5e1', borderRadius: '6px', background: '#ffffff' }}
                   />
-                </>
+                  <button className="btn btn-success btn-xs" onClick={() => onUpdate({ prev })} title="Guardar Preventivo" style={{ padding: '6px 12px', fontWeight: 700 }}>
+                    <Save size={13} />
+                  </button>
+                </div>
               )}
             </div>
 
-            <div className="organizador-field">
-              <label>Técnico</label>
-              {readOnly ? (
-                <span style={{ fontSize: '0.82rem', fontWeight: 600 }}>{curso.tecnico_nombre || '—'}</span>
-              ) : (
-                <select
-                  value={editTecnico}
-                  onChange={(e) => setEditTecnico(e.target.value)}
-                >
-                  <option value="">Seleccionar técnico</option>
-                  {tecnicos.map((t) => (
-                    <option key={t.carnet} value={t.carnet}>{t.nombre}</option>
-                  ))}
-                </select>
-              )}
-            </div>
+            {/* Formulario de Campos Académicos en Grid */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px' }}>
+              
+              {/* Grupo */}
+              <div className="organizador-field">
+                <label style={{ fontSize: '0.82rem', fontWeight: 800, color: '#334155' }}>Grupo</label>
+                {readOnly ? (
+                  <span style={{ fontSize: '0.90rem', fontWeight: 600 }}>{editGrupoNombre || '—'}</span>
+                ) : (
+                  <>
+                    <select
+                      value={editGrupoNombre}
+                      onChange={(e) => setEditGrupoNombre(e.target.value)}
+                      style={{ padding: '7px 10px', fontSize: '0.88rem', fontWeight: 600 }}
+                    >
+                      <option value="">Sin grupo</option>
+                      {grupoNames.map((g) => (
+                        <option key={g} value={g}>{g}</option>
+                      ))}
+                    </select>
+                    <input
+                      type="text"
+                      value={editNewGrupoNombre}
+                      onChange={(e) => setEditNewGrupoNombre(e.target.value)}
+                      placeholder="O nuevo grupo..."
+                      style={{ marginTop: '4px', padding: '6px 10px', fontSize: '0.84rem' }}
+                    />
+                  </>
+                )}
+              </div>
 
-            <div className="organizador-field">
-              <label>Área Formativa</label>
-              {readOnly ? (
-                <span style={{ fontSize: '0.82rem', fontWeight: 600 }}>{editAreaFormativa || '—'}</span>
-              ) : (
-                <select
-                  value={editAreaFormativa}
-                  onChange={(e) => handleAreaFormativaChange(e.target.value)}
-                >
-                  <option value="">Seleccionar área formativa</option>
-                  {AREAS_FORMATIVAS.map((a) => (
-                    <option key={a} value={a}>{a}</option>
-                  ))}
-                </select>
-              )}
-            </div>
+              {/* Técnico */}
+              <div className="organizador-field">
+                <label style={{ fontSize: '0.82rem', fontWeight: 800, color: '#334155' }}>Técnico Asignado</label>
+                {readOnly ? (
+                  <span style={{ fontSize: '0.90rem', fontWeight: 600 }}>{curso.tecnico_nombre || '—'}</span>
+                ) : (
+                  <select
+                    value={editTecnico}
+                    onChange={(e) => setEditTecnico(e.target.value)}
+                    style={{ padding: '7px 10px', fontSize: '0.88rem', fontWeight: 600 }}
+                  >
+                    <option value="">Seleccionar técnico</option>
+                    {tecnicos.map((t) => (
+                      <option key={t.carnet} value={t.carnet}>{t.nombre}</option>
+                    ))}
+                  </select>
+                )}
+              </div>
 
-            <div className="organizador-field">
-              <label>Ciclo Formativo</label>
-              {readOnly ? (
-                <span style={{ fontSize: '0.82rem', fontWeight: 600 }}>{curso.ciclo_nombre || '—'}</span>
-              ) : (
-                <select
-                  value={editCiclo}
-                  onChange={(e) => setEditCiclo(e.target.value)}
-                  disabled={!editAreaFormativa}
-                >
-                  <option value="">
-                    {!editAreaFormativa ? 'Selecciona área formativa primero' : 'Seleccionar ciclo'}
-                  </option>
-                  {filteredCiclos.map((c) => (
-                    <option key={c.id} value={c.id}>{c.nombre}</option>
-                  ))}
-                </select>
-              )}
-            </div>
+              {/* Área Formativa */}
+              <div className="organizador-field" style={{ gridColumn: 'span 2' }}>
+                <label style={{ fontSize: '0.82rem', fontWeight: 800, color: '#334155' }}>Área Formativa</label>
+                {readOnly ? (
+                  <span style={{ fontSize: '0.90rem', fontWeight: 600 }}>{editAreaFormativa || '—'}</span>
+                ) : (
+                  <select
+                    value={editAreaFormativa}
+                    onChange={(e) => handleAreaFormativaChange(e.target.value)}
+                    style={{ padding: '7px 10px', fontSize: '0.88rem', fontWeight: 600 }}
+                  >
+                    <option value="">Seleccionar área formativa</option>
+                    {AREAS_FORMATIVAS.map((a) => (
+                      <option key={a} value={a}>{a}</option>
+                    ))}
+                  </select>
+                )}
+              </div>
 
-            <div className="organizador-field">
-              <label>Facilitador</label>
-              {readOnly ? (
-                <span style={{ fontSize: '0.82rem', fontWeight: 600 }}>{curso.facilitador_nombre || '—'}</span>
-              ) : (
-                <select
-                  value={editFacilitador}
-                  onChange={(e) => setEditFacilitador(e.target.value)}
-                >
-                  <option value="">Seleccionar facilitador</option>
-                  {facilitadores.map((f) => (
-                    <option key={f.carnet} value={f.carnet}>{f.nombre}</option>
-                  ))}
-                </select>
-              )}
-            </div>
+              {/* Ciclo Formativo */}
+              <div className="organizador-field" style={{ gridColumn: 'span 2' }}>
+                <label style={{ fontSize: '0.82rem', fontWeight: 800, color: '#334155' }}>Ciclo Formativo</label>
+                {readOnly ? (
+                  <span style={{ fontSize: '0.90rem', fontWeight: 700, color: '#1e40af' }}>{curso.ciclo_nombre || '—'}</span>
+                ) : (
+                  <select
+                    value={editCiclo}
+                    onChange={(e) => setEditCiclo(e.target.value)}
+                    disabled={!editAreaFormativa}
+                    style={{ padding: '7px 10px', fontSize: '0.88rem', fontWeight: 600 }}
+                  >
+                    <option value="">
+                      {!editAreaFormativa ? 'Selecciona área formativa primero' : 'Seleccionar ciclo formativo'}
+                    </option>
+                    {filteredCiclos.map((c) => (
+                      <option key={c.id} value={c.id}>{c.nombre}</option>
+                    ))}
+                  </select>
+                )}
+              </div>
 
-            <div className="organizador-field">
-              <label>Segmento</label>
-              {readOnly ? (
-                <span style={{ fontSize: '0.82rem', fontWeight: 600 }}>{editSegmento || '—'}</span>
-              ) : (
-                <select
-                  value={editSegmento}
-                  onChange={(e) => setEditSegmento(e.target.value)}
-                >
-                  <option value="">Selecciona segmento</option>
-                  {SEGMENTO_OPTIONS.map((opt) => (
-                    <option key={opt} value={opt}>{opt}</option>
-                  ))}
-                  {editSegmento && !SEGMENTO_OPTIONS.includes(editSegmento) && (
-                    <option value={editSegmento}>{editSegmento}</option>
-                  )}
-                </select>
-              )}
-            </div>
+              {/* Facilitador */}
+              <div className="organizador-field">
+                <label style={{ fontSize: '0.82rem', fontWeight: 800, color: '#334155' }}>Facilitador</label>
+                {readOnly ? (
+                  <span style={{ fontSize: '0.90rem', fontWeight: 600 }}>{curso.facilitador_nombre || '—'}</span>
+                ) : (
+                  <select
+                    value={editFacilitador}
+                    onChange={(e) => setEditFacilitador(e.target.value)}
+                    style={{ padding: '7px 10px', fontSize: '0.88rem', fontWeight: 600 }}
+                  >
+                    <option value="">Seleccionar facilitador</option>
+                    {facilitadores.map((f) => (
+                      <option key={f.carnet} value={f.carnet}>{f.nombre}</option>
+                    ))}
+                  </select>
+                )}
+              </div>
 
-            <div className="organizador-field">
-              <label>Fecha Inicio</label>
-              {readOnly ? (
-                <span style={{ fontSize: '0.82rem', fontWeight: 600 }}>{editFechaInicio ? editFechaInicio.replace('T', ' ') : '—'}</span>
-              ) : (
-                <input
-                  type="datetime-local"
-                  value={editFechaInicio}
-                  onChange={(e) => setEditFechaInicio(e.target.value)}
-                />
-              )}
-            </div>
+              {/* Segmento */}
+              <div className="organizador-field">
+                <label style={{ fontSize: '0.82rem', fontWeight: 800, color: '#334155' }}>Segmento</label>
+                {readOnly ? (
+                  <span style={{ fontSize: '0.90rem', fontWeight: 600 }}>{editSegmento || '—'}</span>
+                ) : (
+                  <select
+                    value={editSegmento}
+                    onChange={(e) => setEditSegmento(e.target.value)}
+                    style={{ padding: '7px 10px', fontSize: '0.88rem', fontWeight: 600 }}
+                  >
+                    <option value="">Selecciona segmento</option>
+                    {SEGMENTO_OPTIONS.map((opt) => (
+                      <option key={opt} value={opt}>{opt}</option>
+                    ))}
+                    {editSegmento && !SEGMENTO_OPTIONS.includes(editSegmento) && (
+                      <option value={editSegmento}>{editSegmento}</option>
+                    )}
+                  </select>
+                )}
+              </div>
 
-            <div className="nota-total-bar" style={{ marginTop: '8px' }}>
-              <small>TOTAL ESTIMADO</small>
-              <span>{curso.inscritos_formulario * editCosto} Bs</span>
+              {/* Fecha Inicio */}
+              <div className="organizador-field" style={{ gridColumn: 'span 2' }}>
+                <label style={{ fontSize: '0.82rem', fontWeight: 800, color: '#334155' }}>Fecha y Hora de Inicio</label>
+                {readOnly ? (
+                  <span style={{ fontSize: '0.90rem', fontWeight: 600 }}>{editFechaInicio ? editFechaInicio.replace('T', ' ') : '—'}</span>
+                ) : (
+                  <input
+                    type="datetime-local"
+                    value={editFechaInicio}
+                    onChange={(e) => setEditFechaInicio(e.target.value)}
+                    style={{ padding: '7px 10px', fontSize: '0.88rem', fontWeight: 600 }}
+                  />
+                )}
+              </div>
+
             </div>
           </div>
 
-          {/* Botón de guardado del curso (hidden in readOnly) */}
-          {!readOnly && (
-            <div className="organizador-save-container" style={{ display: 'flex', width: '100%', marginTop: 'auto', paddingTop: '12px' }}>
-              <button
-                className={`btn ${hasCursoChanges ? 'btn-danger pulse-danger-btn' : 'btn-success'}`}
-                style={{
-                  width: '100%',
-                  fontWeight: 700,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '8px',
-                  padding: hasCursoChanges ? '10px 16px' : '8px 12px',
-                  fontSize: hasCursoChanges ? '0.88rem' : '0.82rem',
-                  transition: 'all 0.3s ease',
-                  boxShadow: hasCursoChanges ? '0 4px 12px rgba(220, 38, 38, 0.3)' : 'none',
-                  borderRadius: 'var(--radius-sm, 6px)',
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.5px'
-                }}
-                onClick={handleSaveCursoInfo}
-              >
-                <Save size={hasCursoChanges ? 15 : 13} />
-                {hasCursoChanges ? '⚠️ Guardar Datos del Curso' : 'Guardar Datos del Curso'}
-              </button>
+          {/* Tarjeta 2: Ubicación, Costos y Datos del Organizador */}
+          <div style={{ background: '#ffffff', border: '1.5px solid #e2e8f0', borderRadius: '10px', padding: '16px', display: 'flex', flexDirection: 'column', gap: '14px', boxShadow: '0 2px 6px rgba(0,0,0,0.03)' }}>
+            
+            {/* Ubicación y Costo */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.92rem', fontWeight: 900, color: '#0f172a', borderBottom: '1px solid #f1f5f9', paddingBottom: '8px' }}>
+              <MapPin size={16} style={{ color: '#0284c7' }} /> Ubicación, Distrito y Costo
             </div>
-          )}
-        </div>
 
-        {/* ─── Columna Central (Costo y Organizador) ─────────────────────────── */}
-        <div className="nota-col-costo">
-          {/* Ubicación y Costo */}
-          <div className="organizador-section" style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
-            <div className="organizador-title" style={{ color: 'var(--nota-color, var(--primary-500))', fontWeight: 800 }}>
-              <MapPin size={14} /> Ubicación y Costo
-            </div>
-            <div className="organizador-grid">
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '12px' }}>
               <div className="organizador-field">
-                <label>Distrito</label>
+                <label style={{ fontSize: '0.82rem', fontWeight: 800, color: '#334155' }}>Distrito</label>
                 {readOnly ? (
-                  <span style={{ fontSize: '0.82rem', fontWeight: 600 }}>{editDistrito || '—'}</span>
+                  <span style={{ fontSize: '0.90rem', fontWeight: 600 }}>{editDistrito || '—'}</span>
                 ) : (
                   <select
                     value={editDistrito}
                     onChange={(e) => setEditDistrito(e.target.value)}
+                    style={{ padding: '7px 10px', fontSize: '0.88rem', fontWeight: 600 }}
                   >
                     {distritosData.map((d, index) => {
                       const val = index === 0 ? "" : d[1];
-                      return (
-                        <option key={index} value={val}>
-                          {d[1]}
-                        </option>
-                      );
+                      return <option key={index} value={val}>{d[1]}</option>;
                     })}
                     {editDistrito && !distritosData.some((d) => d[1] === editDistrito) && (
                       <option value={editDistrito}>{editDistrito}</option>
@@ -1098,41 +1117,47 @@ export default function NotaCard({
                   </select>
                 )}
               </div>
+
               <div className="organizador-field">
-                <label>Área</label>
+                <label style={{ fontSize: '0.82rem', fontWeight: 800, color: '#334155' }}>Área</label>
                 {readOnly ? (
-                  <span style={{ fontSize: '0.82rem', fontWeight: 600 }}>{editArea}</span>
+                  <span style={{ fontSize: '0.90rem', fontWeight: 600 }}>{editArea}</span>
                 ) : (
                   <select
                     value={editArea}
                     onChange={(e) => setEditArea(e.target.value)}
+                    style={{ padding: '7px 10px', fontSize: '0.88rem', fontWeight: 600 }}
                   >
                     <option value="Urbano">Urbano</option>
                     <option value="Rural">Rural</option>
                   </select>
                 )}
               </div>
-              <div className="organizador-field full">
-                <label>Lugar</label>
+
+              <div className="organizador-field" style={{ gridColumn: 'span 2' }}>
+                <label style={{ fontSize: '0.82rem', fontWeight: 800, color: '#334155' }}>Lugar / Sede</label>
                 {readOnly ? (
-                  <span style={{ fontSize: '0.82rem', fontWeight: 600 }}>{editLugar || '—'}</span>
+                  <span style={{ fontSize: '0.90rem', fontWeight: 600 }}>{editLugar || '—'}</span>
                 ) : (
                   <input
                     type="text"
                     value={editLugar}
                     onChange={(e) => setEditLugar(e.target.value)}
-                    placeholder="U.E. o lugar de ejecución"
+                    placeholder="U.E. o lugar de ejecución..."
+                    style={{ padding: '7px 10px', fontSize: '0.88rem', fontWeight: 600 }}
                   />
                 )}
               </div>
+
               <div className="organizador-field">
-                <label>Mes</label>
+                <label style={{ fontSize: '0.82rem', fontWeight: 800, color: '#334155' }}>Mes</label>
                 {readOnly ? (
-                  <span style={{ fontSize: '0.82rem', fontWeight: 600 }}>{editMes || '—'}</span>
+                  <span style={{ fontSize: '0.90rem', fontWeight: 600 }}>{editMes || '—'}</span>
                 ) : (
                   <select
                     value={editMes ? editMes.toUpperCase() : ''}
                     onChange={(e) => setEditMes(e.target.value)}
+                    style={{ padding: '7px 10px', fontSize: '0.88rem', fontWeight: 600 }}
                   >
                     <option value="">Seleccionar mes</option>
                     {['ENERO','FEBRERO','MARZO','ABRIL','MAYO','JUNIO','JULIO','AGOSTO','SEPTIEMBRE','OCTUBRE','NOVIEMBRE','DICIEMBRE'].map((m) => (
@@ -1141,150 +1166,164 @@ export default function NotaCard({
                   </select>
                 )}
               </div>
+
               <div className="organizador-field">
-                <label>Costo por participante (Bs)</label>
+                <label style={{ fontSize: '0.82rem', fontWeight: 800, color: '#334155' }}>Costo x Maestro (Bs)</label>
                 {readOnly ? (
-                  <span style={{ fontSize: '0.82rem', fontWeight: 600 }}>{editCosto} Bs</span>
+                  <span style={{ fontSize: '0.90rem', fontWeight: 700 }}>{editCosto} Bs</span>
                 ) : (
                   <input
                     type="number"
                     value={editCosto}
                     onChange={(e) => setEditCosto(parseFloat(e.target.value) || 0)}
+                    style={{ padding: '7px 10px', fontSize: '0.88rem', fontWeight: 700 }}
                   />
                 )}
               </div>
             </div>
-          </div>
 
-          {/* Organizador (hidden in readOnly) */}
-          {!readOnly && (
-            <div className="organizador-section" style={{ display: 'flex', flexDirection: 'column', flex: 1, borderTop: '1px dashed #e2e8f0', paddingTop: '16px', marginTop: '8px' }}>
-              <div className="organizador-title" style={{ color: 'var(--nota-color, var(--primary-500))', fontWeight: 800 }}>
-                <Users size={14} /> Datos del Organizador
-              </div>
-              <div className="organizador-grid">
-                <div className="organizador-field">
-                  <label>Organizador</label>
-                  <input
-                    type="text"
-                    value={orgNombre}
-                    onChange={(e) => setOrgNombre(e.target.value)}
-                    placeholder="Nombre del organizador"
-                  />
+            {/* Datos del Organizador */}
+            {!readOnly && (
+              <div style={{ borderTop: '1px dashed #e2e8f0', paddingTop: '12px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.90rem', fontWeight: 900, color: '#0f172a' }}>
+                  <Users size={16} style={{ color: '#059669' }} /> Datos del Organizador
                 </div>
-                <div className="organizador-field">
-                  <label>Celular</label>
-                  <input
-                    type="text"
-                    value={orgTelefono}
-                    onChange={(e) => setOrgTelefono(e.target.value)}
-                    placeholder="Teléfono"
-                  />
-                </div>
-                <div className="organizador-field full">
-                  <label>Grupo de WhatsApp</label>
-                  <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '12px' }}>
+                  <div className="organizador-field">
+                    <label style={{ fontSize: '0.82rem', fontWeight: 800, color: '#334155' }}>Organizador</label>
                     <input
                       type="text"
-                      value={orgMaps}
-                      onChange={(e) => {
-                        setOrgMaps(e.target.value);
-                        if (!linkExterno) setLinkExterno(e.target.value);
-                      }}
-                      placeholder="https://chat.whatsapp.com/..."
-                      style={{ flex: 1 }}
+                      value={orgNombre}
+                      onChange={(e) => setOrgNombre(e.target.value)}
+                      placeholder="Nombre del organizador..."
+                      style={{ padding: '7px 10px', fontSize: '0.88rem', fontWeight: 600 }}
                     />
-                    {orgMaps && (
-                      <a
-                        href={orgMaps.startsWith('http') ? orgMaps : `https://${orgMaps}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="btn btn-success btn-xs"
-                        style={{ whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: '4px' }}
-                      >
-                        <MessageCircle size={11} /> Abrir WA
-                      </a>
-                    )}
                   </div>
-                </div>
-                <div className="organizador-field full">
-                  <label>Observaciones</label>
-                  <textarea
-                    value={observaciones}
-                    onChange={(e) => setObservaciones(e.target.value)}
-                    placeholder="Pendientes, detalles del organizador..."
-                  />
-                </div>
-                <div className="organizador-field full">
-                  <label>Link de inscripción</label>
-                  <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
-                    <input
-                      type="text"
-                      value={linkExterno}
-                      onChange={(e) => setLinkExterno(e.target.value)}
-                      placeholder="Google Sheet, formulario externo o lista compartida..."
-                      style={{ flex: 1 }}
-                    />
-                    {linkExterno && (
-                      <a
-                        href={linkExterno}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="btn btn-primary btn-xs"
-                      >
-                        <ExternalLink size={11} /> Abrir
-                      </a>
-                    )}
-                  </div>
-                </div>
-                <div className="organizador-field full">
-                  <label>Color</label>
-                  <div className="color-swatches">
-                    {GROUP_COLORS.map((c) => (
-                      <button
-                        key={c}
-                        className={`color-swatch ${noteColor === c ? 'active' : ''}`}
-                        style={{ background: c }}
-                        onClick={() => setNoteColor(c)}
+
+                  <div className="organizador-field">
+                    <label style={{ fontSize: '0.82rem', fontWeight: 800, color: '#334155' }}>Celular / WhatsApp</label>
+                    <div style={{ display: 'flex', gap: '6px' }}>
+                      <input
+                        type="text"
+                        value={orgTelefono}
+                        onChange={(e) => setOrgTelefono(e.target.value)}
+                        placeholder="Número de celular..."
+                        style={{ flex: 1, padding: '7px 10px', fontSize: '0.88rem', fontWeight: 600 }}
                       />
-                    ))}
+                      {orgTelefono && (
+                        <a
+                          href={`https://wa.me/591${orgTelefono.replace(/\D/g, '')}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="btn btn-success btn-xs"
+                          style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '0 10px', fontWeight: 700 }}
+                        >
+                          <MessageCircle size={13} /> WA
+                        </a>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="organizador-field" style={{ gridColumn: 'span 2' }}>
+                    <label style={{ fontSize: '0.82rem', fontWeight: 800, color: '#334155' }}>Grupo de WhatsApp</label>
+                    <div style={{ display: 'flex', gap: '6px' }}>
+                      <input
+                        type="text"
+                        value={orgMaps}
+                        onChange={(e) => {
+                          setOrgMaps(e.target.value);
+                          if (!linkExterno) setLinkExterno(e.target.value);
+                        }}
+                        placeholder="https://chat.whatsapp.com/..."
+                        style={{ flex: 1, padding: '7px 10px', fontSize: '0.88rem' }}
+                      />
+                      {orgMaps && (
+                        <a
+                          href={orgMaps.startsWith('http') ? orgMaps : `https://${orgMaps}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="btn btn-success btn-xs"
+                          style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '0 10px', fontWeight: 700 }}
+                        >
+                          <ExternalLink size={13} /> Abrir
+                        </a>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="organizador-field" style={{ gridColumn: 'span 2' }}>
+                    <label style={{ fontSize: '0.82rem', fontWeight: 800, color: '#334155' }}>Observaciones</label>
+                    <textarea
+                      value={observaciones}
+                      onChange={(e) => setObservaciones(e.target.value)}
+                      placeholder="Detalles importantes, pendientes o acuerdos..."
+                      rows={2}
+                      style={{ padding: '7px 10px', fontSize: '0.88rem' }}
+                    />
+                  </div>
+
+                  <div className="organizador-field" style={{ gridColumn: 'span 2' }}>
+                    <label style={{ fontSize: '0.82rem', fontWeight: 800, color: '#334155' }}>Color del Grupo</label>
+                    <div className="color-swatches">
+                      {GROUP_COLORS.map((c) => (
+                        <button
+                          key={c}
+                          className={`color-swatch ${noteColor === c ? 'active' : ''}`}
+                          style={{ background: c, width: '26px', height: '26px', borderRadius: '50%' }}
+                          onClick={() => setNoteColor(c)}
+                        />
+                      ))}
+                    </div>
                   </div>
                 </div>
               </div>
+            )}
 
-              <div className="organizador-save-container" style={{ display: 'flex', width: '100%', marginTop: 'auto', paddingTop: '12px' }}>
+            {/* Botón de Guardado Completo del Bloque Izquierdo */}
+            {!readOnly && (
+              <div style={{ marginTop: '8px' }}>
                 <button
-                  className={`btn ${hasOrganizerChanges ? 'btn-danger pulse-danger-btn' : 'btn-success'}`}
+                  type="button"
+                  className={`btn ${hasCursoChanges || hasOrganizerChanges ? 'btn-danger pulse-danger-btn' : 'btn-success'}`}
                   style={{
                     width: '100%',
-                    fontWeight: 700,
+                    fontWeight: 900,
+                    fontSize: '0.95rem',
+                    padding: '12px 18px',
+                    borderRadius: '8px',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
                     gap: '8px',
-                    padding: hasOrganizerChanges ? '10px 16px' : '8px 12px',
-                    fontSize: hasOrganizerChanges ? '0.88rem' : '0.82rem',
-                    transition: 'all 0.3s ease',
-                    boxShadow: hasOrganizerChanges ? '0 4px 12px rgba(220, 38, 38, 0.3)' : 'none',
-                    borderRadius: 'var(--radius-sm, 6px)',
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.5px'
+                    boxShadow: hasCursoChanges || hasOrganizerChanges ? '0 4px 14px rgba(220, 38, 38, 0.35)' : '0 2px 8px rgba(16, 185, 129, 0.25)',
+                    cursor: 'pointer',
+                    letterSpacing: '0.3px'
                   }}
-                  onClick={handleSaveOrganizador}
+                  onClick={handleSaveAll}
                 >
-                  <Save size={hasOrganizerChanges ? 15 : 13} />
-                  {hasOrganizerChanges ? '⚠️ Guardar Cambios del Organizador' : 'Guardar Datos del Organizador'}
+                  <Save size={18} />
+                  {hasCursoChanges || hasOrganizerChanges ? '⚠️ GUARDAR TODOS LOS CAMBIOS' : 'GUARDAR DATOS DEL CURSO'}
                 </button>
               </div>
-            </div>
-          )}
+            )}
+          </div>
         </div>
-        {/* Note: the old closing div of nota-layout was removed here to let columns stand as direct siblings */}
 
-        {/* ─── Columna Derecha (Calendario) ───────────────────── */}
-        <div className="nota-col-widgets">
-          {/* Calendario de Actividades */}
-          <div className="calendar-section">
+        {/* ─── Columna 2: Cronograma de Sesiones & Centro de Acciones ─────────────────────────── */}
+        <div className="nota-col-schedule-and-actions" style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
+          
+          {/* Tarjeta 1: Calendario y Sesiones de Horarios */}
+          <div style={{ background: '#ffffff', border: '1.5px solid #e2e8f0', borderRadius: '10px', padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px', boxShadow: '0 2px 6px rgba(0,0,0,0.03)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #f1f5f9', paddingBottom: '8px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.92rem', fontWeight: 900, color: '#0f172a' }}>
+                <Clock size={16} style={{ color: '#0284c7' }} /> Programación de Sesiones
+              </div>
+              <span style={{ fontSize: '0.80rem', fontWeight: 800, background: '#e0f2fe', color: '#0369a1', padding: '3px 10px', borderRadius: '12px' }}>
+                {totalHours}h acumuladas
+              </span>
+            </div>
+
             <MiniMonthCalendar
               slots={slots}
               onSaveSlots={handleSaveSlots}
@@ -1299,52 +1338,120 @@ export default function NotaCard({
             />
           </div>
 
-          {/* Botones de acciones — integrados dentro de la columna */}
+          {/* Tarjeta 2: Centro de Control y Acciones */}
           {!readOnly && (
-            <div className="nota-actions-grid-4x2">
-              <button className="btn btn-danger btn-sm" onClick={onDelete}>
-                <Trash2 size={12} /> Eliminar
-              </button>
-              <button className="btn btn-teal btn-sm" onClick={() => onManageParticipantes(curso)}>
-                <Users size={12} /> Participantes
-              </button>
-              <button className="btn btn-whatsapp btn-sm" onClick={() => setShowInscripcionModal(true)}>
-                <Globe size={12} /> Insc. online
-              </button>
+            <div style={{ background: '#ffffff', border: '1.5px solid #e2e8f0', borderRadius: '10px', padding: '18px', display: 'flex', flexDirection: 'column', gap: '14px', boxShadow: '0 2px 6px rgba(0,0,0,0.03)' }}>
+              
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.92rem', fontWeight: 900, color: '#0f172a', borderBottom: '1px solid #f1f5f9', paddingBottom: '8px' }}>
+                <Wrench size={16} style={{ color: '#0284c7' }} /> Centro de Control del Curso
+              </div>
+
+              {/* Botón Héroe Primario: PARTICIPANTES */}
               <button
-                className="btn btn-primary btn-sm"
-                onClick={() => {
-                  const link = `${window.location.origin}/participantes/${curso.id}`;
-                  navigator.clipboard.writeText(link);
-                  Swal.fire({
-                    icon: 'success',
-                    title: 'Enlace copiado',
-                    text: 'El enlace de inscripción para los participantes fue copiado al portapapeles.',
-                    timer: 2500,
-                    showConfirmButton: false,
-                    toast: true,
-                    position: 'top-end'
-                  });
+                type="button"
+                style={{
+                  width: '100%',
+                  background: 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)',
+                  color: '#ffffff',
+                  border: 'none',
+                  borderRadius: '10px',
+                  padding: '14px 20px',
+                  fontSize: '1.05rem',
+                  fontWeight: 900,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '10px',
+                  boxShadow: '0 4px 14px rgba(2, 132, 199, 0.35)',
+                  cursor: 'pointer',
+                  letterSpacing: '0.5px'
                 }}
+                onClick={() => onManageParticipantes(curso)}
               >
-                <Link2 size={12} /> Link público
+                <Users size={22} /> PARTICIPANTES ({count})
               </button>
-              <button className="btn btn-purple btn-sm col-span-2" onClick={handlePrintFichaInscripcion}>
-                <FileText size={12} /> Ficha inscripción
-              </button>
-              <button className="btn btn-orange btn-sm">
-                <BookOpen size={12} /> Registro Pedg
-              </button>
-              <button
-                className={`btn ${curso.form_habilitado !== false ? 'btn-dark' : 'btn-secondary'} btn-sm`}
-                onClick={() => onUpdate({ form_habilitado: !(curso.form_habilitado !== false) })}
-              >
-                <ToggleLeft size={12} style={{ transform: curso.form_habilitado !== false ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} /> On/Off Form: {curso.form_habilitado !== false ? 'ON' : 'OFF'}
-              </button>
+
+              {/* Grid 2x2 de Acciones Secundarias */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                
+                {/* Inscripción Online */}
+                <button
+                  type="button"
+                  className="btn btn-whatsapp"
+                  style={{ padding: '10px 14px', fontSize: '0.88rem', fontWeight: 800, borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
+                  onClick={() => setShowInscripcionModal(true)}
+                >
+                  <Globe size={15} /> Insc. Online
+                </button>
+
+                {/* Copiar Link Público */}
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  style={{ padding: '10px 14px', fontSize: '0.88rem', fontWeight: 800, borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
+                  onClick={() => {
+                    const link = `${window.location.origin}/participantes/${curso.id}`;
+                    navigator.clipboard.writeText(link);
+                    Swal.fire({
+                      icon: 'success',
+                      title: 'Enlace copiado',
+                      text: 'El enlace de inscripción para los participantes fue copiado al portapapeles.',
+                      timer: 2200,
+                      showConfirmButton: false,
+                      toast: true,
+                      position: 'top-end'
+                    });
+                  }}
+                >
+                  <Link2 size={15} /> Link Público
+                </button>
+
+                {/* Ficha Inscripción */}
+                <button
+                  type="button"
+                  className="btn btn-purple"
+                  style={{ padding: '10px 14px', fontSize: '0.88rem', fontWeight: 800, borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
+                  onClick={handlePrintFichaInscripcion}
+                >
+                  <FileText size={15} /> Ficha Inscripción
+                </button>
+
+                {/* Registro Pedagógico */}
+                <button
+                  type="button"
+                  className="btn btn-orange"
+                  style={{ padding: '10px 14px', fontSize: '0.88rem', fontWeight: 800, borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
+                >
+                  <BookOpen size={15} /> Registro Pedg
+                </button>
+              </div>
+
+              {/* Barra Inferior: Estado del Formulario y Eliminar */}
+              <div style={{ display: 'flex', gap: '10px', paddingTop: '6px' }}>
+                <button
+                  type="button"
+                  className={`btn ${curso.form_habilitado !== false ? 'btn-dark' : 'btn-secondary'}`}
+                  style={{ flex: 1, padding: '9px 12px', fontSize: '0.84rem', fontWeight: 700, borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
+                  onClick={() => onUpdate({ form_habilitado: !(curso.form_habilitado !== false) })}
+                >
+                  <ToggleLeft size={16} style={{ transform: curso.form_habilitado !== false ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} /> Formulario: {curso.form_habilitado !== false ? 'HABILITADO' : 'CERRADO'}
+                </button>
+
+                <button
+                  type="button"
+                  className="btn btn-danger"
+                  style={{ padding: '9px 16px', fontSize: '0.84rem', fontWeight: 800, borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
+                  onClick={onDelete}
+                  title="Eliminar este curso"
+                >
+                  <Trash2 size={15} /> Eliminar
+                </button>
+              </div>
+
             </div>
           )}
-        </div>
 
+        </div>
       </div> {/* Closing nota-main-content */}
 
       {showInscripcionModal && (

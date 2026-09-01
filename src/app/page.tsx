@@ -1138,103 +1138,120 @@ function HomePage() {
         </div>
       </header>
 
-      {/* View Switcher Bar */}
+      {/* Executive View Switcher Tabs */}
       {viewMode === 'cursos' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '24px' }}>
-          <div className="view-switcher-bar" style={{ display: 'flex', width: '100%', gap: '8px', height: '10px' }}>
-            <button 
-              type="button"
-              onClick={() => setSelectedView('grupal')} 
-              title="Vista Grupal"
-              style={{
-                flex: 1,
-                height: '100%',
-                backgroundColor: '#dc2626',
-                border: 'none',
-                borderRadius: '5px',
-                cursor: 'pointer',
-                opacity: selectedView === 'grupal' ? 1 : 0.3,
-                transform: selectedView === 'grupal' ? 'scaleY(1.4)' : 'none',
-                boxShadow: selectedView === 'grupal' ? '0 0 8px rgba(220, 38, 38, 0.5)' : 'none',
-                transition: 'all 0.25s ease'
-              }}
-            />
-            <button 
-              type="button"
-              onClick={() => setSelectedView('area')} 
-              title="Vista por Área"
-              style={{
-                flex: 1,
-                height: '100%',
-                backgroundColor: '#f59e0b',
-                border: 'none',
-                borderRadius: '5px',
-                cursor: 'pointer',
-                opacity: selectedView === 'area' ? 1 : 0.3,
-                transform: selectedView === 'area' ? 'scaleY(1.4)' : 'none',
-                boxShadow: selectedView === 'area' ? '0 0 8px rgba(245, 158, 11, 0.5)' : 'none',
-                transition: 'all 0.25s ease'
-              }}
-            />
-            <button 
-              type="button"
-              onClick={() => setSelectedView('estados')} 
-              title="Vista Estados"
-              style={{
-                flex: 1,
-                height: '100%',
-                backgroundColor: '#10b981',
-                border: 'none',
-                borderRadius: '5px',
-                cursor: 'pointer',
-                opacity: selectedView === 'estados' ? 1 : 0.3,
-                transform: selectedView === 'estados' ? 'scaleY(1.4)' : 'none',
-                boxShadow: selectedView === 'estados' ? '0 0 8px rgba(16, 185, 129, 0.5)' : 'none',
-                transition: 'all 0.25s ease'
-              }}
-            />
-          </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0 4px', fontSize: '0.75rem', fontWeight: 700, color: 'var(--gray-600)' }}>
-            <span style={{ color: selectedView === 'grupal' ? '#dc2626' : 'inherit', transition: 'color 0.2s' }}>Vista Grupal (Por Defecto)</span>
-            <span style={{ color: selectedView === 'area' ? '#d97706' : 'inherit', transition: 'color 0.2s' }}>Vista por Área</span>
-            <span style={{ color: selectedView === 'estados' ? '#10b981' : 'inherit', transition: 'color 0.2s' }}>Vista Estados</span>
-          </div>
+        <div style={{ display: 'flex', gap: '8px', background: '#ffffff', padding: '6px', borderRadius: '12px', marginBottom: '18px', border: '1.5px solid #e2e8f0', boxShadow: '0 2px 6px rgba(0,0,0,0.03)', flexWrap: 'wrap' }}>
+          <button 
+            type="button"
+            onClick={() => setSelectedView('grupal')} 
+            style={{
+              flex: 1,
+              minWidth: '160px',
+              padding: '10px 16px',
+              backgroundColor: selectedView === 'grupal' ? '#0f172a' : 'transparent',
+              color: selectedView === 'grupal' ? '#ffffff' : '#475569',
+              border: 'none',
+              borderRadius: '8px',
+              cursor: 'pointer',
+              fontWeight: 800,
+              fontSize: '0.90rem',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '8px',
+              boxShadow: selectedView === 'grupal' ? '0 2px 8px rgba(15, 23, 42, 0.25)' : 'none',
+              transition: 'all 0.2s ease'
+            }}
+          >
+            <LayoutGrid size={16} /> Vista Grupal (Por Defecto)
+          </button>
+          <button 
+            type="button"
+            onClick={() => setSelectedView('area')} 
+            style={{
+              flex: 1,
+              minWidth: '160px',
+              padding: '10px 16px',
+              backgroundColor: selectedView === 'area' ? '#0284c7' : 'transparent',
+              color: selectedView === 'area' ? '#ffffff' : '#475569',
+              border: 'none',
+              borderRadius: '8px',
+              cursor: 'pointer',
+              fontWeight: 800,
+              fontSize: '0.90rem',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '8px',
+              boxShadow: selectedView === 'area' ? '0 2px 8px rgba(2, 132, 199, 0.25)' : 'none',
+              transition: 'all 0.2s ease'
+            }}
+          >
+            <BookOpen size={16} /> Vista por Área Formativa
+          </button>
+          <button 
+            type="button"
+            onClick={() => setSelectedView('estados')} 
+            style={{
+              flex: 1,
+              minWidth: '160px',
+              padding: '10px 16px',
+              backgroundColor: selectedView === 'estados' ? '#059669' : 'transparent',
+              color: selectedView === 'estados' ? '#ffffff' : '#475569',
+              border: 'none',
+              borderRadius: '8px',
+              cursor: 'pointer',
+              fontWeight: 800,
+              fontSize: '0.90rem',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '8px',
+              boxShadow: selectedView === 'estados' ? '0 2px 8px rgba(5, 150, 105, 0.25)' : 'none',
+              transition: 'all 0.2s ease'
+            }}
+          >
+            <Shield size={16} /> Vista Estados de Monitoreo
+          </button>
         </div>
       )}
 
       {/* Filter Bar */}
-      <div className="filter-bar">
+      <div className="filter-bar" style={{ background: '#ffffff', border: '1.5px solid #e2e8f0', borderRadius: '12px', padding: '16px', boxShadow: '0 2px 8px rgba(0,0,0,0.03)', marginBottom: '18px' }}>
         <div className="filter-group">
-          <label className="filter-label"><Search size={12} /> Buscar</label>
+          <label className="filter-label" style={{ fontSize: '0.84rem', fontWeight: 800, color: '#1e293b' }}><Search size={14} /> Buscar</label>
           <input
             className="filter-input"
             type="text"
             placeholder={viewMode === 'cursos' ? "ID, ciclo, distrito, facilitador, grupo..." : "Nombre, teléfono, lugar, descripción..."}
             value={filters.busqueda}
             onChange={(e) => setFilters({ ...filters, busqueda: e.target.value })}
+            style={{ height: '42px', fontSize: '0.90rem', fontWeight: 600 }}
           />
         </div>
 
         {viewMode === 'cursos' && (
           <div className="filter-group">
-            <label className="filter-label"><Filter size={12} /> Preventivo</label>
+            <label className="filter-label" style={{ fontSize: '0.84rem', fontWeight: 800, color: '#1e293b' }}><Filter size={14} /> Preventivo</label>
             <input
               className="filter-input"
               type="text"
               placeholder="Número de preventivo"
               value={filters.preventivo}
               onChange={(e) => setFilters({ ...filters, preventivo: e.target.value })}
+              style={{ height: '42px', fontSize: '0.90rem', fontWeight: 600 }}
             />
           </div>
         )}
 
         {viewMode === 'cursos' && (
           <div className="filter-group">
-            <label className="filter-label"><CalendarDays size={12} /> Mes</label>
+            <label className="filter-label" style={{ fontSize: '0.84rem', fontWeight: 800, color: '#1e293b' }}><CalendarDays size={14} /> Mes</label>
             <select
               className="filter-select"
               value={filters.mes}
               onChange={(e) => setFilters({ ...filters, mes: e.target.value })}
+              style={{ height: '42px', fontSize: '0.90rem', fontWeight: 600 }}
             >
               <option value="">Todos los meses</option>
               {['ENERO','FEBRERO','MARZO','ABRIL','MAYO','JUNIO','JULIO','AGOSTO','SEPTIEMBRE','OCTUBRE','NOVIEMBRE','DICIEMBRE'].map((m) => (
@@ -1245,11 +1262,12 @@ function HomePage() {
         )}
 
         <div className="filter-group">
-          <label className="filter-label">Técnico</label>
+          <label className="filter-label" style={{ fontSize: '0.84rem', fontWeight: 800, color: '#1e293b' }}>Técnico</label>
           <select
             className="filter-select"
             value={filters.tecnico}
             onChange={(e) => setFilters({ ...filters, tecnico: e.target.value })}
+            style={{ height: '42px', fontSize: '0.90rem', fontWeight: 600 }}
           >
             <option value="">Todos los técnicos</option>
             {tecnicos.map((t) => (
@@ -1260,11 +1278,12 @@ function HomePage() {
 
         {viewMode === 'cursos' && (
           <div className="filter-group">
-            <label className="filter-label"><Filter size={14} /> Notas Revisadas</label>
+            <label className="filter-label" style={{ fontSize: '0.84rem', fontWeight: 800, color: '#1e293b' }}><Filter size={14} /> Notas Revisadas</label>
             <select
               className="filter-select"
               value={filters.notasRevisadas}
               onChange={(e) => setFilters({ ...filters, notasRevisadas: e.target.value as AppFilters['notasRevisadas'] })}
+              style={{ height: '42px', fontSize: '0.90rem', fontWeight: 600 }}
             >
               <option value="todos">Todos</option>
               <option value="sie-validado">Validación SIE (Validado)</option>
@@ -1278,11 +1297,12 @@ function HomePage() {
 
         {viewMode === 'cursos' && (
           <div className="filter-group">
-            <label className="filter-label">Agrupar por</label>
+            <label className="filter-label" style={{ fontSize: '0.84rem', fontWeight: 800, color: '#1e293b' }}>Agrupar por</label>
             <select
               className="filter-select"
               value={filters.agruparPor}
               onChange={(e) => setFilters({ ...filters, agruparPor: e.target.value as AppFilters['agruparPor'] })}
+              style={{ height: '42px', fontSize: '0.90rem', fontWeight: 600 }}
             >
               <option value="grupo">Grupo de color</option>
               <option value="tecnico">Técnico</option>
@@ -1303,12 +1323,12 @@ function HomePage() {
               alignItems: 'center',
               justifyContent: 'center',
               gap: '6px',
-              fontWeight: 700,
-              fontSize: '0.85rem',
+              fontWeight: 800,
+              fontSize: '0.88rem',
               color: '#d93025',
-              borderColor: 'rgba(217, 48, 37, 0.2)',
-              background: 'rgba(217, 48, 37, 0.06)',
-              border: '1.5px solid rgba(217, 48, 37, 0.2)',
+              borderColor: 'rgba(217, 48, 37, 0.3)',
+              background: 'rgba(217, 48, 37, 0.08)',
+              border: '1.5px solid rgba(217, 48, 37, 0.3)',
               borderRadius: 'var(--radius-sm)',
               cursor: 'pointer',
               transition: 'all var(--transition-fast)',
@@ -1316,17 +1336,17 @@ function HomePage() {
             }}
             onClick={handleClearFilters}
             onMouseEnter={(e) => {
-              e.currentTarget.style.background = 'rgba(217, 48, 37, 0.12)';
+              e.currentTarget.style.background = 'rgba(217, 48, 37, 0.15)';
               e.currentTarget.style.borderColor = '#d93025';
-              e.currentTarget.style.boxShadow = '0 2px 8px rgba(217, 48, 37, 0.15)';
+              e.currentTarget.style.boxShadow = '0 2px 8px rgba(217, 48, 37, 0.2)';
             }}
             onMouseLeave={(e) => {
-              e.currentTarget.style.background = 'rgba(217, 48, 37, 0.06)';
-              e.currentTarget.style.borderColor = 'rgba(217, 48, 37, 0.2)';
+              e.currentTarget.style.background = 'rgba(217, 48, 37, 0.08)';
+              e.currentTarget.style.borderColor = 'rgba(217, 48, 37, 0.3)';
               e.currentTarget.style.boxShadow = 'none';
             }}
           >
-            <X size={15} /> Borrar Filtros
+            <X size={16} /> Borrar Filtros
           </button>
         </div>
       </div>

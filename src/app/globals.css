@@ -3095,11 +3095,13 @@ h6 {
 
 @media (min-width: 1024px) {
 
-  /* Force side-by-side 3-column horizontal sections of equal width */
+  /* Force side-by-side 2-column balanced layout for Focus Mode */
   .nota-card .nota-main-content {
     display: grid !important;
-    grid-template-columns: repeat(3, 1fr) !important;
+    grid-template-columns: 1.18fr 0.92fr !important;
     gap: 20px !important;
+    padding: 20px !important;
+    background: #f8fafc !important;
     align-items: stretch !important;
   }
 }
