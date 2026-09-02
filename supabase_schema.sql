@@ -112,6 +112,7 @@ CREATE TABLE IF NOT EXISTS cursos (
   total_aprobados INTEGER DEFAULT 0,
   total_reprobados INTEGER DEFAULT 0,
   form_habilitado BOOLEAN DEFAULT true,
+  mostrar_whatsapp BOOLEAN DEFAULT true,
   created_at TIMESTAMPTZ DEFAULT now(),
   updated_at TIMESTAMPTZ DEFAULT now()
 );
@@ -602,6 +603,7 @@ ALTER TABLE IF EXISTS participantes ADD COLUMN IF NOT EXISTS documento_url TEXT;
 ALTER TABLE IF EXISTS participantes ADD COLUMN IF NOT EXISTS fecha_nacimiento TEXT;
 ALTER TABLE IF EXISTS inscripcion_ciclo ADD COLUMN IF NOT EXISTS documento_url TEXT;
 ALTER TABLE IF EXISTS inscripcion_ciclo ADD COLUMN IF NOT EXISTS comprobante_url TEXT;
+ALTER TABLE IF EXISTS cursos ADD COLUMN IF NOT EXISTS mostrar_whatsapp BOOLEAN DEFAULT true;
 
 ALTER TABLE reportes_html ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Permitir todo en reportes_html" ON reportes_html;

@@ -22,6 +22,10 @@ const formatOnlyDate = (fechaStr: string | null | undefined): string => {
 
 const getWhatsAppUrl = (c: Curso | null): string | null => {
   if (!c) return null;
+  // Si se ha configurado ocultar el enlace de WhatsApp para este curso
+  if (c.mostrar_whatsapp === false) return null;
+  if (c.observaciones && (c.observaciones.includes('[WA_OCULTO]') || c.observaciones.includes('[OCULTAR_WA]'))) return null;
+
   // 1. Check link_inscripcion_externo
   if (c.link_inscripcion_externo && c.link_inscripcion_externo.trim()) {
     const raw = c.link_inscripcion_externo.trim();
@@ -369,7 +373,7 @@ export default function ParticipanteRegistroPage() {
             </div>
           </div>
 
-          {/* Botón directo para unirse al Grupo de WhatsApp (afuera del formulario, oculto si inscripciones cerradas) */}
+          {/* Botón directo para unirse al Grupo de WhatsApp (afuera del formulario, oculto si inscripciones cerradas o si WhatsApp está oculto) */}
           {curso.form_habilitado !== false && (
             whatsappUrl ? (
               <div style={{ marginTop: '4px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', width: '100%' }}>
@@ -404,11 +408,11 @@ export default function ParticipanteRegistroPage() {
                   👉 Haz clic aquí para unirte al grupo oficial de comunicación en WhatsApp
                 </span>
               </div>
-            ) : (
+            ) : (curso.mostrar_whatsapp !== false && !curso.observaciones?.includes('[WA_OCULTO]') && !curso.observaciones?.includes('[OCULTAR_WA]')) ? (
               <div style={{ marginTop: '4px', textAlign: 'center', fontSize: '0.78rem', color: 'var(--gray-500)', fontStyle: 'italic' }}>
                 (El enlace del grupo de WhatsApp será proporcionado por el técnico responsable)
               </div>
-            )
+            ) : null
           )}
 
           {/* Advertencia Importante de Depósito y Grupo de WhatsApp */}
@@ -431,7 +435,7 @@ export default function ParticipanteRegistroPage() {
               <strong style={{ color: '#b45309', display: 'block', fontSize: '0.88rem', marginBottom: '2px' }}>
                 ⚠️ ADVERTENCIA IMPORTANTE:
               </strong>
-              Por favor <strong>NO REALIZAR NINGÚN DEPÓSITO</strong> hasta confirmar la apertura del grupo. Toda la información y avisos oficiales se comunicarán a través del <strong>grupo de WhatsApp</strong>.
+              Por favor <strong>NO REALIZAR NINGÚN DEPÓSITO</strong> hasta confirmar la apertura del grupo. {whatsappUrl ? 'Toda la información y avisos oficiales se comunicarán a través del grupo de WhatsApp.' : 'Toda la información y avisos oficiales se comunicarán oportunamente por los responsables del curso.'}
             </div>
           </div>
         </div>
@@ -468,7 +472,7 @@ export default function ParticipanteRegistroPage() {
 
             {/* Aviso de no realizar depósitos */}
             <div style={{ background: '#fffbe6', border: '1px solid #f59e0b', borderRadius: '8px', padding: '10px 14px', fontSize: '0.8rem', color: '#92400e', maxWidth: '440px' }}>
-              <b>Recordatorio:</b> No realices ningún depósito hasta que se confirme la apertura del grupo en WhatsApp.
+              <b>Recordatorio:</b> No realices ningún depósito hasta que se confirme la apertura del grupo{whatsappUrl ? ' en WhatsApp' : ''}.
             </div>
 
             {/* Botón de acceso directo al grupo de WhatsApp (sin exponer URL directa en texto) */}
@@ -502,11 +506,11 @@ export default function ParticipanteRegistroPage() {
                   Haz clic arriba para unirte al grupo de comunicación oficial
                 </span>
               </div>
-            ) : (
+            ) : (curso.mostrar_whatsapp !== false && !curso.observaciones?.includes('[WA_OCULTO]') && !curso.observaciones?.includes('[OCULTAR_WA]')) ? (
               <p style={{ fontSize: '0.82rem', color: 'var(--gray-500)', marginTop: '8px', fontStyle: 'italic' }}>
                 (El técnico responsable compartirá el enlace del grupo de WhatsApp próximamente)
               </p>
-            )}
+            ) : null}
           </div>
         ) : (
           /* Formulario de registro */

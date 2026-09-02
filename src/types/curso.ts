@@ -51,6 +51,7 @@ export interface Curso {
   created_at: string;
   updated_at: string;
   form_habilitado?: boolean;
+  mostrar_whatsapp?: boolean;
 
   // Campos enriquecidos (del JOIN / vista)
   tecnico_nombre?: string;
@@ -91,6 +92,7 @@ export interface CursoFormData {
   prev: string;
   grupo_nombre: string;
   grupo_color: string;
+  mostrar_whatsapp?: boolean;
 }
 
 export interface Grupo {

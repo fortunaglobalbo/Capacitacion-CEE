@@ -341,6 +341,39 @@ export default function NotaCard({
     });
   };
 
+  // ─── WhatsApp Link Visibility Toggle ──────────────────────
+  const isWaVisible = curso.mostrar_whatsapp !== false && !(curso.observaciones && (curso.observaciones.includes('[WA_OCULTO]') || curso.observaciones.includes('[OCULTAR_WA]')));
+
+  const handleToggleWhatsApp = async () => {
+    const willBeVisible = !isWaVisible;
+    let newObs = observaciones || '';
+    if (!willBeVisible) {
+      if (!newObs.includes('[WA_OCULTO]')) {
+        newObs = (newObs.trim() + ' [WA_OCULTO]').trim();
+      }
+    } else {
+      newObs = newObs.replace(/\[WA_OCULTO\]/g, '').replace(/\[OCULTAR_WA\]/g, '').trim();
+    }
+    setObservaciones(newObs);
+
+    await onUpdate({
+      mostrar_whatsapp: willBeVisible,
+      observaciones: newObs
+    });
+
+    Swal.fire({
+      icon: willBeVisible ? 'success' : 'info',
+      title: willBeVisible ? 'WhatsApp visible' : 'WhatsApp ocultado',
+      text: willBeVisible
+        ? 'El enlace al grupo de WhatsApp ahora se mostrará en el link público de inscripción.'
+        : 'El enlace al grupo de WhatsApp ha sido ocultado del link público de inscripción.',
+      timer: 2200,
+      showConfirmButton: false,
+      toast: true,
+      position: 'top-end'
+    });
+  };
+
   // ─── Save curso info ───────────────────────────────────────
   const handleSaveCursoInfo = () => {
     const finalGrupoNombre = editNewGrupoNombre.trim() ? editNewGrupoNombre.trim() : editGrupoNombre;
@@ -1226,7 +1259,30 @@ export default function NotaCard({
                   </div>
 
                   <div className="organizador-field" style={{ gridColumn: 'span 2' }}>
-                    <label style={{ fontSize: '0.82rem', fontWeight: 800, color: '#334155' }}>Grupo de WhatsApp</label>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                      <label style={{ fontSize: '0.82rem', fontWeight: 800, color: '#334155' }}>Grupo de WhatsApp</label>
+                      <button
+                        type="button"
+                        onClick={handleToggleWhatsApp}
+                        style={{
+                          background: isWaVisible ? '#ecfdf5' : '#fef2f2',
+                          color: isWaVisible ? '#047857' : '#b91c1c',
+                          border: isWaVisible ? '1.5px solid #a7f3d0' : '1.5px solid #fecaca',
+                          borderRadius: '6px',
+                          padding: '2px 8px',
+                          fontSize: '0.74rem',
+                          fontWeight: 800,
+                          cursor: 'pointer',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '4px',
+                          transition: 'all 0.15s ease'
+                        }}
+                        title="Haz clic para ocultar o mostrar el enlace de WhatsApp en el link público de inscripción"
+                      >
+                        {isWaVisible ? '👁️ Link Público: VISIBLE' : '🙈 Link Público: OCULTO'}
+                      </button>
+                    </div>
                     <div style={{ display: 'flex', gap: '6px' }}>
                       <input
                         type="text"
@@ -1426,25 +1482,40 @@ export default function NotaCard({
                 </button>
               </div>
 
-              {/* Barra Inferior: Estado del Formulario y Eliminar */}
-              <div style={{ display: 'flex', gap: '10px', paddingTop: '6px' }}>
-                <button
-                  type="button"
-                  className={`btn ${curso.form_habilitado !== false ? 'btn-dark' : 'btn-secondary'}`}
-                  style={{ flex: 1, padding: '9px 12px', fontSize: '0.84rem', fontWeight: 700, borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
-                  onClick={() => onUpdate({ form_habilitado: !(curso.form_habilitado !== false) })}
-                >
-                  <ToggleLeft size={16} style={{ transform: curso.form_habilitado !== false ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} /> Formulario: {curso.form_habilitado !== false ? 'HABILITADO' : 'CERRADO'}
-                </button>
+              {/* Barra Inferior: Estado del Formulario, WhatsApp en Link Público y Eliminar */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', paddingTop: '6px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                  {/* Botón Habilitar/Cerrar Formulario */}
+                  <button
+                    type="button"
+                    className={`btn ${curso.form_habilitado !== false ? 'btn-dark' : 'btn-secondary'}`}
+                    style={{ padding: '9px 8px', fontSize: '0.82rem', fontWeight: 700, borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px' }}
+                    onClick={() => onUpdate({ form_habilitado: !(curso.form_habilitado !== false) })}
+                    title={curso.form_habilitado !== false ? 'El formulario público está habilitado para recibir inscripciones' : 'El formulario público está cerrado'}
+                  >
+                    <ToggleLeft size={16} style={{ transform: curso.form_habilitado !== false ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} /> Formulario: {curso.form_habilitado !== false ? 'ABIERTO' : 'CERRADO'}
+                  </button>
+
+                  {/* Botón Mostrar/Ocultar WhatsApp en Link Público */}
+                  <button
+                    type="button"
+                    className={`btn ${isWaVisible ? 'btn-whatsapp' : 'btn-secondary'}`}
+                    style={{ padding: '9px 8px', fontSize: '0.82rem', fontWeight: 800, borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px' }}
+                    onClick={handleToggleWhatsApp}
+                    title="Haz clic para ocultar o mostrar el enlace al grupo de WhatsApp en el link público de inscripción"
+                  >
+                    <MessageCircle size={15} /> WA Público: {isWaVisible ? 'VISIBLE' : 'OCULTO'}
+                  </button>
+                </div>
 
                 <button
                   type="button"
                   className="btn btn-danger"
-                  style={{ padding: '9px 16px', fontSize: '0.84rem', fontWeight: 800, borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
+                  style={{ width: '100%', padding: '8px 16px', fontSize: '0.82rem', fontWeight: 800, borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
                   onClick={onDelete}
                   title="Eliminar este curso"
                 >
-                  <Trash2 size={15} /> Eliminar
+                  <Trash2 size={15} /> Eliminar este curso
                 </button>
               </div>
 

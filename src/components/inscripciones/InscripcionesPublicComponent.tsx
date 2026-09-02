@@ -231,8 +231,9 @@ export function InscripcionesPublicComponent() {
               tema1: rawCurso.tema1 || cf.tema1 || rawCurso.grupo_nombre || '',
               tema2: rawCurso.tema2 || cf.tema2 || '',
               tema3: rawCurso.tema3 || cf.tema3 || '',
-              tema4: rawCurso.tema4 || cf.tema4 || '',
-              link_whatsapp: rawCurso.link_inscripcion_externo || rawCurso.grupo_whatsapp || rawCurso.link_whatsapp || null,
+              link_whatsapp: (rawCurso.mostrar_whatsapp === false || (rawCurso.observaciones && (rawCurso.observaciones.includes('[WA_OCULTO]') || rawCurso.observaciones.includes('[OCULTAR_WA]'))))
+                ? null
+                : (rawCurso.link_inscripcion_externo || rawCurso.grupo_whatsapp || rawCurso.link_whatsapp || null),
               inscripcion_id: item.id,
               comprobante_url: item.comprobante_url || null,
               documento_url: item.documento_url || null

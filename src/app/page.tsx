@@ -901,8 +901,8 @@ function HomePage() {
       const { error } = await supabase.from('cursos').update(data).eq('id', id);
 
       if (error) {
-        // Fallback if organizer columns are not yet added to 'cursos' table in Supabase
-        if (error.message && error.message.includes('organizador_')) {
+        // Fallback if organizer or mostrar_whatsapp columns are not yet added to 'cursos' table in Supabase
+        if (error.message && (error.message.includes('organizador_') || error.message.includes('mostrar_whatsapp'))) {
           const cleanData = { ...data };
           delete cleanData.organizador_nombre;
           delete cleanData.organizador_telefono;
@@ -911,16 +911,11 @@ function HomePage() {
           delete cleanData.organizador_descripcion;
           delete cleanData.organizador_semaforo;
           delete cleanData.organizador_color;
+          delete cleanData.mostrar_whatsapp;
 
           const { error: retryErr } = await supabase.from('cursos').update(cleanData).eq('id', id);
           if (retryErr) throw retryErr;
 
-          Swal.fire({
-            icon: 'info',
-            title: 'Actualizado parcialmente',
-            text: 'Para guardar los datos del organizador directamente en la tabla cursos, por favor ejecuta la sentencia SQL provista en Supabase.',
-            confirmButtonColor: '#bfa05e',
-          });
           loadData();
           return;
         }
