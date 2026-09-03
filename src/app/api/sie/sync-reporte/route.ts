@@ -825,6 +825,91 @@ tbody tr:hover { filter: brightness(.96); }
     border-color: #e11d48 !important;
     box-shadow: 0 2px 8px rgba(225, 29, 72, 0.3);
 }
+
+/* Subsanación provisional */
+.subsanar-check-container {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    background: rgba(241, 245, 249, 0.95);
+    border: 1px solid #cbd5e1;
+    border-radius: 6px;
+    padding: 2px 7px;
+    font-size: 10px;
+    font-weight: 700;
+    color: #334155;
+    cursor: pointer;
+    user-select: none;
+    margin-bottom: 5px;
+    transition: all 0.15s ease;
+}
+.subsanar-check-container:hover {
+    background: #e2e8f0;
+    border-color: #94a3b8;
+}
+.subsanar-check-container input[type="checkbox"] {
+    cursor: pointer;
+    margin: 0;
+    width: 13px;
+    height: 13px;
+    accent-color: #059669;
+}
+.curso.curso-subsanado {
+    border: 2.5px solid #10b981 !important;
+    background: #f0fdf4 !important;
+    box-shadow: 0 4px 14px rgba(16, 185, 129, 0.25) !important;
+    border-radius: 10px !important;
+}
+.curso.curso-subsanado .badge-prioridad {
+    display: none !important;
+}
+.badge-subsanado {
+    background: #d1fae5 !important;
+    color: #065f46 !important;
+    border: 1px solid #34d399 !important;
+    font-size: 10px !important;
+    font-weight: 800 !important;
+    margin-bottom: 4px;
+    display: inline-block;
+    width: 100%;
+    text-align: center;
+    border-radius: 6px;
+    padding: 2px 4px;
+}
+.curso.curso-subsanado .paso.bad {
+    background: #f1f5f9 !important;
+    color: #475569 !important;
+    border-color: #cbd5e1 !important;
+    opacity: 0.75;
+}
+.curso.curso-subsanado .paso.bad .ico {
+    color: #64748b !important;
+}
+.curso.curso-subsanado .paso-prioritario-plan,
+.curso.curso-subsanado .paso-prioritario-informe {
+    border: 1.5px dashed #94a3b8 !important;
+    background: #f8fafc !important;
+    color: #64748b !important;
+}
+.btn-limpiar-subsanados {
+    padding: 8px 12px;
+    border: 1px solid #cbd5e1;
+    border-radius: 8px;
+    font-size: 11px;
+    font-weight: 700;
+    background: #fff;
+    color: #059669;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    transition: all .15s;
+}
+.btn-limpiar-subsanados:hover {
+    background: #ecfdf5;
+    border-color: #10b981;
+}
+
 .curso .nombre { font-weight: 600; font-size: 12px; display: block; margin-bottom: 6px; line-height: 1.35; }
 .bateria { display: flex; flex-direction: column; gap: 4px; }
 .paso { display: flex; align-items: center; gap: 7px; font-size: 12px; padding: 5px 8px; border-radius: 7px; line-height: 1.2; border: 1.5px solid transparent; transition: all .15s; }
@@ -878,6 +963,7 @@ a:hover { opacity: .75; }
         <button id="btnFiltroPrioritarios" class="btn-filter" onclick="setFiltroEstado('prioritarios')" style="color:#e11d48; font-weight:700;">⚡ Prioritarios</button>
         <button id="btnFiltroPendientes" class="btn-filter" onclick="setFiltroEstado('pendientes')">⚠️ Con Pendientes</button>
         <button id="btnFiltroOk" class="btn-filter" onclick="setFiltroEstado('ok')">✓ Todo OK</button>
+        <button id="btnLimpiarSubsanados" class="btn-limpiar-subsanados" onclick="limpiarTodosSubsanados()" title="Desmarcar todos los cursos provisionalmente subsanados">🧹 Limpiar Subsanados</button>
     </div>
 </div>
 
@@ -1028,8 +1114,111 @@ function marcarPrioritarios() {
     });
 }
 
+function getCursoKey(cursoEl) {
+    var tr = cursoEl.closest('tr');
+    var facTd = tr ? tr.querySelector('td:nth-child(3)') : null;
+    var cicloTd = tr ? tr.querySelector('td:nth-child(1)') : null;
+    var nombreEl = cursoEl.querySelector('.nombre');
+    
+    var fac = facTd ? facTd.textContent.replace(/[^a-zA-Z0-9]/g, '').toLowerCase() : '';
+    var ciclo = cicloTd ? cicloTd.textContent.replace(/[^a-zA-Z0-9]/g, '').toLowerCase().substring(0, 25) : '';
+    var nom = nombreEl ? nombreEl.textContent.replace(/[^a-zA-Z0-9]/g, '').toLowerCase().substring(0, 35) : '';
+
+    var cursoCards = tr ? Array.from(tr.querySelectorAll('.curso')) : [];
+    var cIdx = cursoCards.indexOf(cursoEl);
+
+    return 'sub_' + fac.substring(0, 20) + '_' + ciclo + '_' + nom + '_' + cIdx;
+}
+
+function getSubsanadosMap() {
+    try {
+        var raw = localStorage.getItem('reporte_cursos_subsanados');
+        return raw ? JSON.parse(raw) : {};
+    } catch(e) {
+        return {};
+    }
+}
+
+function saveSubsanadosMap(map) {
+    try {
+        localStorage.setItem('reporte_cursos_subsanados', JSON.stringify(map));
+    } catch(e) {}
+}
+
+function aplicarEstadoSubsanado(cursoEl, isSubsanado) {
+    var badge = cursoEl.querySelector('.badge-subsanado');
+    if (isSubsanado) {
+        cursoEl.classList.add('curso-subsanado');
+        if (!badge) {
+            badge = document.createElement('span');
+            badge.className = 'badge badge-subsanado';
+            badge.innerHTML = '✓ Subsanado (Provisional)';
+            var ref = cursoEl.querySelector('.bateria') || cursoEl.firstChild;
+            cursoEl.insertBefore(badge, ref);
+        } else {
+            badge.style.display = 'inline-block';
+        }
+    } else {
+        cursoEl.classList.remove('curso-subsanado');
+        if (badge) {
+            badge.style.display = 'none';
+        }
+    }
+}
+
+function initSubsanaciones() {
+    var subsMap = getSubsanadosMap();
+    var cursos = document.querySelectorAll('.curso');
+
+    cursos.forEach(function(curso) {
+        var key = getCursoKey(curso);
+        var isChecked = !!subsMap[key];
+
+        aplicarEstadoSubsanado(curso, isChecked);
+
+        var container = curso.querySelector('.subsanar-check-container');
+        if (!container) {
+            container = document.createElement('label');
+            container.className = 'subsanar-check-container';
+            container.title = 'Marcar como subsanado provisionalmente hasta el próximo análisis';
+            container.innerHTML = '<input type="checkbox" ' + (isChecked ? 'checked' : '') + ' data-key="' + key + '"><span>Subsanado</span>';
+            
+            var cb = container.querySelector('input');
+            cb.addEventListener('change', function(e) {
+                e.stopPropagation();
+                var curMap = getSubsanadosMap();
+                if (this.checked) {
+                    curMap[key] = true;
+                } else {
+                    delete curMap[key];
+                }
+                saveSubsanadosMap(curMap);
+                aplicarEstadoSubsanado(curso, this.checked);
+            });
+
+            var nombreEl = curso.querySelector('.nombre');
+            if (nombreEl) {
+                curso.insertBefore(container, nombreEl);
+            } else {
+                curso.insertBefore(container, curso.firstChild);
+            }
+        } else {
+            var cb = container.querySelector('input');
+            if (cb) cb.checked = isChecked;
+        }
+    });
+}
+
+function limpiarTodosSubsanados() {
+    if (confirm('¿Deseas desmarcar todos los cursos subsanados provisionalmente?')) {
+        localStorage.removeItem('reporte_cursos_subsanados');
+        initSubsanaciones();
+    }
+}
+
 function buscar() {
     marcarPrioritarios();
+    initSubsanaciones();
 
     var input = document.getElementById('buscar');
     var filter = input ? input.value.toLowerCase().trim() : '';
@@ -1096,6 +1285,7 @@ function initReporte() {
         }
     }
     buscar();
+    initSubsanaciones();
 }
 
 if (document.readyState === 'loading') {
