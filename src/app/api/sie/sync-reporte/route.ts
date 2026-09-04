@@ -798,6 +798,11 @@ export async function POST(request: Request) {
         <td title="${grp.facilitador}" style="vertical-align:middle;">
             <strong style="font-size:13px; color:#0f172a; display:block;">${grp.facilitador}</strong>
             <span style="font-size:11px; color:#64748b; font-weight:600;">${grp.courses.length} curso${grp.courses.length > 1 ? 's' : ''} en ${grp.mes}</span>
+            <div style="margin-top: 6px;">
+                <button type="button" class="btn-validar-fac" onclick="validarFacilitadorFila(this)" title="Revalidar datos de este facilitador en SIE UNEFCO">
+                    <span class="btn-val-icon">🔄</span> <span class="btn-val-text">Validar</span>
+                </button>
+            </div>
         </td>
         <td title="${sedesSummary} | ${ciclosSummary}" style="vertical-align:middle; font-size:11px; max-width:220px;">
             <div style="font-weight:600; color:#334155; line-height:1.3;">${sedesShort || 'Sede General'}</div>
@@ -983,6 +988,51 @@ tbody tr:hover { filter: brightness(.96); }
 @keyframes pulse-badge {
     0%, 100% { transform: scale(1); opacity: 0.95; }
     50% { transform: scale(1.05); opacity: 1; }
+}
+.btn-validar-fac {
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 4px !important;
+    background: #0284c7 !important;
+    color: #ffffff !important;
+    border: none !important;
+    border-radius: 6px !important;
+    padding: 3px 8px !important;
+    font-size: 11px !important;
+    font-weight: 700 !important;
+    cursor: pointer !important;
+    box-shadow: 0 1px 3px rgba(2, 132, 199, 0.25) !important;
+    transition: all 0.15s ease !important;
+}
+.btn-validar-fac:hover {
+    background: #0369a1 !important;
+    transform: translateY(-1px) !important;
+    box-shadow: 0 3px 6px rgba(2, 132, 199, 0.35) !important;
+}
+.btn-validar-fac:disabled {
+    background: #94a3b8 !important;
+    cursor: not-allowed !important;
+    transform: none !important;
+    box-shadow: none !important;
+}
+.btn-validar-fac.success {
+    background: #10b981 !important;
+    box-shadow: 0 2px 6px rgba(16, 185, 129, 0.35) !important;
+}
+@keyframes spin-val {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+.btn-validar-fac.loading .btn-val-icon {
+    display: inline-block !important;
+    animation: spin-val 0.8s linear infinite !important;
+}
+@keyframes row-updated-glow {
+    0% { background-color: rgba(16, 185, 129, 0.4) !important; }
+    100% { background-color: inherit; }
+}
+.tr-updated-glow {
+    animation: row-updated-glow 2.5s ease-out !important;
 }
 .badge-prioridad {
     background: #ffe4e6 !important;
@@ -1406,6 +1456,85 @@ function initSubsanaciones() {
         });
     } catch(e) {
         console.error('Error en initSubsanaciones:', e);
+    }
+}
+
+async function validarFacilitadorFila(btn) {
+    var tr = btn.closest('tr');
+    if (!tr) return;
+
+    var facEl = tr.querySelector('strong');
+    var facilitador = facEl ? facEl.innerText.trim() : '';
+    var mes = (tr.getAttribute('data-mes') || '').toLowerCase().trim();
+
+    var linkEls = tr.querySelectorAll('a.btn-sie-link');
+    var eventUrls = [];
+    linkEls.forEach(function(a) {
+        if (a.href && eventUrls.indexOf(a.href) === -1) {
+            eventUrls.push(a.href);
+        }
+    });
+
+    if (!facilitador) {
+        alert('No se pudo identificar el facilitador de la fila');
+        return;
+    }
+
+    var originalHtml = btn.innerHTML;
+    btn.disabled = true;
+    btn.classList.add('loading');
+    btn.innerHTML = '<span class="btn-val-icon">⏳</span> <span class="btn-val-text">Validando en SIE...</span>';
+
+    try {
+        var res = await fetch('/api/sie/validar-facilitador', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                facilitador: facilitador,
+                mes: mes,
+                eventUrls: eventUrls
+            })
+        });
+
+        var data = await res.json();
+        if (!data.success) {
+            throw new Error(data.error || 'Error al validar facilitador en SIE');
+        }
+
+        if (data.rowHtml) {
+            var temp = document.createElement('tbody');
+            temp.innerHTML = data.rowHtml;
+            var newTr = temp.querySelector('tr');
+            if (newTr) {
+                var curTec = tr.getAttribute('data-tecnico');
+                if (curTec) newTr.setAttribute('data-tecnico', curTec);
+                var curStyle = tr.getAttribute('style');
+                if (curStyle) newTr.setAttribute('style', curStyle);
+
+                newTr.classList.add('tr-updated-glow');
+                tr.parentNode.replaceChild(newTr, tr);
+
+                initSubsanaciones();
+                buscar();
+                return;
+            }
+        }
+
+        btn.classList.remove('loading');
+        btn.classList.add('success');
+        btn.innerHTML = '<span class="btn-val-icon">✓</span> <span class="btn-val-text">¡Al día!</span>';
+        setTimeout(function() {
+            btn.disabled = false;
+            btn.classList.remove('success');
+            btn.innerHTML = originalHtml;
+        }, 3000);
+
+    } catch (err) {
+        console.error('Error al validar facilitador:', err);
+        btn.classList.remove('loading');
+        btn.disabled = false;
+        btn.innerHTML = originalHtml;
+        alert('No se pudo validar al facilitador en SIE: ' + (err.message || 'Error de conexión'));
     }
 }
 
