@@ -407,6 +407,13 @@ export async function POST(request: Request) {
               fecha_fin: cFin,
               deadline: deadline ? `${deadline.getDate().toString().padStart(2, '0')}/${(deadline.getMonth() + 1).toString().padStart(2, '0')}/${deadline.getFullYear()}` : '',
               plan: hasPlan ? 'SI' : 'NO',
+              has_plan: hasPlan,
+              has_report: hasReport,
+              conform_ok: conformOk,
+              planif_date_obj: planifDate,
+              cierre_date_obj: cierreDate,
+              inicio_date_obj: inicioDt,
+              fin_date_obj: finDt,
               eval_notas_resp: evalNotasResp,
               eval_notas_total: totalStd,
               val_pct: valPct,
@@ -485,6 +492,95 @@ export async function POST(request: Request) {
       return cicloA.localeCompare(cicloB);
     });
 
+    // Paso de Unificación Mensual por Facilitador:
+    // Los facilitadores entregan UN SOLO informe final mensual.
+    // Agrupamos todos los cursos de cada facilitador por mes de socialización (o de inicio).
+    const facilitatorMonthGroups: Record<string, {
+      facilitador: string;
+      mes: string;
+      courses: any[];
+      events: any[];
+    }> = {};
+
+    for (const ev of deduplicatedEvents) {
+      const facKey = normalizeText(ev.facilitador);
+      for (const cr of ev.courses) {
+        let mNum = 0;
+        if (cr.fin_date_obj) {
+          mNum = cr.fin_date_obj.getMonth() + 1;
+        } else if (cr.inicio_date_obj) {
+          mNum = cr.inicio_date_obj.getMonth() + 1;
+        }
+        const mName = (mNum && MONTH_NAMES[mNum]) ? MONTH_NAMES[mNum] : (ev.mes || 'Mes');
+        cr.socializacion_month = mName;
+        const groupKey = `${facKey}_${mName.toLowerCase()}`;
+
+        if (!facilitatorMonthGroups[groupKey]) {
+          facilitatorMonthGroups[groupKey] = {
+            facilitador: ev.facilitador,
+            mes: mName,
+            courses: [],
+            events: [],
+          };
+        }
+        facilitatorMonthGroups[groupKey].courses.push(cr);
+        if (!facilitatorMonthGroups[groupKey].events.includes(ev)) {
+          facilitatorMonthGroups[groupKey].events.push(ev);
+        }
+      }
+    }
+
+    // Para cada grupo (facilitador, mes): calcular fecha límite unificada (+5d de la última socialización) y revalidar informe final
+    for (const groupKey in facilitatorMonthGroups) {
+      const grp = facilitatorMonthGroups[groupKey];
+      let maxFin: Date | null = null;
+      let latestInforme: Date | null = null;
+
+      for (const cr of grp.courses) {
+        if (cr.fin_date_obj) {
+          if (!maxFin || cr.fin_date_obj > maxFin) {
+            maxFin = cr.fin_date_obj;
+          }
+        }
+        if (cr.cierre_date_obj) {
+          if (!latestInforme || cr.cierre_date_obj > latestInforme) {
+            latestInforme = cr.cierre_date_obj;
+          }
+        }
+      }
+
+      const unifiedDeadline = maxFin ? new Date(maxFin.getTime() + 5 * 24 * 3600 * 1000) : null;
+      const unifiedDeadlineStr = unifiedDeadline 
+        ? `${unifiedDeadline.getDate().toString().padStart(2, '0')}/${(unifiedDeadline.getMonth() + 1).toString().padStart(2, '0')}/${unifiedDeadline.getFullYear()}`
+        : '';
+
+      for (const cr of grp.courses) {
+        if (unifiedDeadlineStr) {
+          cr.deadline = unifiedDeadlineStr;
+        }
+        const reportDate = cr.cierre_date_obj || latestInforme;
+        if (reportDate) {
+          cr.informe_date = formatDtShort(reportDate);
+        }
+
+        // Validación unificada del informe final mensual:
+        // Es válido si existe la fecha de informe y se entregó en o antes de la fecha límite unificada
+        if (reportDate && unifiedDeadline) {
+          const rDateOnly = new Date(reportDate.getFullYear(), reportDate.getMonth(), reportDate.getDate());
+          const dDateOnly = new Date(unifiedDeadline.getFullYear(), unifiedDeadline.getMonth(), unifiedDeadline.getDate());
+          cr.informe_ok = rDateOnly <= dDateOnly;
+        }
+
+        // Re-evaluar todo_ok
+        cr.todo_ok = cr.has_plan && cr.eval_notas_resp >= 1 && (cr.has_report || !!reportDate) && cr.planif_ok && cr.informe_ok && cr.conform_ok;
+      }
+    }
+
+    // Re-evaluar all_ok a nivel de evento
+    for (const ev of deduplicatedEvents) {
+      ev.all_ok = ev.courses.every((cr: any) => cr.todo_ok);
+    }
+
     // Fetch technicians & course mappings from Supabase
     const [{ data: cursosDb }, { data: facsDb }] = await Promise.all([
       supabase.from('cursos').select('id, tecnico_carnet, facilitador_carnet'),
@@ -506,9 +602,9 @@ export async function POST(request: Request) {
     // Helper functions for cell temperature & HTML generation
     function cellTemp(cr: any): string {
       if (cr.todo_ok) return 'cell-green';
-      const inicioDate = parseStartDate(cr.dates);
-      const finDate = parseCourseDates(cr.dates);
-      const deadlineDate = finDate ? new Date(finDate.getTime() + 5 * 24 * 3600 * 1000) : null;
+      const inicioDate = cr.inicio_date_obj || parseStartDate(cr.dates);
+      const finDate = cr.fin_date_obj || parseCourseDates(cr.dates);
+      const deadlineDate = cr.deadline ? parseSpanishDate(cr.deadline) || (finDate ? new Date(finDate.getTime() + 5 * 24 * 3600 * 1000) : null) : null;
       const today = new Date();
       today.setHours(0, 0, 0, 0);
 
@@ -541,7 +637,7 @@ export async function POST(request: Request) {
         const dayNum = dp[0];
         const mNum = parseInt(dp[1], 10);
         const literalMonth = MONTH_NAMES_LITERAL[mNum] || dp[1];
-        limiteShort = `${dayNum}/${literalMonth}`;
+        limiteShort = `${dayNum}/${literalMonth} (Mes)`;
       }
 
       const pasos = [
@@ -551,8 +647,8 @@ export async function POST(request: Request) {
         paso(true, 'Socialización', finShort, 'Última fecha de socialización', true),
         paso(cr.eval_notas_resp >= 1, 'Informe Evaluación', `${cr.eval_notas_resp}/${cr.eval_notas_total || cr.val_total}`, 'Estudiantes evaluados con notas por el facilitador / total'),
         paso(!cr.val_disabled && cr.val_pct > 0, 'Valoración', cr.val_disabled ? 'DESHABILITADA' : `${cr.val_pct}%`, 'Porcentaje de encuesta de valoración completada por estudiantes en SIE'),
-        paso(cr.informe_ok, 'Informe Final', cr.informe_date || '—', 'Informe Final: fecha de cierre entre socialización y +5d'),
-        paso(cr.todo_ok, 'Fecha límite', limiteShort, 'Socialización + 5 días. Verde solo si todos los pasos están OK')
+        paso(cr.informe_ok, 'Informe Final', cr.informe_date || '—', 'Informe Final Mensual: fecha de cierre hasta la fecha límite unificada (+5d de la última socialización)'),
+        paso(cr.todo_ok, 'Fecha límite', limiteShort, 'Fecha límite mensual: última socialización del mes + 5 días. Verde solo si todos los pasos están OK')
       ];
 
       const conformAlert = cr.conform_pend ? '<span class="badge conform-alert">⚠️ Generar Conformidad</span>' : '';
@@ -636,6 +732,18 @@ export async function POST(request: Request) {
         }
       }
 
+      // Determinar meses de este evento
+      const eventMonths = new Set<string>();
+      for (const cr of ev.courses) {
+        if (cr.socializacion_month) {
+          eventMonths.add(cr.socializacion_month.toLowerCase());
+        }
+      }
+      if (eventMonths.size === 0 && ev.mes) {
+        eventMonths.add(ev.mes.toLowerCase());
+      }
+      const dataMesAttr = Array.from(eventMonths).join(' ');
+
       let courseCells = '';
       for (const cr of ev.courses) {
         const status = cellTemp(cr);
@@ -646,7 +754,7 @@ export async function POST(request: Request) {
       }
 
       const dataOk = ev.all_ok ? '1' : '0';
-      htmlRows += `<tr style="background:${bgColor}" data-ok="${dataOk}" data-tecnico="${tec}">
+      htmlRows += `<tr style="background:${bgColor}" data-ok="${dataOk}" data-tecnico="${tec}" data-mes="${dataMesAttr}">
         <td class="toggle-ciclo" title="${ev.ciclo}">${ev.ciclo ? ev.ciclo.substring(0, 60) : ''}</td>
         <td title="${ev.sede}">${ev.sede ? ev.sede.substring(0, 40) : ''}</td>
         <td title="${ev.facilitador}"><strong>${ev.facilitador ? ev.facilitador.substring(0, 40) : ''}</strong></td>
@@ -654,6 +762,22 @@ export async function POST(request: Request) {
         <td style="text-align:center"><a href="${ev.url_evento}" target="_blank" title="Ver evento en SIE">👁️</a></td>
     </tr>`;
     }
+
+    // Recopilar meses únicos para el selector de filtro por mes
+    const allMonthsDetected = new Set<string>();
+    for (const ev of deduplicatedEvents) {
+      for (const cr of ev.courses) {
+        if (cr.socializacion_month) {
+          allMonthsDetected.add(cr.socializacion_month);
+        }
+      }
+    }
+    const standardMonthOrder = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+    let orderedMonths = standardMonthOrder.filter(m => allMonthsDetected.has(m));
+    if (orderedMonths.length === 0) {
+      orderedMonths = ['Mayo', 'Junio', 'Julio', 'Agosto'];
+    }
+    const monthOptionsHtml = `<option value="todos">Todos los meses</option>` + orderedMonths.map(m => `<option value="${m.toLowerCase()}">${m}</option>`).join('');
 
     const totalCourses = deduplicatedEvents.reduce((acc, ev) => acc + ev.courses.length, 0);
     const totalOk = deduplicatedEvents.filter(ev => ev.all_ok).length;
@@ -957,6 +1081,9 @@ a:hover { opacity: .75; }
         <option value="7782629">Juan Pablo Alba Vaca</option>
         <option value="3355859">Claudia Lisett Olivares Rivero</option>
     </select>
+    <select id="filtroMes" onchange="buscar()" style="padding: 10px 14px; border: 1px solid var(--border); border-radius: 8px; font-size: 13px; background: #fff; font-weight: 600; color: #0284c7;">
+        ${monthOptionsHtml}
+    </select>
     <input type="search" id="buscar" placeholder="Buscar por ciclo, sede, facilitador o curso..." oninput="buscar()">
     <div class="filter-group" style="display: flex; gap: 6px; flex-wrap: wrap;">
         <button id="btnFiltroTodos" class="btn-filter active" onclick="setFiltroEstado('todos')">Todos</button>
@@ -990,7 +1117,7 @@ ${htmlRows}
 </div>
 
 <div class="footer">
-    <p>Batería por curso, en orden: <strong>Planificación</strong> (SI/NO), <strong>Planif. Fecha</strong> (válida entre inicio−5d y el día de inicio), <strong>Fecha de inicio</strong>, <strong>Socialización</strong>, <strong>Inf. Evaluación</strong> (respondidos/total), <strong>Valoración</strong> (%), <strong>Inf. Final</strong> (fecha de cierre entre socialización y +5d), <strong>Fecha límite</strong> (socialización + 5 días) | ✓ verde = paso OK, ✗ rojo = pendiente/incorrecto | <strong>⚡ Prioritario</strong> = Planificación pendiente 5d antes de inicio o Informe Final pendiente tras socialización</p>
+    <p>Batería por curso, en orden: <strong>Planificación</strong> (SI/NO), <strong>Planif. Fecha</strong> (válida entre inicio−5d y el día de inicio), <strong>Fecha de inicio</strong>, <strong>Socialización</strong>, <strong>Inf. Evaluación</strong> (respondidos/total), <strong>Valoración</strong> (%), <strong>Inf. Final</strong> (fecha de cierre de informe del mes), <strong>Fecha límite</strong> (última socialización del mes + 5 días) | ✓ verde = paso OK, ✗ rojo = pendiente/incorrecto | <strong>⚡ Prioritario</strong> = Planificación pendiente 5d antes de inicio o Informe Final pendiente tras fecha límite mensual</p>
 </div>
 </div>
 <!-- INJECTED_REPORTE_SCRIPT -->
@@ -1068,10 +1195,7 @@ function marcarPrioritarios() {
         var isInformeOk = pasoInforme && pasoInforme.classList.contains('ok');
 
         var inicioVal = pasoInicio ? pasoInicio.querySelector('.val').textContent.trim() : '';
-        var socVal = pasoSoc ? pasoSoc.querySelector('.val').textContent.trim() : '';
-
         var inicioDate = parseFechaStr(inicioVal, 2026);
-        var socDate = parseFechaStr(socVal, 2026);
 
         var isPrioPlan = false;
         if (!isPlanOk && inicioDate) {
@@ -1084,9 +1208,12 @@ function marcarPrioritarios() {
         }
 
         var isPrioInforme = false;
-        if (!isInformeOk && socDate) {
-            var diffDaysSoc = Math.ceil((today.getTime() - socDate.getTime()) / (1000 * 3600 * 24));
-            if (diffDaysSoc >= 0) {
+        var limiteVal = pasoLimite ? pasoLimite.querySelector('.val').textContent.replace(/\(Mes\)|\(Global\)/gi, '').trim() : '';
+        var limiteDate = parseFechaStr(limiteVal, 2026);
+
+        if (!isInformeOk && limiteDate) {
+            var diffDaysLimite = Math.ceil((today.getTime() - limiteDate.getTime()) / (1000 * 3600 * 24));
+            if (diffDaysLimite >= 0) {
                 isPrioInforme = true;
                 if (pasoInforme) pasoInforme.classList.add('paso-prioritario-informe');
                 if (pasoLimite) pasoLimite.classList.add('paso-prioritario-informe');
@@ -1225,6 +1352,9 @@ function buscar() {
     var tecSelect = document.getElementById('filtroTecnico');
     var selectedTec = tecSelect ? tecSelect.value : 'todos';
 
+    var mesSelect = document.getElementById('filtroMes');
+    var selectedMes = mesSelect ? mesSelect.value.toLowerCase().trim() : 'todos';
+
     var table = document.getElementById('reportTable');
     if (!table) return;
     var tbody = table.getElementsByTagName('tbody')[0];
@@ -1240,11 +1370,13 @@ function buscar() {
         var tr = trs[i];
         var text = tr.textContent.toLowerCase();
         var rowTec = tr.getAttribute('data-tecnico') || '8639300';
+        var rowMes = (tr.getAttribute('data-mes') || '').toLowerCase();
         var isOk = tr.getAttribute('data-ok') === '1';
         var isPrio = tr.getAttribute('data-prioritario') === '1';
 
         var matchesText = !filter || text.includes(filter);
         var matchesTec = (selectedTec === 'todos') || (rowTec === selectedTec);
+        var matchesMes = (selectedMes === 'todos') || rowMes.includes(selectedMes);
 
         var matchesEstado = true;
         if (currentFiltroEstado === 'prioritarios') {
@@ -1255,7 +1387,7 @@ function buscar() {
             matchesEstado = isOk;
         }
 
-        if (matchesText && matchesTec && matchesEstado) {
+        if (matchesText && matchesTec && matchesMes && matchesEstado) {
             tr.style.display = '';
             totalProg++;
             var cursosInRow = tr.querySelectorAll('.curso').length;
@@ -1282,6 +1414,13 @@ function initReporte() {
         var tecSelect = document.getElementById('filtroTecnico');
         if (tecSelect) {
             tecSelect.value = tecParam;
+        }
+    }
+    var mesParam = params.get('mes');
+    if (mesParam) {
+        var mesSelect = document.getElementById('filtroMes');
+        if (mesSelect) {
+            mesSelect.value = mesParam.toLowerCase();
         }
     }
     buscar();

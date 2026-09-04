@@ -77,6 +77,24 @@ export default function ReporteDiarioModal({
       }
     }
 
+    const selectMesHtml = `<select id="filtroMes" onchange="buscar()" style="padding: 10px 14px; border: 1px solid var(--border); border-radius: 8px; font-size: 13px; background: #fff; font-weight: 600; color: #0284c7;">
+    <option value="todos">Todos los meses</option>
+    <option value="mayo">Mayo</option>
+    <option value="junio">Junio</option>
+    <option value="julio">Julio</option>
+    <option value="agosto">Agosto</option>
+    <option value="septiembre">Septiembre</option>
+    <option value="octubre">Octubre</option>
+    <option value="noviembre">Noviembre</option>
+    <option value="diciembre">Diciembre</option>
+</select>`;
+
+    if (finalHtml.includes('id="filtroTecnico"') && !finalHtml.includes('id="filtroMes"')) {
+      finalHtml = finalHtml.replace(/(<select id="filtroTecnico"[\s\S]*?<\/select>)/gi, `$1\n    ${selectMesHtml}`);
+    } else if (!finalHtml.includes('id="filtroMes"') && finalHtml.includes('id="buscar"')) {
+      finalHtml = finalHtml.replace(/(<input[^>]*id="buscar"[^>]*>)/gi, `${selectMesHtml}\n    $1`);
+    }
+
     // Inyectar CSS de prioridades y de subsanación provisional si falta
     if (!finalHtml.includes('.curso-subsanado')) {
       const subsanarAndPrioCss = `<style>
@@ -304,9 +322,12 @@ function marcarPrioritarios() {
         }
 
         var isPrioInforme = false;
-        if (!isInformeOk && socDate) {
-            var diffDaysSoc = Math.ceil((today.getTime() - socDate.getTime()) / (1000 * 3600 * 24));
-            if (diffDaysSoc >= 0) {
+        var limiteVal = pasoLimite ? pasoLimite.querySelector('.val').textContent.replace(/\(Mes\)|\(Global\)/gi, '').trim() : '';
+        var limiteDate = parseFechaStr(limiteVal, 2026);
+
+        if (!isInformeOk && limiteDate) {
+            var diffDaysLimite = Math.ceil((today.getTime() - limiteDate.getTime()) / (1000 * 3600 * 24));
+            if (diffDaysLimite >= 0) {
                 isPrioInforme = true;
                 if (pasoInforme) pasoInforme.classList.add('paso-prioritario-informe');
                 if (pasoLimite) pasoLimite.classList.add('paso-prioritario-informe');
@@ -450,6 +471,22 @@ if (document.readyState === 'loading') {
 }
 </script></body>`;
       finalHtml = finalHtml.replace('</body>', subsanarScriptBlock);
+    }
+
+    // Asegurar que buscar() filtre por mes si existe en el HTML
+    if (finalHtml.includes('function buscar(') && !finalHtml.includes('selectedMes')) {
+      finalHtml = finalHtml.replace(
+        "var selectedTec = tecSelect ? tecSelect.value : 'todos';",
+        "var selectedTec = tecSelect ? tecSelect.value : 'todos';\n    var mesSelect = document.getElementById('filtroMes');\n    var selectedMes = mesSelect ? mesSelect.value.toLowerCase().trim() : 'todos';"
+      );
+      finalHtml = finalHtml.replace(
+        "var matchesTec = (selectedTec === 'todos') || (rowTec === selectedTec);",
+        "var matchesTec = (selectedTec === 'todos') || (rowTec === selectedTec);\n        var rowMes = (tr.getAttribute('data-mes') || '').toLowerCase();\n        var matchesMes = (selectedMes === 'todos') || rowMes.includes(selectedMes);"
+      );
+      finalHtml = finalHtml.replace(
+        "if (matchesText && matchesTec && matchesEstado)",
+        "if (matchesText && matchesTec && matchesMes && matchesEstado)"
+      );
     }
 
     if (defaultTecnicoCarnet !== 'todos') {

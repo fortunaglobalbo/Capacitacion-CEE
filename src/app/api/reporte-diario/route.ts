@@ -31,8 +31,22 @@ async function processHtmlForResponse(htmlStr: string): Promise<string> {
     ${tecOptions}
 </select>`;
 
+    const selectMesHtml = `<select id="filtroMes" onchange="buscar()" style="padding: 10px 14px; border: 1px solid var(--border); border-radius: 8px; font-size: 13px; background: #fff; font-weight: 600; color: #0284c7;">
+    <option value="todos">Todos los meses</option>
+    <option value="mayo">Mayo</option>
+    <option value="junio">Junio</option>
+    <option value="julio">Julio</option>
+    <option value="agosto">Agosto</option>
+    <option value="septiembre">Septiembre</option>
+    <option value="octubre">Octubre</option>
+    <option value="noviembre">Noviembre</option>
+    <option value="diciembre">Diciembre</option>
+</select>`;
+
     if (finalHtml.includes('id="filtroTecnico"')) {
-      finalHtml = finalHtml.replace(/<select id="filtroTecnico"[\s\S]*?<\/select>/gi, dynamicSelectHtml);
+      finalHtml = finalHtml.replace(/<select id="filtroTecnico"[\s\S]*?<\/select>/gi, `${dynamicSelectHtml}\n    ${selectMesHtml}`);
+    } else if (!finalHtml.includes('id="filtroMes"') && finalHtml.includes('class="toolbar"')) {
+      finalHtml = finalHtml.replace(/(<div[^>]*class="toolbar"[^>]*>)/gi, `$1\n    ${selectMesHtml}`);
     }
 
     const filterButtonsHtml = `<div class="filter-group" style="display: flex; gap: 6px; flex-wrap: wrap;">
@@ -283,9 +297,12 @@ function marcarPrioritarios() {
         }
 
         var isPrioInforme = false;
-        if (!isInformeOk && socDate) {
-            var diffDaysSoc = Math.ceil((today.getTime() - socDate.getTime()) / (1000 * 3600 * 24));
-            if (diffDaysSoc >= 0) {
+        var limiteVal = pasoLimite ? pasoLimite.querySelector('.val').textContent.replace(/\(Mes\)|\(Global\)/gi, '').trim() : '';
+        var limiteDate = parseFechaStr(limiteVal, 2026);
+
+        if (!isInformeOk && limiteDate) {
+            var diffDaysLimite = Math.ceil((today.getTime() - limiteDate.getTime()) / (1000 * 3600 * 24));
+            if (diffDaysLimite >= 0) {
                 isPrioInforme = true;
                 if (pasoInforme) pasoInforme.classList.add('paso-prioritario-informe');
                 if (pasoLimite) pasoLimite.classList.add('paso-prioritario-informe');
@@ -427,6 +444,22 @@ if (document.readyState === 'loading') {
 }
 </script></body>`;
       finalHtml = finalHtml.replace('</body>', subsanarScriptBlock);
+    }
+
+    // Asegurar que buscar() filtre por mes si existe en el HTML
+    if (finalHtml.includes('function buscar(') && !finalHtml.includes('selectedMes')) {
+      finalHtml = finalHtml.replace(
+        "var selectedTec = tecSelect ? tecSelect.value : 'todos';",
+        "var selectedTec = tecSelect ? tecSelect.value : 'todos';\n    var mesSelect = document.getElementById('filtroMes');\n    var selectedMes = mesSelect ? mesSelect.value.toLowerCase().trim() : 'todos';"
+      );
+      finalHtml = finalHtml.replace(
+        "var matchesTec = (selectedTec === 'todos') || (rowTec === selectedTec);",
+        "var matchesTec = (selectedTec === 'todos') || (rowTec === selectedTec);\n        var rowMes = (tr.getAttribute('data-mes') || '').toLowerCase();\n        var matchesMes = (selectedMes === 'todos') || rowMes.includes(selectedMes);"
+      );
+      finalHtml = finalHtml.replace(
+        "if (matchesText && matchesTec && matchesEstado)",
+        "if (matchesText && matchesTec && matchesMes && matchesEstado)"
+      );
     }
   } catch (e) {
     console.warn('Error al procesar HTML de reporte:', e);
