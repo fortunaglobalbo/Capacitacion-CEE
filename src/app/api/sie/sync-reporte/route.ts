@@ -62,10 +62,14 @@ function parseCourseDates(dateStr: string): Date | null {
   return null;
 }
 
+const DIAS_SEMANA_ABBR = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
+
 function formatDtShort(d: Date | null): string {
   if (!d) return '';
+  const diaSem = DIAS_SEMANA_ABBR[d.getDay()];
+  const diaNum = d.getDate().toString().padStart(2, '0');
   const abbr = ['', 'Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
-  return `${d.getDate()}/${abbr[d.getMonth() + 1] || d.getMonth() + 1}`;
+  return `${diaSem} ${diaNum}/${abbr[d.getMonth() + 1] || d.getMonth() + 1}`;
 }
 
 function validPlanif(planifDate: Date | null, inicioDate: Date | null): boolean {
@@ -626,27 +630,41 @@ export async function POST(request: Request) {
         return `<div class="paso ${cls}"${titleAttr}><span class="ico">${ico}</span><span class="lbl">${label}</span><span class="val">${value}</span></div>`;
       }
 
-      const inicioShort = cr.fecha_inicio;
-      const finParts = cr.fecha_fin ? cr.fecha_fin.split('/') : [];
-      const finShort = finParts.length >= 2 ? `${finParts[0]}/${finParts[1]}` : (cr.fecha_fin || '—');
-      const dp = cr.deadline ? cr.deadline.split('/') : [];
-      let limiteShort = cr.deadline || '—';
-      if (dp.length >= 2) {
-        const dayNum = dp[0];
-        const mNum = parseInt(dp[1], 10);
-        const literalMonth = MONTH_NAMES[mNum] || dp[1];
-        limiteShort = `${dayNum}/${literalMonth} (Mes)`;
+      const inicioDt = cr.inicio_date_obj || parseStartDate(cr.dates);
+      const finDt = cr.fin_date_obj || parseCourseDates(cr.dates);
+
+      const inicioShort = formatDtShort(inicioDt) || cr.fecha_inicio || '—';
+      const finShort = formatDtShort(finDt) || cr.fecha_fin || '—';
+
+      const isPlanOk = cr.plan === 'SI';
+      let planifShort = '—';
+      if (isPlanOk) {
+        const pDate = cr.planif_date_obj || inicioDt;
+        planifShort = formatDtShort(pDate);
+        cr.planif_ok = true;
+      } else {
+        planifShort = '—';
+        cr.planif_ok = false;
       }
 
+      let limiteShort = cr.deadline || '—';
+      const parsedDeadline = parseSpanishDate(cr.deadline);
+      if (parsedDeadline) {
+        limiteShort = `${formatDtShort(parsedDeadline)} (Mes)`;
+      }
+
+      const infDt = cr.cierre_date_obj;
+      const informeShort = infDt ? formatDtShort(infDt) : (cr.informe_date || '—');
+
       const pasos = [
-        paso(cr.plan === 'SI', 'Planificación', cr.plan, 'Planificación (plan de trabajo): SI = existe'),
-        paso(cr.planif_ok, 'Planificación Fecha', cr.planif_date || '—', 'Fecha de planificación: válida entre inicio−5d y el día de inicio'),
-        paso(true, 'Fecha de inicio', inicioShort || '—', '', true),
-        paso(true, 'Socialización', finShort, 'Última fecha de socialización', true),
+        paso(isPlanOk, 'Planificación', cr.plan, 'Planificación (plan de trabajo): SI = existe'),
+        paso(cr.planif_ok, 'Planificación Fecha', planifShort, 'Fecha de planificación con día de la semana'),
+        paso(true, 'Fecha de inicio', inicioShort, 'Fecha de inicio oficial con día de la semana', true),
+        paso(true, 'Socialización', finShort, 'Última fecha de socialización con día de la semana', true),
         paso(cr.eval_notas_resp >= 1, 'Informe Evaluación', `${cr.eval_notas_resp}/${cr.eval_notas_total || cr.val_total}`, 'Estudiantes evaluados con notas por el facilitador / total'),
         paso(!cr.val_disabled && cr.val_pct > 0, 'Valoración', cr.val_disabled ? 'DESHABILITADA' : `${cr.val_pct}%`, 'Porcentaje de encuesta de valoración completada por estudiantes en SIE'),
-        paso(cr.informe_ok, 'Informe Final', cr.informe_date || '—', 'Informe Final Mensual: fecha de cierre hasta la fecha límite unificada (+5d de la última socialización)'),
-        paso(cr.todo_ok, 'Fecha límite', limiteShort, 'Fecha límite mensual: última socialización del mes + 5 días. Verde solo si todos los pasos están OK')
+        paso(cr.informe_ok, 'Informe Final', informeShort, 'Informe Final Mensual: fecha de cierre con día de la semana'),
+        paso(cr.todo_ok, 'Fecha límite', limiteShort, 'Fecha límite mensual con día de la semana')
       ];
 
       const conformAlert = cr.conform_pend ? '<span class="badge conform-alert">⚠️ Generar Conformidad</span>' : '';
@@ -700,6 +718,14 @@ export async function POST(request: Request) {
       const grp = facilitatorMonthGroups[groupKey];
       const bgColor = facilitatorColorMap[grp.facilitador] || '#ffffff';
       const mesLower = grp.mes.toLowerCase();
+
+      // Ordenar cursos en orden ASCENDENTE según Fecha de Inicio
+      grp.courses.sort((a: any, b: any) => {
+        const dtA = (a.inicio_date_obj || parseStartDate(a.dates))?.getTime() || 0;
+        const dtB = (b.inicio_date_obj || parseStartDate(b.dates))?.getTime() || 0;
+        if (dtA !== dtB) return dtA - dtB;
+        return (a.name || '').localeCompare(b.name || '');
+      });
 
       // Determine technician for this facilitator month group
       let tec = '8639300';
