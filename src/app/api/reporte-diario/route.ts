@@ -412,7 +412,6 @@ async function validarFacilitadorFila(btn) {
                 newTr.classList.add('tr-updated-glow');
                 tr.parentNode.replaceChild(newTr, tr);
 
-                initSubsanaciones();
                 buscar();
 
                 setTimeout(function() {
@@ -437,14 +436,6 @@ async function validarFacilitadorFila(btn) {
         btn.disabled = false;
         btn.innerHTML = originalHtml;
         alert('No se pudo validar al facilitador en SIE: ' + (err.message || 'Error de conexión'));
-    }
-}
-
-function limpiarTodosSubsanados() {
-    if (confirm('¿Deseas desmarcar todos los cursos subsanados provisionalmente?')) {
-        localStorage.removeItem('reporte_cursos_subsanados');
-        initSubsanaciones();
-        buscar();
     }
 }
 
@@ -522,7 +513,6 @@ function marcarPrioritarios() {
 function buscar() {
     try {
         marcarPrioritarios();
-        initSubsanaciones();
 
         var input = document.getElementById('buscar');
         var filter = input ? input.value.toLowerCase().trim() : '';
@@ -648,7 +638,6 @@ function initReporte() {
             }
         }
         marcarPrioritarios();
-        initSubsanaciones();
         buscar();
     } catch(e) {
         console.error('Error en initReporte:', e);

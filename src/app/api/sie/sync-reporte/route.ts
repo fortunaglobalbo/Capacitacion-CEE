@@ -1127,67 +1127,6 @@ tbody tr:hover { filter: brightness(.96); }
     text-transform: uppercase !important;
     letter-spacing: 0.5px !important;
 }
-.subsanar-check-container {
-    position: static !important;
-    display: inline-flex !important;
-    align-items: center !important;
-    gap: 4px !important;
-    background: #ffffff !important;
-    border: 1.5px solid #cbd5e1 !important;
-    border-radius: 9999px !important;
-    padding: 1px 7px !important;
-    font-size: 10px !important;
-    font-weight: 700 !important;
-    color: #475569 !important;
-    cursor: pointer !important;
-    user-select: none !important;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.06) !important;
-    transition: all 0.2s ease !important;
-}
-.subsanar-check-container:hover {
-    background: #f1f5f9;
-    border-color: #94a3b8;
-    color: #1e293b;
-}
-.subsanar-check-container input[type="checkbox"] {
-    cursor: pointer;
-    margin: 0;
-    width: 12px;
-    height: 12px;
-    accent-color: #10b981;
-}
-.curso.curso-subsanado {
-    border: 2.5px solid #10b981 !important;
-    background: #f0fdf4 !important;
-    box-shadow: 0 4px 14px rgba(16, 185, 129, 0.25) !important;
-}
-.curso.curso-subsanado .subsanar-check-container {
-    background: #ecfdf5 !important;
-    border-color: #10b981 !important;
-    color: #065f46 !important;
-    box-shadow: 0 1px 4px rgba(16, 185, 129, 0.2) !important;
-}
-.curso.curso-subsanado .badge-prioridad {
-    display: none !important;
-}
-.badge-subsanado {
-    display: none !important;
-}
-.curso.curso-subsanado .paso.bad {
-    background: #f1f5f9 !important;
-    color: #475569 !important;
-    border-color: #cbd5e1 !important;
-    opacity: 0.75;
-}
-.curso.curso-subsanado .paso.bad .ico {
-    color: #64748b !important;
-}
-.curso.curso-subsanado .paso-prioritario-plan,
-.curso.curso-subsanado .paso-prioritario-informe {
-    border: 1.5px dashed #94a3b8 !important;
-    background: #f8fafc !important;
-    color: #64748b !important;
-}
 .btn-sie-link {
     display: flex !important;
     align-items: center !important;
@@ -1348,117 +1287,6 @@ function setFiltroEstado(estado) {
     buscar();
 }
 
-function getCursoKey(cursoEl) {
-    try {
-        var customKey = cursoEl.getAttribute('data-curso-key');
-        if (customKey) return customKey;
-
-        var tr = cursoEl.closest('tr');
-        var facTd = tr ? tr.querySelector('td:nth-child(2)') : null;
-        var nombreEl = cursoEl.querySelector('.nombre');
-        
-        var fac = facTd ? facTd.textContent.replace(/[^a-zA-Z0-9]/g, '').toLowerCase() : '';
-        var nom = nombreEl ? nombreEl.textContent.replace(/[^a-zA-Z0-9]/g, '').toLowerCase().substring(0, 30) : '';
-
-        var cursoCards = tr ? Array.from(tr.querySelectorAll('.curso')) : [];
-        var cIdx = cursoCards.indexOf(cursoEl);
-
-        return 'sub_' + fac.substring(0, 15) + '_' + nom + '_' + cIdx;
-    } catch(e) {
-        return 'sub_item_' + Math.random().toString(36).substr(2, 9);
-    }
-}
-
-function getSubsanadosMap() {
-    try {
-        var raw = localStorage.getItem('reporte_cursos_subsanados');
-        return raw ? JSON.parse(raw) : {};
-    } catch(e) {
-        return {};
-    }
-}
-
-function saveSubsanadosMap(map) {
-    try {
-        localStorage.setItem('reporte_cursos_subsanados', JSON.stringify(map));
-    } catch(e) {}
-}
-
-function aplicarEstadoSubsanado(cursoEl, isChecked) {
-    try {
-        if (isChecked) {
-            cursoEl.classList.add('curso-subsanado');
-        } else {
-            cursoEl.classList.remove('curso-subsanado');
-        }
-    } catch(e) {}
-}
-
-function initSubsanaciones() {
-    try {
-        var subsMap = getSubsanadosMap();
-        var cursos = document.querySelectorAll('.curso');
-
-        cursos.forEach(function(curso) {
-            var key = getCursoKey(curso);
-            var isChecked = !!subsMap[key];
-
-            aplicarEstadoSubsanado(curso, isChecked);
-
-            var container = curso.querySelector('.subsanar-check-container');
-            if (!container) {
-                var header = curso.querySelector('.curso-header');
-                container = document.createElement('label');
-                container.className = 'subsanar-check-container';
-                container.title = 'Marcar como subsanado provisionalmente';
-                container.innerHTML = '<input type="checkbox" ' + (isChecked ? 'checked' : '') + ' data-key="' + key + '"><span>Subsanado</span>';
-                
-                var cb = container.querySelector('input');
-                cb.addEventListener('change', function(e) {
-                    e.stopPropagation();
-                    var curMap = getSubsanadosMap();
-                    if (this.checked) {
-                        curMap[key] = true;
-                    } else {
-                        delete curMap[key];
-                    }
-                    saveSubsanadosMap(curMap);
-                    aplicarEstadoSubsanado(curso, this.checked);
-                    buscar();
-                });
-
-                if (header) {
-                    header.appendChild(container);
-                } else {
-                    curso.insertBefore(container, curso.firstChild);
-                }
-            } else {
-                var cb = container.querySelector('input');
-                if (cb) {
-                    cb.checked = isChecked;
-                    if (!cb.getAttribute('data-listener-added')) {
-                        cb.setAttribute('data-listener-added', '1');
-                        cb.addEventListener('change', function(e) {
-                            e.stopPropagation();
-                            var curMap = getSubsanadosMap();
-                            if (this.checked) {
-                                curMap[key] = true;
-                            } else {
-                                delete curMap[key];
-                            }
-                            saveSubsanadosMap(curMap);
-                            aplicarEstadoSubsanado(curso, this.checked);
-                            buscar();
-                        });
-                    }
-                }
-            }
-        });
-    } catch(e) {
-        console.error('Error en initSubsanaciones:', e);
-    }
-}
-
 async function validarFacilitadorFila(btn) {
     var tr = btn.closest('tr');
     if (!tr) return;
@@ -1514,7 +1342,6 @@ async function validarFacilitadorFila(btn) {
                 newTr.classList.add('tr-updated-glow');
                 tr.parentNode.replaceChild(newTr, tr);
 
-                initSubsanaciones();
                 buscar();
 
                 setTimeout(function() {
@@ -1539,14 +1366,6 @@ async function validarFacilitadorFila(btn) {
         btn.disabled = false;
         btn.innerHTML = originalHtml;
         alert('No se pudo validar al facilitador en SIE: ' + (err.message || 'Error de conexión'));
-    }
-}
-
-function limpiarTodosSubsanados() {
-    if (confirm('¿Deseas desmarcar todos los cursos subsanados provisionalmente?')) {
-        localStorage.removeItem('reporte_cursos_subsanados');
-        initSubsanaciones();
-        buscar();
     }
 }
 
@@ -1624,7 +1443,6 @@ function marcarPrioritarios() {
 function buscar() {
     try {
         marcarPrioritarios();
-        initSubsanaciones();
 
         var input = document.getElementById('buscar');
         var filter = input ? input.value.toLowerCase().trim() : '';
@@ -1750,7 +1568,6 @@ function initReporte() {
             }
         }
         marcarPrioritarios();
-        initSubsanaciones();
         buscar();
     } catch(e) {
         console.error('Error en initReporte:', e);

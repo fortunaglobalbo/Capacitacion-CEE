@@ -267,16 +267,13 @@ export async function POST(request: Request) {
 
           let hasPlan = false, hasReport = false, docid = '';
           try {
-            const chunks = detHtml.split(/<div[^>]*class=["'][^"']*(?:course-card|col-lg-6 col-xl-4)[^"']*["']/i);
-            const foundChunk = chunks.find(ch => ch.includes(`date-course-update-${cid}`) || ch.includes(`/inscription/${cid}`));
-            const cardContent = foundChunk || '';
-
-            if (cardContent) {
-              hasPlan = /\/events\/sede\/planning\/report\/\d+\/1/i.test(cardContent);
-              const docm = cardContent.match(/\/events\/reportes\/documentos-sede\/(\d+)/i);
-              hasReport = !!docm;
-              docid = docm ? docm[1] : '';
-            }
+            const cardRegex = new RegExp(`date-course-update-${cid}.*?card-footer.*?</div>`, 'is');
+            const cardMatch = detHtml.match(cardRegex);
+            const cardContent = cardMatch ? cardMatch[0] : detHtml;
+            hasPlan = /\/events\/sede\/planning\/report\/\d+\/1/i.test(cardContent);
+            const docm = cardContent.match(/\/events\/reportes\/documentos-sede\/(\d+)/i);
+            hasReport = !!docm;
+            docid = docm ? docm[1] : '';
           } catch (e) {}
 
           const [gRes, vRes, docRes] = await Promise.allSettled([
