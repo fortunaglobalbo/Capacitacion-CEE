@@ -60,7 +60,6 @@ async function processHtmlForResponse(htmlStr: string): Promise<string> {
     <button id="btnFiltroPrioritarios" class="btn-filter" onclick="setFiltroEstado('prioritarios')" style="color:#e11d48; font-weight:700;">⚡ Prioritarios</button>
     <button id="btnFiltroPendientes" class="btn-filter" onclick="setFiltroEstado('pendientes')">⚠️ Con Pendientes</button>
     <button id="btnFiltroOk" class="btn-filter" onclick="setFiltroEstado('ok')">✓ Todo OK</button>
-    <button id="btnLimpiarSubsanados" class="btn-limpiar-subsanados" onclick="limpiarTodosSubsanados()" title="Desmarcar todos los cursos provisionalmente subsanados">🧹 Limpiar Subsanados</button>
 </div>`;
 
     finalHtml = finalHtml.replace(/<div class="filter-group"[\s\S]*?<\/div>/gi, '');
@@ -70,6 +69,9 @@ async function processHtmlForResponse(htmlStr: string): Promise<string> {
     finalHtml = finalHtml.replace(/<button[^>]*\bid=["']?btnVerdes["']?[^>]*>[\s\S]*?<\/button>/gi, '');
     finalHtml = finalHtml.replace(/<button[^>]*toggleCol\(['"]ciclo['"]\)[\s\S]*?<\/button>/gi, '');
     finalHtml = finalHtml.replace(/<button[^>]*toggleVerdes\(\)[\s\S]*?<\/button>/gi, '');
+    finalHtml = finalHtml.replace(/<button[^>]*\bid=["']?btnLimpiarSubsanados["']?[^>]*>[\s\S]*?<\/button>/gi, '');
+    finalHtml = finalHtml.replace(/<label class="subsanar-check-container"[\s\S]*?<\/label>/gi, '');
+    finalHtml = finalHtml.replace(/\bcurso-subsanado\b/gi, '');
 
     if (finalHtml.includes('id="buscar"')) {
       finalHtml = finalHtml.replace(/(<input[^>]*id="buscar"[^>]*>)/i, `$1\n    ${filterButtonsHtml}`);
@@ -86,7 +88,7 @@ async function processHtmlForResponse(htmlStr: string): Promise<string> {
       return `${inner}${btnHtml}${close}`;
     });
 
-    // 3. CSS de prioridades y de subsanación provisional (Opción A consolidada)
+    // 3. CSS de prioridades y de validación directa
     const subsanarAndPrioCss = `<style id="custom-subsanar-prio-css">
 .badge-row-mes {
     display: inline-block;
@@ -128,67 +130,6 @@ async function processHtmlForResponse(htmlStr: string): Promise<string> {
     border-radius: 9999px !important;
     text-transform: uppercase !important;
     letter-spacing: 0.5px !important;
-}
-.subsanar-check-container {
-    position: static !important;
-    display: inline-flex !important;
-    align-items: center !important;
-    gap: 4px !important;
-    background: #ffffff !important;
-    border: 1.5px solid #cbd5e1 !important;
-    border-radius: 9999px !important;
-    padding: 1px 7px !important;
-    font-size: 10px !important;
-    font-weight: 700 !important;
-    color: #475569 !important;
-    cursor: pointer !important;
-    user-select: none !important;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.06) !important;
-    transition: all 0.2s ease !important;
-}
-.subsanar-check-container:hover {
-    background: #f1f5f9 !important;
-    border-color: #94a3b8 !important;
-    color: #1e293b !important;
-}
-.subsanar-check-container input[type="checkbox"] {
-    cursor: pointer !important;
-    margin: 0 !important;
-    width: 12px !important;
-    height: 12px !important;
-    accent-color: #10b981 !important;
-}
-.curso.curso-subsanado {
-    border: 2.5px solid #10b981 !important;
-    background: #f0fdf4 !important;
-    box-shadow: 0 4px 14px rgba(16, 185, 129, 0.25) !important;
-}
-.curso.curso-subsanado .subsanar-check-container {
-    background: #ecfdf5 !important;
-    border-color: #10b981 !important;
-    color: #065f46 !important;
-    box-shadow: 0 1px 4px rgba(16, 185, 129, 0.2) !important;
-}
-.curso.curso-subsanado .badge-prioridad {
-    display: none !important;
-}
-.badge-subsanado {
-    display: none !important;
-}
-.curso.curso-subsanado .paso.bad {
-    background: #f1f5f9 !important;
-    color: #475569 !important;
-    border-color: #cbd5e1 !important;
-    opacity: 0.75;
-}
-.curso.curso-subsanado .paso.bad .ico {
-    color: #64748b !important;
-}
-.curso.curso-subsanado .paso-prioritario-plan,
-.curso.curso-subsanado .paso-prioritario-informe {
-    border: 1.5px dashed #94a3b8 !important;
-    background: #f8fafc !important;
-    color: #64748b !important;
 }
 .btn-sie-link {
     display: flex !important;
@@ -416,96 +357,6 @@ function getCursoKey(cursoEl) {
     }
 }
 
-function getSubsanadosMap() {
-    try {
-        var raw = localStorage.getItem('reporte_cursos_subsanados');
-        return raw ? JSON.parse(raw) : {};
-    } catch(e) {
-        return {};
-    }
-}
-
-function saveSubsanadosMap(map) {
-    try {
-        localStorage.setItem('reporte_cursos_subsanados', JSON.stringify(map));
-    } catch(e) {}
-}
-
-function aplicarEstadoSubsanado(cursoEl, isChecked) {
-    try {
-        if (isChecked) {
-            cursoEl.classList.add('curso-subsanado');
-        } else {
-            cursoEl.classList.remove('curso-subsanado');
-        }
-    } catch(e) {}
-}
-
-function initSubsanaciones() {
-    try {
-        var subsMap = getSubsanadosMap();
-        var cursos = document.querySelectorAll('.curso');
-
-        cursos.forEach(function(curso) {
-            var key = getCursoKey(curso);
-            var isChecked = !!subsMap[key];
-
-            aplicarEstadoSubsanado(curso, isChecked);
-
-            var container = curso.querySelector('.subsanar-check-container');
-            if (!container) {
-                var header = curso.querySelector('.curso-header');
-                container = document.createElement('label');
-                container.className = 'subsanar-check-container';
-                container.title = 'Marcar como subsanado provisionalmente';
-                container.innerHTML = '<input type="checkbox" ' + (isChecked ? 'checked' : '') + ' data-key="' + key + '"><span>Subsanado</span>';
-                
-                var cb = container.querySelector('input');
-                cb.addEventListener('change', function(e) {
-                    e.stopPropagation();
-                    var curMap = getSubsanadosMap();
-                    if (this.checked) {
-                        curMap[key] = true;
-                    } else {
-                        delete curMap[key];
-                    }
-                    saveSubsanadosMap(curMap);
-                    aplicarEstadoSubsanado(curso, this.checked);
-                    buscar();
-                });
-
-                if (header) {
-                    header.appendChild(container);
-                } else {
-                    curso.insertBefore(container, curso.firstChild);
-                }
-            } else {
-                var cb = container.querySelector('input');
-                if (cb) {
-                    cb.checked = isChecked;
-                    if (!cb.getAttribute('data-listener-added')) {
-                        cb.setAttribute('data-listener-added', '1');
-                        cb.addEventListener('change', function(e) {
-                            e.stopPropagation();
-                            var curMap = getSubsanadosMap();
-                            if (this.checked) {
-                                curMap[key] = true;
-                            } else {
-                                delete curMap[key];
-                            }
-                            saveSubsanadosMap(curMap);
-                            aplicarEstadoSubsanado(curso, this.checked);
-                            buscar();
-                        });
-                    }
-                }
-            }
-        });
-    } catch(e) {
-        console.error('Error en initSubsanaciones:', e);
-    }
-}
-
 async function validarFacilitadorFila(btn) {
     var tr = btn.closest('tr');
     if (!tr) return;
@@ -717,9 +568,8 @@ function buscar() {
             var allOkInRow = true;
 
             cursosInRow.forEach(function(c) {
-                var isSub = c.classList.contains('curso-subsanado');
-                var isPrio = c.classList.contains('curso-prioritario') && !isSub;
-                var hasBad = (c.querySelectorAll('.paso.bad').length > 0) && !isSub;
+                var isPrio = c.classList.contains('curso-prioritario');
+                var hasBad = (c.querySelectorAll('.paso.bad').length > 0);
 
                 if (isPrio) hasPrioInRow = true;
                 if (hasBad) hasPendInRow = true;

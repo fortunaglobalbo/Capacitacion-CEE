@@ -267,13 +267,16 @@ export async function POST(request: Request) {
 
           let hasPlan = false, hasReport = false, docid = '';
           try {
-            const cardRegex = new RegExp(`date-course-update-${cid}.*?card-footer.*?</div>`, 'is');
-            const cardMatch = detHtml.match(cardRegex);
-            const cardContent = cardMatch ? cardMatch[0] : detHtml;
-            hasPlan = /\/events\/sede\/planning\/report\/\d+\/1/i.test(cardContent);
-            const docm = cardContent.match(/\/events\/reportes\/documentos-sede\/(\d+)/i);
-            hasReport = !!docm;
-            docid = docm ? docm[1] : '';
+            const chunks = detHtml.split(/<div[^>]*class=["'][^"']*(?:course-card|col-lg-6 col-xl-4)[^"']*["']/i);
+            const foundChunk = chunks.find(ch => ch.includes(`date-course-update-${cid}`) || ch.includes(`/inscription/${cid}`));
+            const cardContent = foundChunk || '';
+
+            if (cardContent) {
+              hasPlan = /\/events\/sede\/planning\/report\/\d+\/1/i.test(cardContent);
+              const docm = cardContent.match(/\/events\/reportes\/documentos-sede\/(\d+)/i);
+              hasReport = !!docm;
+              docid = docm ? docm[1] : '';
+            }
           } catch (e) {}
 
           const [gRes, vRes, docRes] = await Promise.allSettled([
@@ -443,7 +446,10 @@ export async function POST(request: Request) {
       }
 
       const isPlanOk = cr.plan === 'SI';
-      cr.planif_ok = isPlanOk;
+      const planifDt = cr.planif_date_obj;
+      const cInicioDt = cr.inicio_date_obj || parseStartDate(cr.dates);
+      const planifOk = isPlanOk && validPlanif(planifDt, cInicioDt);
+      cr.planif_ok = planifOk;
 
       if (reportDate && unifiedDeadline) {
         const rDateOnly = new Date(reportDate.getFullYear(), reportDate.getMonth(), reportDate.getDate());
@@ -470,7 +476,10 @@ export async function POST(request: Request) {
       const inicioShort = formatDtShort(inicioDt) || cr.fecha_inicio || '—';
       const finShort = formatDtShort(finDt) || cr.fecha_fin || '—';
       const isPlanOk = cr.plan === 'SI';
-      const planifShort = isPlanOk ? (formatDtShort(cr.planif_date_obj || inicioDt) || '—') : '—';
+      const planifDt = cr.planif_date_obj;
+      const planifOk = isPlanOk && validPlanif(planifDt, inicioDt);
+      const planifShort = planifDt ? formatDtShort(planifDt) : '—';
+      cr.planif_ok = planifOk;
 
       let limiteShort = cr.deadline || '—';
       const parsedDeadline = parseSpanishDate(cr.deadline);
@@ -483,7 +492,7 @@ export async function POST(request: Request) {
 
       const pasos = [
         paso(isPlanOk, 'Planificación', cr.plan, 'Planificación (plan de trabajo): SI = existe'),
-        paso(cr.planif_ok, 'Planificación Fecha', planifShort, 'Fecha de planificación con día de la semana'),
+        paso(cr.planif_ok, 'Planificación Fecha', planifShort, 'Fecha de planificación: debe ser el mismo día de inicio o hasta 5 días antes'),
         paso(true, 'Fecha de inicio', inicioShort, 'Fecha de inicio oficial con día de la semana', true),
         paso(true, cr.is_latest_soc ? 'Socialización<span class="badge-ultima-soc" title="Última fecha de socialización del mes: define la fecha límite">🎯 Límite</span>' : 'Socialización', finShort, 'Última fecha de socialización con día de la semana', true),
         paso(cr.eval_notas_resp >= 1, 'Informe Evaluación', `${cr.eval_notas_resp}/${cr.eval_notas_total || cr.val_total}`, 'Estudiantes evaluados con notas por el facilitador / total'),
@@ -501,9 +510,6 @@ export async function POST(request: Request) {
       return `<div class="curso${pulseCls}" data-curso-mes="${cMes}" data-curso-key="${cleanKey}">
         <div class="curso-header">
             <span class="badge-curso-mes">${cr.start_month}</span>
-            <label class="subsanar-check-container" title="Marcar como subsanado provisionalmente">
-                <input type="checkbox" data-key="${cleanKey}"><span>Subsanado</span>
-            </label>
         </div>
         <span class="nombre" title="${cr.name}">${safeName}</span>
         <div class="bateria">${pasos.join('')}</div>
