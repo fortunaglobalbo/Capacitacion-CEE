@@ -561,7 +561,15 @@ export async function POST(request: Request) {
         ? `${unifiedDeadline.getDate().toString().padStart(2, '0')}/${(unifiedDeadline.getMonth() + 1).toString().padStart(2, '0')}/${unifiedDeadline.getFullYear()}`
         : '';
 
+      let latestSocTagged = false;
       for (const cr of grp.courses) {
+        if (!latestSocTagged && maxFin && cr.fin_date_obj && cr.fin_date_obj.getTime() === maxFin.getTime()) {
+          cr.is_latest_soc = true;
+          latestSocTagged = true;
+        } else {
+          cr.is_latest_soc = false;
+        }
+
         if (unifiedDeadlineStr) {
           cr.deadline = unifiedDeadlineStr;
         }
@@ -660,7 +668,7 @@ export async function POST(request: Request) {
         paso(isPlanOk, 'Planificación', cr.plan, 'Planificación (plan de trabajo): SI = existe'),
         paso(cr.planif_ok, 'Planificación Fecha', planifShort, 'Fecha de planificación con día de la semana'),
         paso(true, 'Fecha de inicio', inicioShort, 'Fecha de inicio oficial con día de la semana', true),
-        paso(true, 'Socialización', finShort, 'Última fecha de socialización con día de la semana', true),
+        paso(true, cr.is_latest_soc ? 'Socialización<span class="badge-ultima-soc" title="Última fecha de socialización del mes: define la fecha límite">🎯 Límite</span>' : 'Socialización', finShort, 'Última fecha de socialización con día de la semana', true),
         paso(cr.eval_notas_resp >= 1, 'Informe Evaluación', `${cr.eval_notas_resp}/${cr.eval_notas_total || cr.val_total}`, 'Estudiantes evaluados con notas por el facilitador / total'),
         paso(!cr.val_disabled && cr.val_pct > 0, 'Valoración', cr.val_disabled ? 'DESHABILITADA' : `${cr.val_pct}%`, 'Porcentaje de encuesta de valoración completada por estudiantes en SIE'),
         paso(cr.informe_ok, 'Informe Final', informeShort, 'Informe Final Mensual: fecha de cierre con día de la semana'),
@@ -671,8 +679,9 @@ export async function POST(request: Request) {
       const safeName = cr.name ? cr.name.substring(0, 70) : '';
       const cursoMes = (cr.start_month || 'mes').toLowerCase();
       const cleanKey = `sub_${normalizeText(facName).substring(0, 15)}_${cursoMes}_${cIdx}`;
+      const pulseCls = cr.is_latest_soc ? ' curso-ultima-socializacion' : '';
 
-      return `<div class="curso" data-curso-mes="${cursoMes}" data-curso-key="${cleanKey}">
+      return `<div class="curso${pulseCls}" data-curso-mes="${cursoMes}" data-curso-key="${cleanKey}">
         <div class="curso-header">
             <span class="badge-curso-mes">${cr.start_month}</span>
             <label class="subsanar-check-container" title="Marcar como subsanado provisionalmente">
@@ -942,6 +951,38 @@ tbody tr:hover { filter: brightness(.96); }
     border: 2.5px solid #e11d48 !important;
     box-shadow: 0 4px 12px rgba(225, 29, 72, 0.25) !important;
     border-radius: 12px !important;
+}
+@keyframes pulse-border-glow {
+    0%, 100% {
+        border-color: #0284c7 !important;
+        box-shadow: 0 0 0 0 rgba(2, 132, 199, 0.4), 0 3px 10px rgba(2, 132, 199, 0.15) !important;
+    }
+    50% {
+        border-color: #f59e0b !important;
+        box-shadow: 0 0 0 4px rgba(245, 158, 11, 0.35), 0 4px 14px rgba(245, 158, 11, 0.25) !important;
+    }
+}
+.curso.curso-ultima-socializacion {
+    animation: pulse-border-glow 2.2s infinite ease-in-out !important;
+    border: 2.5px solid #f59e0b !important;
+}
+.badge-ultima-soc {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    background: #fffbeb;
+    color: #b45309;
+    border: 1px solid #fde68a;
+    font-size: 9.5px;
+    font-weight: 800;
+    padding: 1px 6px;
+    border-radius: 9999px;
+    margin-left: 4px;
+    animation: pulse-badge 2.2s infinite ease-in-out;
+}
+@keyframes pulse-badge {
+    0%, 100% { transform: scale(1); opacity: 0.95; }
+    50% { transform: scale(1.05); opacity: 1; }
 }
 .badge-prioridad {
     background: #ffe4e6 !important;

@@ -217,6 +217,38 @@ async function processHtmlForResponse(htmlStr: string): Promise<string> {
     box-shadow: 0 4px 12px rgba(225, 29, 72, 0.25) !important;
     border-radius: 12px !important;
 }
+@keyframes pulse-border-glow {
+    0%, 100% {
+        border-color: #0284c7 !important;
+        box-shadow: 0 0 0 0 rgba(2, 132, 199, 0.4), 0 3px 10px rgba(2, 132, 199, 0.15) !important;
+    }
+    50% {
+        border-color: #f59e0b !important;
+        box-shadow: 0 0 0 4px rgba(245, 158, 11, 0.35), 0 4px 14px rgba(245, 158, 11, 0.25) !important;
+    }
+}
+.curso.curso-ultima-socializacion {
+    animation: pulse-border-glow 2.2s infinite ease-in-out !important;
+    border: 2.5px solid #f59e0b !important;
+}
+.badge-ultima-soc {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    background: #fffbeb;
+    color: #b45309;
+    border: 1px solid #fde68a;
+    font-size: 9.5px;
+    font-weight: 800;
+    padding: 1px 6px;
+    border-radius: 9999px;
+    margin-left: 4px;
+    animation: pulse-badge 2.2s infinite ease-in-out;
+}
+@keyframes pulse-badge {
+    0%, 100% { transform: scale(1); opacity: 0.95; }
+    50% { transform: scale(1.05); opacity: 1; }
+}
 .badge-prioridad {
     background: #ffe4e6 !important;
     color: #be123c !important;
