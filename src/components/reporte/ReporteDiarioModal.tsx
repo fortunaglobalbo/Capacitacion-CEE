@@ -41,12 +41,9 @@ export default function ReporteDiarioModal({
 
   // Determinar el carnet del técnico actual para filtrar por defecto
   const defaultTecnicoCarnet = useMemo(() => {
-    if (!currentUser) return 'todos';
-    if (currentUser.rol === 'supervisor') return 'todos';
-    if (currentUser.username === '7782629' || (currentUser.nombre_completo || '').toUpperCase().includes('JUAN PABLO')) return '7782629';
-    if (currentUser.username) return currentUser.username;
+    // Por defecto mostrar 'todos' para ver el panorama completo y permitir filtrar libremente por mes
     return 'todos';
-  }, [currentUser]);
+  }, []);
 
   // Inyectar el filtro por defecto del usuario y transformar el HTML con la lógica de prioridades y nuevos filtros
   const processedHtml = useMemo(() => {
@@ -95,15 +92,41 @@ export default function ReporteDiarioModal({
       finalHtml = finalHtml.replace(/(<input[^>]*id="buscar"[^>]*>)/gi, `${selectMesHtml}\n    $1`);
     }
 
-    // Inyectar CSS de prioridades y de subsanación provisional si falta
-    if (!finalHtml.includes('.curso-subsanado')) {
-      const subsanarAndPrioCss = `<style>
+    // Inyectar CSS de prioridades y de subsanación provisional siempre actualizado
+    const subsanarAndPrioCss = `<style id="custom-subsanar-prio-css">
+.curso {
+    position: relative !important;
+    min-width: 175px;
+    max-width: 300px;
+    border: 2px solid #0284c7 !important;
+    border-radius: 12px !important;
+    padding: 8px !important;
+    padding-top: 12px !important;
+    background: #ffffff !important;
+    box-shadow: 0 3px 10px rgba(2, 132, 199, 0.12) !important;
+    transition: all 0.2s ease !important;
+}
+.curso-start-month-header {
+    display: inline-block;
+    background: #e0f2fe;
+    color: #0369a1;
+    border: 1px solid #bae6fd;
+    border-radius: 6px;
+    padding: 2px 7px;
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: 0.3px;
+    margin-bottom: 7px;
+    max-width: calc(100% - 95px);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    vertical-align: middle;
+}
 .curso.curso-prioritario {
     border: 2.5px solid #e11d48 !important;
     box-shadow: 0 4px 12px rgba(225, 29, 72, 0.25) !important;
-    border-radius: 10px !important;
-    padding: 6px !important;
-    background: #ffffff !important;
+    border-radius: 12px !important;
 }
 .badge-prioridad {
     background: #ffe4e6 !important;
@@ -115,6 +138,8 @@ export default function ReporteDiarioModal({
     display: inline-block;
     width: 100%;
     text-align: center;
+    border-radius: 6px;
+    padding: 2px 4px;
 }
 .paso-prioritario-plan {
     border: 2px solid #d97706 !important;
@@ -143,55 +168,57 @@ export default function ReporteDiarioModal({
 .btn-filter.active { background: var(--primary); color: #fff; border-color: var(--primary); }
 .btn-filter.active-prio { background: #e11d48 !important; color: #fff !important; border-color: #e11d48 !important; box-shadow: 0 2px 8px rgba(225, 29, 72, 0.3); }
 
-/* Subsanación provisional */
+/* Subsanación provisional - Badge pill posicionado perfectamente en esquina superior derecha */
 .subsanar-check-container {
+    position: absolute;
+    top: 7px;
+    right: 7px;
+    margin: 0 !important;
     display: inline-flex;
     align-items: center;
-    gap: 5px;
-    background: rgba(241, 245, 249, 0.95);
-    border: 1px solid #cbd5e1;
-    border-radius: 6px;
-    padding: 2px 7px;
+    gap: 4px;
+    background: #ffffff;
+    border: 1.5px solid #cbd5e1;
+    border-radius: 9999px;
+    padding: 2px 8px;
     font-size: 10px;
     font-weight: 700;
-    color: #334155;
+    color: #475569;
     cursor: pointer;
     user-select: none;
-    margin-bottom: 5px;
-    transition: all 0.15s ease;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+    transition: all 0.2s ease;
+    z-index: 10;
 }
 .subsanar-check-container:hover {
-    background: #e2e8f0;
+    background: #f1f5f9;
     border-color: #94a3b8;
+    color: #1e293b;
 }
 .subsanar-check-container input[type="checkbox"] {
     cursor: pointer;
     margin: 0;
-    width: 13px;
-    height: 13px;
-    accent-color: #059669;
+    width: 12px;
+    height: 12px;
+    accent-color: #10b981;
 }
 .curso.curso-subsanado {
     border: 2.5px solid #10b981 !important;
     background: #f0fdf4 !important;
     box-shadow: 0 4px 14px rgba(16, 185, 129, 0.25) !important;
-    border-radius: 10px !important;
+    border-radius: 12px !important;
+}
+.curso.curso-subsanado .subsanar-check-container {
+    background: #ecfdf5 !important;
+    border-color: #10b981 !important;
+    color: #065f46 !important;
+    box-shadow: 0 1px 4px rgba(16, 185, 129, 0.2) !important;
 }
 .curso.curso-subsanado .badge-prioridad {
     display: none !important;
 }
 .badge-subsanado {
-    background: #d1fae5 !important;
-    color: #065f46 !important;
-    border: 1px solid #34d399 !important;
-    font-size: 10px !important;
-    font-weight: 800 !important;
-    margin-bottom: 4px;
-    display: inline-block;
-    width: 100%;
-    text-align: center;
-    border-radius: 6px;
-    padding: 2px 4px;
+    display: none !important;
 }
 .curso.curso-subsanado .paso.bad {
     background: #f1f5f9 !important;
@@ -226,8 +253,11 @@ export default function ReporteDiarioModal({
     background: #ecfdf5;
     border-color: #10b981;
 }
-</style></head>`;
-      finalHtml = finalHtml.replace('</head>', subsanarAndPrioCss);
+</style>`;
+    if (finalHtml.includes('id="custom-subsanar-prio-css"')) {
+      finalHtml = finalHtml.replace(/<style id="custom-subsanar-prio-css">[\s\S]*?<\/style>/i, subsanarAndPrioCss);
+    } else {
+      finalHtml = finalHtml.replace('</head>', `${subsanarAndPrioCss}\n</head>`);
     }
 
     // Inyectar script de prioridades si falta
@@ -392,24 +422,11 @@ function saveSubsanadosMap(map) {
     } catch(e) {}
 }
 
-function aplicarEstadoSubsanado(cursoEl, isSubsanado) {
-    var badge = cursoEl.querySelector('.badge-subsanado');
-    if (isSubsanado) {
+function aplicarEstadoSubsanado(cursoEl, isChecked) {
+    if (isChecked) {
         cursoEl.classList.add('curso-subsanado');
-        if (!badge) {
-            badge = document.createElement('span');
-            badge.className = 'badge badge-subsanado';
-            badge.innerHTML = '✓ Subsanado (Provisional)';
-            var ref = cursoEl.querySelector('.bateria') || cursoEl.firstChild;
-            cursoEl.insertBefore(badge, ref);
-        } else {
-            badge.style.display = 'inline-block';
-        }
     } else {
         cursoEl.classList.remove('curso-subsanado');
-        if (badge) {
-            badge.style.display = 'none';
-        }
     }
 }
 
@@ -427,7 +444,7 @@ function initSubsanaciones() {
         if (!container) {
             container = document.createElement('label');
             container.className = 'subsanar-check-container';
-            container.title = 'Marcar como subsanado provisionalmente hasta el próximo análisis';
+            container.title = 'Marcar como subsanado provisionalmente';
             container.innerHTML = '<input type="checkbox" ' + (isChecked ? 'checked' : '') + ' data-key="' + key + '"><span>Subsanado</span>';
             
             var cb = container.querySelector('input');
@@ -443,12 +460,7 @@ function initSubsanaciones() {
                 aplicarEstadoSubsanado(curso, this.checked);
             });
 
-            var nombreEl = curso.querySelector('.nombre');
-            if (nombreEl) {
-                curso.insertBefore(container, nombreEl);
-            } else {
-                curso.insertBefore(container, curso.firstChild);
-            }
+            curso.appendChild(container);
         } else {
             var cb = container.querySelector('input');
             if (cb) cb.checked = isChecked;
@@ -471,22 +483,192 @@ if (document.readyState === 'loading') {
 }
 </script></body>`;
       finalHtml = finalHtml.replace('</body>', subsanarScriptBlock);
+    } else {
+      // Si ya existía initSubsanaciones en el HTML almacenado, actualizar la lógica de check y aplicar
+      finalHtml = finalHtml.replace(
+        /function aplicarEstadoSubsanado[\s\S]*?function limpiarTodosSubsanados\(\) \{[\s\S]*?\}/,
+        `function aplicarEstadoSubsanado(cursoEl, isChecked) {
+    if (isChecked) {
+        cursoEl.classList.add('curso-subsanado');
+    } else {
+        cursoEl.classList.remove('curso-subsanado');
+    }
+}
+
+function initSubsanaciones() {
+    var subsMap = getSubsanadosMap();
+    var cursos = document.querySelectorAll('.curso');
+
+    cursos.forEach(function(curso) {
+        var key = getCursoKey(curso);
+        var isChecked = !!subsMap[key];
+
+        aplicarEstadoSubsanado(curso, isChecked);
+
+        var container = curso.querySelector('.subsanar-check-container');
+        if (!container) {
+            container = document.createElement('label');
+            container.className = 'subsanar-check-container';
+            container.title = 'Marcar como subsanado provisionalmente';
+            container.innerHTML = '<input type="checkbox" ' + (isChecked ? 'checked' : '') + ' data-key="' + key + '"><span>Subsanado</span>';
+            
+            var cb = container.querySelector('input');
+            cb.addEventListener('change', function(e) {
+                e.stopPropagation();
+                var curMap = getSubsanadosMap();
+                if (this.checked) {
+                    curMap[key] = true;
+                } else {
+                    delete curMap[key];
+                }
+                saveSubsanadosMap(curMap);
+                aplicarEstadoSubsanado(curso, this.checked);
+            });
+
+            curso.appendChild(container);
+        } else {
+            var cb = container.querySelector('input');
+            if (cb) cb.checked = isChecked;
+        }
+    });
+}
+
+function limpiarTodosSubsanados() {
+    if (confirm('¿Deseas desmarcar todos los cursos subsanados provisionalmente?')) {
+        localStorage.removeItem('reporte_cursos_subsanados');
+        initSubsanaciones();
+    }
+}`
+      );
     }
 
-    // Asegurar que buscar() filtre por mes si existe en el HTML
-    if (finalHtml.includes('function buscar(') && !finalHtml.includes('selectedMes')) {
-      finalHtml = finalHtml.replace(
-        "var selectedTec = tecSelect ? tecSelect.value : 'todos';",
-        "var selectedTec = tecSelect ? tecSelect.value : 'todos';\n    var mesSelect = document.getElementById('filtroMes');\n    var selectedMes = mesSelect ? mesSelect.value.toLowerCase().trim() : 'todos';"
-      );
-      finalHtml = finalHtml.replace(
-        "var matchesTec = (selectedTec === 'todos') || (rowTec === selectedTec);",
-        "var matchesTec = (selectedTec === 'todos') || (rowTec === selectedTec);\n        var rowMes = (tr.getAttribute('data-mes') || '').toLowerCase();\n        var matchesMes = (selectedMes === 'todos') || rowMes.includes(selectedMes);"
-      );
-      finalHtml = finalHtml.replace(
-        "if (matchesText && matchesTec && matchesEstado)",
-        "if (matchesText && matchesTec && matchesMes && matchesEstado)"
-      );
+    // Reemplazar o actualizar buscar() para soportar filtro robusto por meses con alias, destacados y feedback si queda vacío
+    const newBuscarBody = `function buscar() {
+    marcarPrioritarios();
+    initSubsanaciones();
+
+    var input = document.getElementById('buscar');
+    var filter = input ? input.value.toLowerCase().trim() : '';
+    var tecSelect = document.getElementById('filtroTecnico');
+    var selectedTec = tecSelect ? tecSelect.value : 'todos';
+
+    var mesSelect = document.getElementById('filtroMes');
+    var selectedMes = mesSelect ? mesSelect.value.toLowerCase().trim() : 'todos';
+
+    var table = document.getElementById('reportTable');
+    if (!table) return;
+    var tbody = table.getElementsByTagName('tbody')[0];
+    if (!tbody) return;
+    var trs = tbody.getElementsByTagName('tr');
+
+    var totalProg = 0;
+    var totalCursos = 0;
+    var okCount = 0;
+    var pendCount = 0;
+
+    var monthAliases = {
+        'mayo': ['mayo', 'may'],
+        'junio': ['junio', 'jun'],
+        'julio': ['julio', 'jul'],
+        'agosto': ['agosto', 'ago'],
+        'septiembre': ['septiembre', 'sep', 'set'],
+        'octubre': ['octubre', 'oct'],
+        'noviembre': ['noviembre', 'nov'],
+        'diciembre': ['diciembre', 'dic']
+    };
+    var aliases = monthAliases[selectedMes] || [selectedMes];
+
+    for (var i = 0; i < trs.length; i++) {
+        var tr = trs[i];
+        if (tr.id === 'noRowsMsg') continue;
+
+        var text = tr.textContent.toLowerCase();
+        var rowTec = tr.getAttribute('data-tecnico') || '8639300';
+        var rowMes = (tr.getAttribute('data-mes') || '').toLowerCase();
+        var isOk = tr.getAttribute('data-ok') === '1';
+        var isPrio = tr.getAttribute('data-prioritario') === '1';
+
+        var matchesText = !filter || text.includes(filter);
+        var matchesTec = (selectedTec === 'todos') || (rowTec === selectedTec);
+        var matchesMes = (selectedMes === 'todos') || aliases.some(function(a) {
+            return rowMes.includes(a) || text.includes(a);
+        });
+
+        var matchesEstado = true;
+        if (typeof currentFiltroEstado !== 'undefined') {
+            if (currentFiltroEstado === 'prioritarios') {
+                matchesEstado = isPrio;
+            } else if (currentFiltroEstado === 'pendientes') {
+                matchesEstado = !isOk;
+            } else if (currentFiltroEstado === 'ok') {
+                matchesEstado = isOk;
+            }
+        }
+
+        if (matchesText && matchesTec && matchesMes && matchesEstado) {
+            tr.style.display = '';
+            totalProg++;
+            var cursosInRow = tr.querySelectorAll('.curso');
+            totalCursos += cursosInRow.length;
+            if (isOk) okCount++; else pendCount++;
+
+            if (selectedMes !== 'todos') {
+                cursosInRow.forEach(function(c) {
+                    var cText = c.textContent.toLowerCase();
+                    var cMes = (c.getAttribute('data-curso-mes') || '').toLowerCase();
+                    var cMatch = aliases.some(function(a) { return cText.includes(a) || cMes.includes(a); });
+                    if (cMatch) {
+                        c.style.opacity = '1';
+                        c.style.boxShadow = '0 0 0 2px #0284c7';
+                    } else {
+                        c.style.opacity = '0.45';
+                        c.style.boxShadow = 'none';
+                    }
+                });
+            } else {
+                cursosInRow.forEach(function(c) {
+                    c.style.opacity = '1';
+                    c.style.boxShadow = '';
+                });
+            }
+        } else {
+            tr.style.display = 'none';
+        }
+    }
+
+    var existingNoRow = document.getElementById('noRowsMsg');
+    if (totalProg === 0) {
+        if (!existingNoRow) {
+            existingNoRow = document.createElement('tr');
+            existingNoRow.id = 'noRowsMsg';
+            tbody.appendChild(existingNoRow);
+        }
+        var tecName = (tecSelect && tecSelect.options[tecSelect.selectedIndex]) ? tecSelect.options[tecSelect.selectedIndex].text : '';
+        var msgHtml = '<td colspan="8" style="text-align:center; padding:35px 20px; color:#475569; font-size:14px; background:#f8fafc;">';
+        msgHtml += '🔍 No se encontraron cursos con los filtros seleccionados.';
+        if (selectedTec !== 'todos') {
+            msgHtml += '<br><span style="font-size:12px; color:#64748b;">El técnico <strong>' + tecName + '</strong> no tiene cursos registrados para ';
+            msgHtml += (selectedMes !== 'todos') ? ('el mes de <strong>' + selectedMes.toUpperCase() + '</strong>.') : 'estos filtros.';
+            msgHtml += '</span><br><button onclick="document.getElementById(\\'filtroTecnico\\').value=\\'todos\\'; buscar();" style="margin-top:12px; padding:7px 16px; background:#0284c7; color:#fff; border:none; border-radius:8px; font-size:12px; font-weight:700; cursor:pointer;">Ver todos los técnicos para este mes</button>';
+        }
+        msgHtml += '</td>';
+        existingNoRow.innerHTML = msgHtml;
+        existingNoRow.style.display = '';
+    } else if (existingNoRow) {
+        existingNoRow.style.display = 'none';
+    }
+
+    var cardValues = document.querySelectorAll('.card .value');
+    if (cardValues.length >= 4) {
+        cardValues[0].innerHTML = totalProg;
+        cardValues[1].innerHTML = totalCursos;
+        cardValues[2].innerHTML = okCount + '<span style="font-size:14px;color:var(--muted);font-weight:400"> / ' + totalProg + '</span>';
+        cardValues[3].innerHTML = pendCount + '<span style="font-size:14px;color:var(--muted);font-weight:400"> / ' + totalProg + '</span>';
+    }
+}`;
+
+    if (finalHtml.includes('function buscar()')) {
+      finalHtml = finalHtml.replace(/function buscar\(\)[\s\S]*?function initReporte\(\)/, `${newBuscarBody}\n\nfunction initReporte()`);
     }
 
     if (defaultTecnicoCarnet !== 'todos') {

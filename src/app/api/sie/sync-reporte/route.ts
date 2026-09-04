@@ -654,8 +654,9 @@ export async function POST(request: Request) {
       const conformAlert = cr.conform_pend ? '<span class="badge conform-alert">⚠️ Generar Conformidad</span>' : '';
       const safeName = cr.name ? cr.name.substring(0, 70) : '';
       const monthBadgeHeader = cr.start_month ? `<div class="curso-start-month-header">🗓️ INICIO: ${cr.start_month.toUpperCase()}</div>` : '';
+      const cursoMesAttr = `${cr.socializacion_month || ''} ${cr.start_month || ''}`.toLowerCase().trim();
 
-      return `<div class="curso">
+      return `<div class="curso" data-curso-mes="${cursoMesAttr}">
         ${monthBadgeHeader}
         <span class="nombre" title="${cr.name}">${safeName}</span>
         <div class="bateria">${pasos.join('')}</div>
@@ -732,11 +733,14 @@ export async function POST(request: Request) {
         }
       }
 
-      // Determinar meses de este evento
+      // Determinar meses de este evento (socialización e inicio)
       const eventMonths = new Set<string>();
       for (const cr of ev.courses) {
         if (cr.socializacion_month) {
           eventMonths.add(cr.socializacion_month.toLowerCase());
+        }
+        if (cr.start_month) {
+          eventMonths.add(cr.start_month.toLowerCase());
         }
       }
       if (eventMonths.size === 0 && ev.mes) {
@@ -769,6 +773,9 @@ export async function POST(request: Request) {
       for (const cr of ev.courses) {
         if (cr.socializacion_month) {
           allMonthsDetected.add(cr.socializacion_month);
+        }
+        if (cr.start_month) {
+          allMonthsDetected.add(cr.start_month);
         }
       }
     }
@@ -886,20 +893,38 @@ tbody tr:hover { filter: brightness(.96); }
     display: flex;
 }
 .curso {
+    position: relative !important;
     min-width: 175px;
     max-width: 300px;
     border: 2px solid #0284c7 !important;
     border-radius: 12px !important;
     padding: 8px !important;
+    padding-top: 12px !important;
     background: #ffffff !important;
     box-shadow: 0 3px 10px rgba(2, 132, 199, 0.12) !important;
+    transition: all 0.2s ease !important;
+}
+.curso-start-month-header {
+    display: inline-block;
+    background: #e0f2fe;
+    color: #0369a1;
+    border: 1px solid #bae6fd;
+    border-radius: 6px;
+    padding: 2px 7px;
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: 0.3px;
+    margin-bottom: 7px;
+    max-width: calc(100% - 95px);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    vertical-align: middle;
 }
 .curso.curso-prioritario {
     border: 2.5px solid #e11d48 !important;
     box-shadow: 0 4px 12px rgba(225, 29, 72, 0.25) !important;
-    border-radius: 10px !important;
-    padding: 6px !important;
-    background: #ffffff !important;
+    border-radius: 12px !important;
 }
 .badge-prioridad {
     background: #ffe4e6 !important;
@@ -911,6 +936,8 @@ tbody tr:hover { filter: brightness(.96); }
     display: inline-block;
     width: 100%;
     text-align: center;
+    border-radius: 6px;
+    padding: 2px 4px;
 }
 .paso-prioritario-plan {
     border: 2px solid #d97706 !important;
@@ -950,55 +977,57 @@ tbody tr:hover { filter: brightness(.96); }
     box-shadow: 0 2px 8px rgba(225, 29, 72, 0.3);
 }
 
-/* Subsanación provisional */
+/* Subsanación provisional - Badge pill en esquina superior derecha */
 .subsanar-check-container {
+    position: absolute;
+    top: 7px;
+    right: 7px;
+    margin: 0 !important;
     display: inline-flex;
     align-items: center;
-    gap: 5px;
-    background: rgba(241, 245, 249, 0.95);
-    border: 1px solid #cbd5e1;
-    border-radius: 6px;
-    padding: 2px 7px;
+    gap: 4px;
+    background: #ffffff;
+    border: 1.5px solid #cbd5e1;
+    border-radius: 9999px;
+    padding: 2px 8px;
     font-size: 10px;
     font-weight: 700;
-    color: #334155;
+    color: #475569;
     cursor: pointer;
     user-select: none;
-    margin-bottom: 5px;
-    transition: all 0.15s ease;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+    transition: all 0.2s ease;
+    z-index: 10;
 }
 .subsanar-check-container:hover {
-    background: #e2e8f0;
+    background: #f1f5f9;
     border-color: #94a3b8;
+    color: #1e293b;
 }
 .subsanar-check-container input[type="checkbox"] {
     cursor: pointer;
     margin: 0;
-    width: 13px;
-    height: 13px;
-    accent-color: #059669;
+    width: 12px;
+    height: 12px;
+    accent-color: #10b981;
 }
 .curso.curso-subsanado {
     border: 2.5px solid #10b981 !important;
     background: #f0fdf4 !important;
     box-shadow: 0 4px 14px rgba(16, 185, 129, 0.25) !important;
-    border-radius: 10px !important;
+    border-radius: 12px !important;
+}
+.curso.curso-subsanado .subsanar-check-container {
+    background: #ecfdf5 !important;
+    border-color: #10b981 !important;
+    color: #065f46 !important;
+    box-shadow: 0 1px 4px rgba(16, 185, 129, 0.2) !important;
 }
 .curso.curso-subsanado .badge-prioridad {
     display: none !important;
 }
 .badge-subsanado {
-    background: #d1fae5 !important;
-    color: #065f46 !important;
-    border: 1px solid #34d399 !important;
-    font-size: 10px !important;
-    font-weight: 800 !important;
-    margin-bottom: 4px;
-    display: inline-block;
-    width: 100%;
-    text-align: center;
-    border-radius: 6px;
-    padding: 2px 4px;
+    display: none !important;
 }
 .curso.curso-subsanado .paso.bad {
     background: #f1f5f9 !important;
@@ -1272,24 +1301,11 @@ function saveSubsanadosMap(map) {
     } catch(e) {}
 }
 
-function aplicarEstadoSubsanado(cursoEl, isSubsanado) {
-    var badge = cursoEl.querySelector('.badge-subsanado');
-    if (isSubsanado) {
+function aplicarEstadoSubsanado(cursoEl, isChecked) {
+    if (isChecked) {
         cursoEl.classList.add('curso-subsanado');
-        if (!badge) {
-            badge = document.createElement('span');
-            badge.className = 'badge badge-subsanado';
-            badge.innerHTML = '✓ Subsanado (Provisional)';
-            var ref = cursoEl.querySelector('.bateria') || cursoEl.firstChild;
-            cursoEl.insertBefore(badge, ref);
-        } else {
-            badge.style.display = 'inline-block';
-        }
     } else {
         cursoEl.classList.remove('curso-subsanado');
-        if (badge) {
-            badge.style.display = 'none';
-        }
     }
 }
 
@@ -1307,7 +1323,7 @@ function initSubsanaciones() {
         if (!container) {
             container = document.createElement('label');
             container.className = 'subsanar-check-container';
-            container.title = 'Marcar como subsanado provisionalmente hasta el próximo análisis';
+            container.title = 'Marcar como subsanado provisionalmente';
             container.innerHTML = '<input type="checkbox" ' + (isChecked ? 'checked' : '') + ' data-key="' + key + '"><span>Subsanado</span>';
             
             var cb = container.querySelector('input');
@@ -1323,12 +1339,7 @@ function initSubsanaciones() {
                 aplicarEstadoSubsanado(curso, this.checked);
             });
 
-            var nombreEl = curso.querySelector('.nombre');
-            if (nombreEl) {
-                curso.insertBefore(container, nombreEl);
-            } else {
-                curso.insertBefore(container, curso.firstChild);
-            }
+            curso.appendChild(container);
         } else {
             var cb = container.querySelector('input');
             if (cb) cb.checked = isChecked;
@@ -1366,8 +1377,22 @@ function buscar() {
     var okCount = 0;
     var pendCount = 0;
 
+    var monthAliases = {
+        'mayo': ['mayo', 'may'],
+        'junio': ['junio', 'jun'],
+        'julio': ['julio', 'jul'],
+        'agosto': ['agosto', 'ago'],
+        'septiembre': ['septiembre', 'sep', 'set'],
+        'octubre': ['octubre', 'oct'],
+        'noviembre': ['noviembre', 'nov'],
+        'diciembre': ['diciembre', 'dic']
+    };
+    var aliases = monthAliases[selectedMes] || [selectedMes];
+
     for (var i = 0; i < trs.length; i++) {
         var tr = trs[i];
+        if (tr.id === 'noRowsMsg') continue;
+
         var text = tr.textContent.toLowerCase();
         var rowTec = tr.getAttribute('data-tecnico') || '8639300';
         var rowMes = (tr.getAttribute('data-mes') || '').toLowerCase();
@@ -1376,7 +1401,9 @@ function buscar() {
 
         var matchesText = !filter || text.includes(filter);
         var matchesTec = (selectedTec === 'todos') || (rowTec === selectedTec);
-        var matchesMes = (selectedMes === 'todos') || rowMes.includes(selectedMes);
+        var matchesMes = (selectedMes === 'todos') || aliases.some(function(a) {
+            return rowMes.includes(a) || text.includes(a);
+        });
 
         var matchesEstado = true;
         if (currentFiltroEstado === 'prioritarios') {
@@ -1390,12 +1417,54 @@ function buscar() {
         if (matchesText && matchesTec && matchesMes && matchesEstado) {
             tr.style.display = '';
             totalProg++;
-            var cursosInRow = tr.querySelectorAll('.curso').length;
-            totalCursos += cursosInRow;
+            var cursosInRow = tr.querySelectorAll('.curso');
+            totalCursos += cursosInRow.length;
             if (isOk) okCount++; else pendCount++;
+
+            if (selectedMes !== 'todos') {
+                cursosInRow.forEach(function(c) {
+                    var cText = c.textContent.toLowerCase();
+                    var cMes = (c.getAttribute('data-curso-mes') || '').toLowerCase();
+                    var cMatch = aliases.some(function(a) { return cText.includes(a) || cMes.includes(a); });
+                    if (cMatch) {
+                        c.style.opacity = '1';
+                        c.style.boxShadow = '0 0 0 2px #0284c7';
+                    } else {
+                        c.style.opacity = '0.45';
+                        c.style.boxShadow = 'none';
+                    }
+                });
+            } else {
+                cursosInRow.forEach(function(c) {
+                    c.style.opacity = '1';
+                    c.style.boxShadow = '';
+                });
+            }
         } else {
             tr.style.display = 'none';
         }
+    }
+
+    var existingNoRow = document.getElementById('noRowsMsg');
+    if (totalProg === 0) {
+        if (!existingNoRow) {
+            existingNoRow = document.createElement('tr');
+            existingNoRow.id = 'noRowsMsg';
+            tbody.appendChild(existingNoRow);
+        }
+        var tecName = (tecSelect && tecSelect.options[tecSelect.selectedIndex]) ? tecSelect.options[tecSelect.selectedIndex].text : '';
+        var msgHtml = '<td colspan="8" style="text-align:center; padding:35px 20px; color:#475569; font-size:14px; background:#f8fafc;">';
+        msgHtml += '🔍 No se encontraron cursos con los filtros seleccionados.';
+        if (selectedTec !== 'todos') {
+            msgHtml += '<br><span style="font-size:12px; color:#64748b;">El técnico <strong>' + tecName + '</strong> no tiene cursos registrados para ';
+            msgHtml += (selectedMes !== 'todos') ? ('el mes de <strong>' + selectedMes.toUpperCase() + '</strong>.') : 'estos filtros.';
+            msgHtml += '</span><br><button onclick="document.getElementById(\\'filtroTecnico\\').value=\\'todos\\'; buscar();" style="margin-top:12px; padding:7px 16px; background:#0284c7; color:#fff; border:none; border-radius:8px; font-size:12px; font-weight:700; cursor:pointer;">Ver todos los técnicos para este mes</button>';
+        }
+        msgHtml += '</td>';
+        existingNoRow.innerHTML = msgHtml;
+        existingNoRow.style.display = '';
+    } else if (existingNoRow) {
+        existingNoRow.style.display = 'none';
     }
 
     var cardValues = document.querySelectorAll('.card .value');
