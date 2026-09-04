@@ -494,7 +494,7 @@ export async function POST(request: Request) {
 
     // Paso de Unificación Mensual por Facilitador:
     // Los facilitadores entregan UN SOLO informe final mensual.
-    // Agrupamos todos los cursos de cada facilitador por mes de socialización (o de inicio).
+    // Agrupamos todos los cursos de cada facilitador por mes de inicio (la que manda es Fecha de Inicio).
     const facilitatorMonthGroups: Record<string, {
       facilitador: string;
       mes: string;
@@ -505,9 +505,11 @@ export async function POST(request: Request) {
     for (const ev of deduplicatedEvents) {
       const facKey = normalizeText(ev.facilitador);
       for (const cr of ev.courses) {
+        cr.url_evento = ev.url_evento;
         let mNum = 0;
-        if (cr.inicio_date_obj) {
-          mNum = cr.inicio_date_obj.getMonth() + 1;
+        const dtInicio = cr.inicio_date_obj || parseStartDate(cr.dates);
+        if (dtInicio) {
+          mNum = dtInicio.getMonth() + 1;
         } else if (cr.fin_date_obj) {
           mNum = cr.fin_date_obj.getMonth() + 1;
         }
@@ -531,7 +533,7 @@ export async function POST(request: Request) {
       }
     }
 
-    // Para cada grupo (facilitador, mes): calcular fecha límite unificada (+5d de la última socialización) y revalidar informe final
+    // Para cada grupo (facilitador, mes): calcular fecha límite unificada (+5d de la última socialización del mes) y revalidar informe final
     for (const groupKey in facilitatorMonthGroups) {
       const grp = facilitatorMonthGroups[groupKey];
       let maxFin: Date | null = null;
@@ -616,18 +618,13 @@ export async function POST(request: Request) {
       return diffDays <= 5 ? 'cell-yellow' : 'cell-blue';
     }
 
-    function courseCellHtml(cr: any): string {
+    function courseCellHtml(cr: any, facName: string, cIdx: number): string {
       function paso(ok: boolean, label: string, value: string, title = '', info = false): string {
         const ico = info ? '📅' : (ok ? '✓' : '✗');
         const cls = info ? 'info' : (ok ? 'ok' : 'bad');
         const titleAttr = title ? ` title="${title}"` : '';
         return `<div class="paso ${cls}"${titleAttr}><span class="ico">${ico}</span><span class="lbl">${label}</span><span class="val">${value}</span></div>`;
       }
-
-      const MONTH_NAMES_LITERAL: Record<number, string> = {
-        1: 'Enero', 2: 'Febrero', 3: 'Marzo', 4: 'Abril', 5: 'Mayo', 6: 'Junio',
-        7: 'Julio', 8: 'Agosto', 9: 'Septiembre', 10: 'Octubre', 11: 'Noviembre', 12: 'Diciembre'
-      };
 
       const inicioShort = cr.fecha_inicio;
       const finParts = cr.fecha_fin ? cr.fecha_fin.split('/') : [];
@@ -637,7 +634,7 @@ export async function POST(request: Request) {
       if (dp.length >= 2) {
         const dayNum = dp[0];
         const mNum = parseInt(dp[1], 10);
-        const literalMonth = MONTH_NAMES_LITERAL[mNum] || dp[1];
+        const literalMonth = MONTH_NAMES[mNum] || dp[1];
         limiteShort = `${dayNum}/${literalMonth} (Mes)`;
       }
 
@@ -654,19 +651,25 @@ export async function POST(request: Request) {
 
       const conformAlert = cr.conform_pend ? '<span class="badge conform-alert">⚠️ Generar Conformidad</span>' : '';
       const safeName = cr.name ? cr.name.substring(0, 70) : '';
-      const cursoMes = (cr.start_month || cr.socializacion_month || '').toLowerCase();
+      const cursoMes = (cr.start_month || 'mes').toLowerCase();
+      const cleanKey = `sub_${normalizeText(facName).substring(0, 15)}_${cursoMes}_${cIdx}`;
 
-      return `<div class="curso" data-curso-mes="${cursoMes}">
+      return `<div class="curso" data-curso-mes="${cursoMes}" data-curso-key="${cleanKey}">
+        <div class="curso-header">
+            <span class="badge-curso-mes">${cr.start_month}</span>
+            <label class="subsanar-check-container" title="Marcar como subsanado provisionalmente">
+                <input type="checkbox" data-key="${cleanKey}"><span>Subsanado</span>
+            </label>
+        </div>
         <span class="nombre" title="${cr.name}">${safeName}</span>
         <div class="bateria">${pasos.join('')}</div>
         ${conformAlert}
+        ${cr.url_evento ? `<a href="${cr.url_evento}" target="_blank" class="btn-sie-link" title="Abrir curso en SIE UNEFCO"><span>👁️</span> Ver en SIE</a>` : ''}
     </div>`;
     }
 
     const facilitatorColors = [
-      '#e3f2fd', '#fff3e0', '#e8f5e9', '#fce4ec', '#f3e5f5',
-      '#e0f7fa', '#fff8e1', '#efebe9', '#e8eaf6', '#fbe9e7',
-      '#e0f2f1', '#f1f8e9', '#fce4ec', '#e3f2fd', '#fff3e0'
+      '#f8fafc', '#f0f9ff', '#f0fdf4', '#fefce8', '#fdf2f8', '#faf5ff', '#fff7ed', '#f0fdfa'
     ];
 
     const facilitatorOrder: string[] = [];
@@ -680,30 +683,39 @@ export async function POST(request: Request) {
       facilitatorColorMap[fac] = facilitatorColors[i % facilitatorColors.length];
     });
 
+    const monthWeights: Record<string, number> = { mayo: 5, junio: 6, julio: 7, agosto: 8, septiembre: 9, octubre: 10, noviembre: 11, diciembre: 12 };
+    const sortedGroupKeys = Object.keys(facilitatorMonthGroups).sort((a, b) => {
+      const grpA = facilitatorMonthGroups[a];
+      const grpB = facilitatorMonthGroups[b];
+      const fA = normalizeText(grpA.facilitador);
+      const fB = normalizeText(grpB.facilitador);
+      if (fA !== fB) return fA.localeCompare(fB);
+      const mA = monthWeights[grpA.mes.toLowerCase()] || 99;
+      const mB = monthWeights[grpB.mes.toLowerCase()] || 99;
+      return mA - mB;
+    });
+
     let htmlRows = '';
-    for (const ev of deduplicatedEvents) {
-      const bgColor = facilitatorColorMap[ev.facilitador] || '#ffffff';
+    for (const groupKey of sortedGroupKeys) {
+      const grp = facilitatorMonthGroups[groupKey];
+      const bgColor = facilitatorColorMap[grp.facilitador] || '#ffffff';
+      const mesLower = grp.mes.toLowerCase();
 
+      // Determine technician for this facilitator month group
       let tec = '8639300';
-      const idMatch = ev.sede ? ev.sede.match(/ID\s*(\d+)/i) : null;
-      if (idMatch) {
-        const dbCourse = (cursosDb || []).find(c => String(c.id) === String(idMatch[1]));
-        if (dbCourse && dbCourse.tecnico_carnet) {
-          tec = dbCourse.tecnico_carnet;
-        }
-      }
-
-      if (tec === '8639300') {
-        for (const cr of ev.courses) {
-          if (courseMap[cr.cid]) {
-            tec = courseMap[cr.cid];
+      for (const ev of grp.events) {
+        const idMatch = ev.sede ? ev.sede.match(/ID\s*(\d+)/i) : null;
+        if (idMatch) {
+          const dbCourse = (cursosDb || []).find(c => String(c.id) === String(idMatch[1]));
+          if (dbCourse && dbCourse.tecnico_carnet) {
+            tec = dbCourse.tecnico_carnet;
             break;
           }
         }
       }
 
-      if (tec === '8639300' && ev.facilitador) {
-        const facNorm = normalizeText(ev.facilitador);
+      if (tec === '8639300' && grp.facilitador) {
+        const facNorm = normalizeText(grp.facilitador);
         for (const f of (facsDb || [])) {
           const dbNorm = normalizeText(f.nombre);
           if (dbNorm && dbNorm !== 'por confirmar') {
@@ -721,48 +733,42 @@ export async function POST(request: Request) {
         }
       }
 
-      // Determine start month for each course
-      for (const cr of ev.courses) {
-        const dt = parseStartDate(cr.dates);
-        if (dt) {
-          const mNum = dt.getMonth() + 1;
-          cr.start_month = MONTH_NAMES[mNum] || ev.mes || 'MES';
-        } else {
-          cr.start_month = ev.mes || 'MES';
-        }
-      }
-
-      // Determinar meses de este evento (socialización e inicio)
-      const eventMonths = new Set<string>();
-      for (const cr of ev.courses) {
-        if (cr.socializacion_month) {
-          eventMonths.add(cr.socializacion_month.toLowerCase());
-        }
-        if (cr.start_month) {
-          eventMonths.add(cr.start_month.toLowerCase());
-        }
-      }
-      if (eventMonths.size === 0 && ev.mes) {
-        eventMonths.add(ev.mes.toLowerCase());
-      }
-      const dataMesAttr = Array.from(eventMonths).join(' ');
-
       let courseCells = '';
-      for (const cr of ev.courses) {
+      grp.courses.forEach((cr: any, idx: number) => {
         const status = cellTemp(cr);
-        courseCells += `<td class="${status}">${courseCellHtml(cr)}</td>`;
-      }
-      for (let i = ev.courses.length; i < 4; i++) {
-        courseCells += '<td></td>';
+        courseCells += `<td class="${status}">${courseCellHtml(cr, grp.facilitador, idx)}</td>`;
+      });
+      for (let i = grp.courses.length; i < 5; i++) {
+        courseCells += '<td class="empty-course-cell"></td>';
       }
 
-      const dataOk = ev.all_ok ? '1' : '0';
-      htmlRows += `<tr style="background:${bgColor}" data-ok="${dataOk}" data-tecnico="${tec}" data-mes="${dataMesAttr}">
-        <td class="toggle-ciclo" title="${ev.ciclo}">${ev.ciclo ? ev.ciclo.substring(0, 60) : ''}</td>
-        <td title="${ev.sede}">${ev.sede ? ev.sede.substring(0, 40) : ''}</td>
-        <td title="${ev.facilitador}"><strong>${ev.facilitador ? ev.facilitador.substring(0, 40) : ''}</strong></td>
+      const sedesSet = new Set<string>();
+      const ciclosSet = new Set<string>();
+      grp.events.forEach(ev => {
+        if (ev.sede) sedesSet.add(ev.sede);
+        if (ev.ciclo) ciclosSet.add(ev.ciclo);
+      });
+      const sedesSummary = Array.from(sedesSet).join(' / ');
+      const ciclosSummary = Array.from(ciclosSet).join(' / ');
+      const sedesShort = sedesSummary.length > 55 ? sedesSummary.substring(0, 55) + '...' : sedesSummary;
+      const ciclosShort = ciclosSummary.length > 60 ? ciclosSummary.substring(0, 60) + '...' : ciclosSummary;
+
+      const rowAllOk = grp.courses.every((cr: any) => cr.todo_ok);
+      const dataOk = rowAllOk ? '1' : '0';
+
+      htmlRows += `<tr style="background:${bgColor}" data-ok="${dataOk}" data-tecnico="${tec}" data-mes="${mesLower}">
+        <td style="text-align:center; vertical-align:middle; font-weight:700;">
+            <span class="badge-row-mes">${grp.mes.toUpperCase()}</span>
+        </td>
+        <td title="${grp.facilitador}" style="vertical-align:middle;">
+            <strong style="font-size:13px; color:#0f172a; display:block;">${grp.facilitador}</strong>
+            <span style="font-size:11px; color:#64748b; font-weight:600;">${grp.courses.length} curso${grp.courses.length > 1 ? 's' : ''} en ${grp.mes}</span>
+        </td>
+        <td title="${sedesSummary} | ${ciclosSummary}" style="vertical-align:middle; font-size:11px; max-width:220px;">
+            <div style="font-weight:600; color:#334155; line-height:1.3;">${sedesShort || 'Sede General'}</div>
+            <div style="color:#64748b; font-size:10px; margin-top:3px; line-height:1.2;">${ciclosShort}</div>
+        </td>
         ${courseCells}
-        <td style="text-align:center"><a href="${ev.url_evento}" target="_blank" title="Ver evento en SIE">👁️</a></td>
     </tr>`;
     }
 
@@ -962,27 +968,64 @@ tbody tr:hover { filter: brightness(.96); }
     box-shadow: 0 2px 8px rgba(225, 29, 72, 0.3);
 }
 
-/* Subsanación provisional - Badge pill en esquina superior derecha */
-.subsanar-check-container {
-    position: absolute;
-    top: 7px;
-    right: 7px;
-    margin: 0 !important;
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-    background: #ffffff;
-    border: 1.5px solid #cbd5e1;
+/* Subsanación provisional y estilos Opción A */
+.badge-row-mes {
+    display: inline-block;
+    background: #e0f2fe;
+    color: #0369a1;
+    border: 1px solid #7dd3fc;
+    font-size: 11px;
+    font-weight: 800;
+    padding: 3px 8px;
     border-radius: 9999px;
-    padding: 2px 8px;
-    font-size: 10px;
-    font-weight: 700;
-    color: #475569;
-    cursor: pointer;
-    user-select: none;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.06);
-    transition: all 0.2s ease;
-    z-index: 10;
+    letter-spacing: 0.5px;
+}
+.curso {
+    position: relative !important;
+    display: flex !important;
+    flex-direction: column !important;
+    min-width: 185px !important;
+    max-width: 280px !important;
+    background: #ffffff !important;
+    border: 2px solid #0284c7 !important;
+    border-radius: 12px !important;
+    padding: 8px 10px !important;
+    box-shadow: 0 2px 8px rgba(2, 132, 199, 0.1) !important;
+    transition: all 0.2s ease !important;
+}
+.curso-header {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    margin-bottom: 6px !important;
+    gap: 6px !important;
+}
+.badge-curso-mes {
+    background: #0284c7 !important;
+    color: #ffffff !important;
+    font-size: 9px !important;
+    font-weight: 800 !important;
+    padding: 2px 7px !important;
+    border-radius: 9999px !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.5px !important;
+}
+.subsanar-check-container {
+    position: static !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 4px !important;
+    background: #ffffff !important;
+    border: 1.5px solid #cbd5e1 !important;
+    border-radius: 9999px !important;
+    padding: 1px 7px !important;
+    font-size: 10px !important;
+    font-weight: 700 !important;
+    color: #475569 !important;
+    cursor: pointer !important;
+    user-select: none !important;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.06) !important;
+    transition: all 0.2s ease !important;
 }
 .subsanar-check-container:hover {
     background: #f1f5f9;
@@ -1000,7 +1043,6 @@ tbody tr:hover { filter: brightness(.96); }
     border: 2.5px solid #10b981 !important;
     background: #f0fdf4 !important;
     box-shadow: 0 4px 14px rgba(16, 185, 129, 0.25) !important;
-    border-radius: 12px !important;
 }
 .curso.curso-subsanado .subsanar-check-container {
     background: #ecfdf5 !important;
@@ -1029,6 +1071,31 @@ tbody tr:hover { filter: brightness(.96); }
     background: #f8fafc !important;
     color: #64748b !important;
 }
+.btn-sie-link {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 5px !important;
+    margin-top: 8px !important;
+    padding: 5px 8px !important;
+    background: #0284c7 !important;
+    color: #ffffff !important;
+    text-decoration: none !important;
+    border-radius: 6px !important;
+    font-size: 11px !important;
+    font-weight: 700 !important;
+    transition: all 0.2s ease !important;
+    box-shadow: 0 1px 3px rgba(2, 132, 199, 0.2) !important;
+}
+.btn-sie-link:hover {
+    background: #0369a1 !important;
+    transform: translateY(-1px) !important;
+    box-shadow: 0 3px 6px rgba(2, 132, 199, 0.3) !important;
+}
+.empty-course-cell {
+    background: rgba(241, 245, 249, 0.45) !important;
+    border-bottom: 1px solid var(--border);
+}
 .btn-limpiar-subsanados {
     padding: 8px 12px;
     border: 1px solid #cbd5e1;
@@ -1048,7 +1115,7 @@ tbody tr:hover { filter: brightness(.96); }
     border-color: #10b981;
 }
 
-.curso .nombre { font-weight: 600; font-size: 12px; display: block; margin-bottom: 6px; line-height: 1.35; }
+.curso .nombre { font-weight: 700; font-size: 11px; display: block; margin-bottom: 6px; line-height: 1.35; min-height: 28px; }
 .bateria { display: flex; flex-direction: column; gap: 4px; }
 .paso { display: flex; align-items: center; gap: 7px; font-size: 12px; padding: 5px 8px; border-radius: 7px; line-height: 1.2; border: 1.5px solid transparent; transition: all .15s; }
 .paso .ico { width: 16px; font-size: 14px; font-weight: 700; flex-shrink: 0; text-align: center; }
@@ -1112,9 +1179,14 @@ a:hover { opacity: .75; }
 <table id="reportTable">
 <thead>
 <tr>
-    <th class="toggle-ciclo">Ciclo Formativo</th><th>Sede</th><th>Facilitador</th>
-    <th>Curso 1</th><th>Curso 2</th><th>Curso 3</th><th>Curso 4</th>
-    <th style="width:40px;text-align:center">🔗</th>
+    <th style="width:90px; text-align:center;">Mes</th>
+    <th style="width:200px;">Facilitador</th>
+    <th style="width:190px;">Sede / Ciclo</th>
+    <th>Curso 1</th>
+    <th>Curso 2</th>
+    <th>Curso 3</th>
+    <th>Curso 4</th>
+    <th>Curso 5</th>
 </tr>
 </thead>
 <tbody>
@@ -1161,19 +1233,20 @@ function setFiltroEstado(estado) {
 
 function getCursoKey(cursoEl) {
     try {
+        var customKey = cursoEl.getAttribute('data-curso-key');
+        if (customKey) return customKey;
+
         var tr = cursoEl.closest('tr');
-        var facTd = tr ? tr.querySelector('td:nth-child(3)') : null;
-        var cicloTd = tr ? tr.querySelector('td:nth-child(1)') : null;
+        var facTd = tr ? tr.querySelector('td:nth-child(2)') : null;
         var nombreEl = cursoEl.querySelector('.nombre');
         
         var fac = facTd ? facTd.textContent.replace(/[^a-zA-Z0-9]/g, '').toLowerCase() : '';
-        var ciclo = cicloTd ? cicloTd.textContent.replace(/[^a-zA-Z0-9]/g, '').toLowerCase().substring(0, 20) : '';
         var nom = nombreEl ? nombreEl.textContent.replace(/[^a-zA-Z0-9]/g, '').toLowerCase().substring(0, 30) : '';
 
         var cursoCards = tr ? Array.from(tr.querySelectorAll('.curso')) : [];
         var cIdx = cursoCards.indexOf(cursoEl);
 
-        return 'sub_' + fac.substring(0, 15) + '_' + ciclo + '_' + nom + '_' + cIdx;
+        return 'sub_' + fac.substring(0, 15) + '_' + nom + '_' + cIdx;
     } catch(e) {
         return 'sub_item_' + Math.random().toString(36).substr(2, 9);
     }
@@ -1217,6 +1290,7 @@ function initSubsanaciones() {
 
             var container = curso.querySelector('.subsanar-check-container');
             if (!container) {
+                var header = curso.querySelector('.curso-header');
                 container = document.createElement('label');
                 container.className = 'subsanar-check-container';
                 container.title = 'Marcar como subsanado provisionalmente';
@@ -1236,10 +1310,31 @@ function initSubsanaciones() {
                     buscar();
                 });
 
-                curso.appendChild(container);
+                if (header) {
+                    header.appendChild(container);
+                } else {
+                    curso.insertBefore(container, curso.firstChild);
+                }
             } else {
                 var cb = container.querySelector('input');
-                if (cb) cb.checked = isChecked;
+                if (cb) {
+                    cb.checked = isChecked;
+                    if (!cb.getAttribute('data-listener-added')) {
+                        cb.setAttribute('data-listener-added', '1');
+                        cb.addEventListener('change', function(e) {
+                            e.stopPropagation();
+                            var curMap = getSubsanadosMap();
+                            if (this.checked) {
+                                curMap[key] = true;
+                            } else {
+                                delete curMap[key];
+                            }
+                            saveSubsanadosMap(curMap);
+                            aplicarEstadoSubsanado(curso, this.checked);
+                            buscar();
+                        });
+                    }
+                }
             }
         });
     } catch(e) {
@@ -1253,37 +1348,6 @@ function limpiarTodosSubsanados() {
         initSubsanaciones();
         buscar();
     }
-}
-
-function getCursoMesFromFechaInicio(cursoEl) {
-    try {
-        var pasos = cursoEl.querySelectorAll('.paso');
-        var fStr = '';
-        for (var i = 0; i < pasos.length; i++) {
-            var lbl = pasos[i].querySelector('.lbl');
-            if (lbl && lbl.textContent.toLowerCase().includes('fecha de inicio')) {
-                var valEl = pasos[i].querySelector('.val');
-                if (valEl) fStr = valEl.textContent.trim().toLowerCase();
-                break;
-            }
-        }
-        if (fStr.includes('may')) return 'mayo';
-        if (fStr.includes('jun')) return 'junio';
-        if (fStr.includes('jul')) return 'julio';
-        if (fStr.includes('ago')) return 'agosto';
-        if (fStr.includes('sep') || fStr.includes('set')) return 'septiembre';
-        if (fStr.includes('oct')) return 'octubre';
-        if (fStr.includes('nov')) return 'noviembre';
-        if (fStr.includes('dic')) return 'diciembre';
-        if (fStr.includes('ene')) return 'enero';
-        if (fStr.includes('feb')) return 'febrero';
-        if (fStr.includes('mar')) return 'marzo';
-        if (fStr.includes('abr')) return 'abril';
-
-        var attr = cursoEl.getAttribute('data-curso-mes');
-        if (attr) return attr.toLowerCase().trim();
-    } catch(e) {}
-    return '';
 }
 
 function marcarPrioritarios() {
@@ -1309,7 +1373,7 @@ function marcarPrioritarios() {
             });
 
             var isPlanBad = (pasoPlan && pasoPlan.classList.contains('bad')) || (pasoPlanFecha && pasoPlanFecha.classList.contains('bad'));
-            var isInformeBad = (pasoInforme && pasoInforme.classList.contains('bad')) || (pasoLimite && pasoLimite.classList.contains('bad'));
+            var isInformeBad = (pasoInforme && pasoInforme.classList.contains('bad'));
             var isEvalBad = (pasoEval && pasoEval.classList.contains('bad'));
 
             if (isPlanBad && pasoPlanFecha) {
@@ -1388,46 +1452,34 @@ function buscar() {
 
             var text = tr.textContent.toLowerCase();
             var rowTec = (tr.getAttribute('data-tecnico') || '').trim();
+            var rowMes = (tr.getAttribute('data-mes') || '').toLowerCase().trim();
 
             var matchesText = !filter || text.includes(filter);
             var matchesTec = (selectedTec === 'todos') || (rowTec === selectedTec);
+            var matchesMes = (selectedMes === 'todos') || (rowMes === selectedMes);
 
-            if (!matchesText || !matchesTec) {
+            if (!matchesText || !matchesTec || !matchesMes) {
                 tr.style.display = 'none';
                 continue;
             }
 
-            var visibleCursosInRow = 0;
+            var cursosInRow = tr.querySelectorAll('.curso');
+            var visibleCursosInRow = cursosInRow.length;
             var hasPrioInRow = false;
             var hasPendInRow = false;
             var allOkInRow = true;
 
-            var cursosInRow = tr.querySelectorAll('.curso');
             cursosInRow.forEach(function(c) {
-                var cMes = getCursoMesFromFechaInicio(c);
-                var cMatchMes = (selectedMes === 'todos') || (cMes === selectedMes);
+                var isSub = c.classList.contains('curso-subsanado');
+                var isPrio = c.classList.contains('curso-prioritario') && !isSub;
+                var hasBad = (c.querySelectorAll('.paso.bad').length > 0) && !isSub;
 
-                if (cMatchMes) {
-                    c.style.display = '';
-                    visibleCursosInRow++;
-
-                    var isSub = c.classList.contains('curso-subsanado');
-                    var isPrio = c.classList.contains('curso-prioritario') && !isSub;
-                    var hasBad = (c.querySelectorAll('.paso.bad').length > 0) && !isSub;
-
-                    if (isPrio) hasPrioInRow = true;
-                    if (hasBad) hasPendInRow = true;
-                    if (hasBad || isPrio) allOkInRow = false;
-                } else {
-                    c.style.display = 'none';
-                }
+                if (isPrio) hasPrioInRow = true;
+                if (hasBad) hasPendInRow = true;
+                if (hasBad || isPrio) allOkInRow = false;
             });
 
-            if (selectedMes !== 'todos' && visibleCursosInRow === 0) {
-                tr.style.display = 'none';
-                continue;
-            }
-
+            // Filtrado por botones de estado
             var matchesEstado = true;
             if (currentFiltroEstado === 'prioritarios') {
                 matchesEstado = hasPrioInRow;
@@ -1437,7 +1489,7 @@ function buscar() {
                 matchesEstado = allOkInRow && (visibleCursosInRow > 0);
             }
 
-            if (matchesEstado && (selectedMes === 'todos' || visibleCursosInRow > 0)) {
+            if (matchesEstado) {
                 tr.style.display = '';
                 totalProg++;
                 totalCursos += visibleCursosInRow;
