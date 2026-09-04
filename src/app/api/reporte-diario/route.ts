@@ -563,6 +563,10 @@ async function validarFacilitadorFila(btn) {
 
                 initSubsanaciones();
                 buscar();
+
+                setTimeout(function() {
+                    newTr.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }, 50);
                 return;
             }
         }

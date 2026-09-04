@@ -382,8 +382,21 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, error: 'No se pudieron recuperar cursos del facilitador en SIE' }, { status: 500 });
     }
 
+    // Filtrar estrictamente los cursos que corresponden al mes de la fila seleccionada (la que manda es Fecha de Inicio)
+    const targetMesLower = (mes || '').toLowerCase().trim();
+    let coursesToRender = scrapedCourses;
+    if (targetMesLower && targetMesLower !== 'todos') {
+      const filtered = scrapedCourses.filter(cr => {
+        const cMes = (cr.start_month || '').toLowerCase();
+        return cMes === targetMesLower;
+      });
+      if (filtered.length > 0) {
+        coursesToRender = filtered;
+      }
+    }
+
     // 4. Ordenar cursos en orden ASCENDENTE según Fecha de Inicio
-    scrapedCourses.sort((a, b) => {
+    coursesToRender.sort((a, b) => {
       const dtA = (a.inicio_date_obj || parseStartDate(a.dates))?.getTime() || 0;
       const dtB = (b.inicio_date_obj || parseStartDate(b.dates))?.getTime() || 0;
       if (dtA !== dtB) return dtA - dtB;
@@ -394,7 +407,7 @@ export async function POST(request: Request) {
     let maxFin: Date | null = null;
     let latestInforme: Date | null = null;
 
-    for (const cr of scrapedCourses) {
+    for (const cr of coursesToRender) {
       if (cr.fin_date_obj) {
         if (!maxFin || cr.fin_date_obj > maxFin) {
           maxFin = cr.fin_date_obj;
@@ -413,7 +426,7 @@ export async function POST(request: Request) {
       : '';
 
     let latestSocTagged = false;
-    for (const cr of scrapedCourses) {
+    for (const cr of coursesToRender) {
       if (!latestSocTagged && maxFin && cr.fin_date_obj && cr.fin_date_obj.getTime() === maxFin.getTime()) {
         cr.is_latest_soc = true;
         latestSocTagged = true;
@@ -500,15 +513,15 @@ export async function POST(request: Request) {
     }
 
     let courseCells = '';
-    scrapedCourses.forEach((cr, idx) => {
+    coursesToRender.slice(0, 5).forEach((cr, idx) => {
       const status = cr.todo_ok ? 'ok' : 'bad';
       courseCells += `<td class="${status}">${courseCellHtml(cr, facilitador, idx)}</td>`;
     });
-    for (let i = scrapedCourses.length; i < 5; i++) {
+    for (let i = coursesToRender.length; i < 5; i++) {
       courseCells += '<td class="empty-course-cell"></td>';
     }
 
-    const rowAllOk = scrapedCourses.every(cr => cr.todo_ok);
+    const rowAllOk = coursesToRender.every(cr => cr.todo_ok);
     const dataOk = rowAllOk ? '1' : '0';
 
     sedesSummary = Array.from(sedesSet).join(' / ') || 'Sede General';
@@ -516,15 +529,15 @@ export async function POST(request: Request) {
     const sedesShort = sedesSummary.length > 55 ? sedesSummary.substring(0, 55) + '...' : sedesSummary;
     const ciclosShort = ciclosSummary.length > 60 ? ciclosSummary.substring(0, 60) + '...' : ciclosSummary;
 
-    const displayMes = mes ? (mes.charAt(0).toUpperCase() + mes.slice(1)) : (scrapedCourses[0]?.start_month || 'Mes');
+    const displayMes = targetMesLower ? (targetMesLower.charAt(0).toUpperCase() + targetMesLower.slice(1)) : (coursesToRender[0]?.start_month || 'Mes');
 
-    const newRowHtml = `<tr data-ok="${dataOk}" data-mes="${mes}">
+    const newRowHtml = `<tr data-ok="${dataOk}" data-mes="${targetMesLower}">
         <td style="text-align:center; vertical-align:middle; font-weight:700;">
             <span class="badge-row-mes">${displayMes.toUpperCase()}</span>
         </td>
         <td title="${facilitador}" style="vertical-align:middle;">
             <strong style="font-size:13px; color:#0f172a; display:block;">${facilitador}</strong>
-            <span style="font-size:11px; color:#64748b; font-weight:600;">${scrapedCourses.length} curso${scrapedCourses.length > 1 ? 's' : ''} en ${displayMes}</span>
+            <span style="font-size:11px; color:#64748b; font-weight:600;">${coursesToRender.length} curso${coursesToRender.length > 1 ? 's' : ''} en ${displayMes}</span>
             <div style="margin-top: 6px;">
                 <button type="button" class="btn-validar-fac" onclick="validarFacilitadorFila(this)" title="Revalidar datos de este facilitador en SIE UNEFCO">
                     <span class="btn-val-icon">🔄</span> <span class="btn-val-text">Validar</span>
