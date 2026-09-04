@@ -653,11 +653,9 @@ export async function POST(request: Request) {
 
       const conformAlert = cr.conform_pend ? '<span class="badge conform-alert">⚠️ Generar Conformidad</span>' : '';
       const safeName = cr.name ? cr.name.substring(0, 70) : '';
-      const monthBadgeHeader = cr.start_month ? `<div class="curso-start-month-header">🗓️ INICIO: ${cr.start_month.toUpperCase()}</div>` : '';
-      const cursoMesAttr = `${cr.socializacion_month || ''} ${cr.start_month || ''}`.toLowerCase().trim();
+      const cursoMes = (cr.start_month || cr.socializacion_month || '').toLowerCase();
 
-      return `<div class="curso" data-curso-mes="${cursoMesAttr}">
-        ${monthBadgeHeader}
+      return `<div class="curso" data-curso-mes="${cursoMes}">
         <span class="nombre" title="${cr.name}">${safeName}</span>
         <div class="bateria">${pasos.join('')}</div>
         ${conformAlert}
@@ -905,21 +903,7 @@ tbody tr:hover { filter: brightness(.96); }
     transition: all 0.2s ease !important;
 }
 .curso-start-month-header {
-    display: inline-block;
-    background: #e0f2fe;
-    color: #0369a1;
-    border: 1px solid #bae6fd;
-    border-radius: 6px;
-    padding: 2px 7px;
-    font-size: 10px;
-    font-weight: 800;
-    letter-spacing: 0.3px;
-    margin-bottom: 7px;
-    max-width: calc(100% - 95px);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    vertical-align: middle;
+    display: none !important;
 }
 .curso.curso-prioritario {
     border: 2.5px solid #e11d48 !important;
@@ -1414,31 +1398,37 @@ function buscar() {
             matchesEstado = isOk;
         }
 
-        if (matchesText && matchesTec && matchesMes && matchesEstado) {
-            tr.style.display = '';
-            totalProg++;
-            var cursosInRow = tr.querySelectorAll('.curso');
-            totalCursos += cursosInRow.length;
-            if (isOk) okCount++; else pendCount++;
+        var cursosInRow = tr.querySelectorAll('.curso');
+        var matchingCursosInRow = 0;
 
-            if (selectedMes !== 'todos') {
-                cursosInRow.forEach(function(c) {
+        if (matchesText && matchesTec && matchesEstado) {
+            cursosInRow.forEach(function(c) {
+                var cMes = (c.getAttribute('data-curso-mes') || '').toLowerCase();
+                if (!cMes) {
                     var cText = c.textContent.toLowerCase();
-                    var cMes = (c.getAttribute('data-curso-mes') || '').toLowerCase();
-                    var cMatch = aliases.some(function(a) { return cText.includes(a) || cMes.includes(a); });
-                    if (cMatch) {
-                        c.style.opacity = '1';
-                        c.style.boxShadow = '0 0 0 2px #0284c7';
-                    } else {
-                        c.style.opacity = '0.45';
-                        c.style.boxShadow = 'none';
+                    for (var mKey in monthAliases) {
+                        if (monthAliases[mKey].some(function(a) { return cText.includes(a); })) {
+                            cMes = mKey;
+                            break;
+                        }
                     }
-                });
+                }
+                var cMatch = (selectedMes === 'todos') || (cMes === selectedMes) || (aliases.indexOf(cMes) !== -1);
+                if (cMatch) {
+                    c.style.display = '';
+                    matchingCursosInRow++;
+                } else {
+                    c.style.display = 'none';
+                }
+            });
+
+            if (selectedMes !== 'todos' && matchingCursosInRow === 0) {
+                tr.style.display = 'none';
             } else {
-                cursosInRow.forEach(function(c) {
-                    c.style.opacity = '1';
-                    c.style.boxShadow = '';
-                });
+                tr.style.display = '';
+                totalProg++;
+                totalCursos += matchingCursosInRow;
+                if (isOk) okCount++; else pendCount++;
             }
         } else {
             tr.style.display = 'none';
