@@ -506,13 +506,14 @@ export async function POST(request: Request) {
       const facKey = normalizeText(ev.facilitador);
       for (const cr of ev.courses) {
         let mNum = 0;
-        if (cr.fin_date_obj) {
-          mNum = cr.fin_date_obj.getMonth() + 1;
-        } else if (cr.inicio_date_obj) {
+        if (cr.inicio_date_obj) {
           mNum = cr.inicio_date_obj.getMonth() + 1;
+        } else if (cr.fin_date_obj) {
+          mNum = cr.fin_date_obj.getMonth() + 1;
         }
         const mName = (mNum && MONTH_NAMES[mNum]) ? MONTH_NAMES[mNum] : (ev.mes || 'Mes');
         cr.socializacion_month = mName;
+        cr.start_month = mName;
         const groupKey = `${facKey}_${mName.toLowerCase()}`;
 
         if (!facilitatorMonthGroups[groupKey]) {
@@ -1158,116 +1159,24 @@ function setFiltroEstado(estado) {
     buscar();
 }
 
-function parseFechaStr(dateStr, defaultYear) {
-    if (!dateStr || dateStr === '—' || dateStr === 'OK' || dateStr === 'SI' || dateStr === 'NO') return null;
-    var year = defaultYear || 2026;
-    var str = dateStr.trim();
-    var parts = str.split('/');
-    if (parts.length === 3) {
-        var d = parseInt(parts[0], 10);
-        var m = parseInt(parts[1], 10) - 1;
-        var y = parseInt(parts[2], 10);
-        if (!isNaN(d) && !isNaN(m) && !isNaN(y)) return new Date(y, m, d);
-    }
-    if (parts.length === 2) {
-        var d = parseInt(parts[0], 10);
-        var mNum = parseInt(parts[1], 10);
-        if (!isNaN(mNum)) return new Date(year, mNum - 1, d);
-        var monthsMap = { ene:0, feb:1, mar:2, abr:3, may:4, jun:5, jul:6, ago:7, sep:8, oct:9, nov:10, dic:11 };
-        var mKey = parts[1].toLowerCase().substring(0, 3);
-        if (monthsMap[mKey] !== undefined) return new Date(year, monthsMap[mKey], d);
-    }
-    return null;
-}
-
-function marcarPrioritarios() {
-    var cursos = document.querySelectorAll('.curso');
-    var today = new Date();
-    today.setHours(0, 0, 0, 0);
-
-    cursos.forEach(function(curso) {
-        var pasos = curso.querySelectorAll('.paso');
-        if (!pasos || pasos.length === 0) return;
-
-        var pasoPlan = null, pasoPlanFecha = null, pasoInicio = null;
-        var pasoSoc = null, pasoInforme = null, pasoLimite = null;
-
-        pasos.forEach(function(p) {
-            var lblEl = p.querySelector('.lbl');
-            if (!lblEl) return;
-            var txt = lblEl.textContent.trim().toLowerCase();
-            if (txt === 'planificación') pasoPlan = p;
-            else if (txt === 'planificación fecha') pasoPlanFecha = p;
-            else if (txt === 'fecha de inicio') pasoInicio = p;
-            else if (txt === 'socialización') pasoSoc = p;
-            else if (txt === 'informe final') pasoInforme = p;
-            else if (txt === 'fecha límite') pasoLimite = p;
-        });
-
-        var isPlanOk = pasoPlan && pasoPlan.classList.contains('ok');
-        var isInformeOk = pasoInforme && pasoInforme.classList.contains('ok');
-
-        var inicioVal = pasoInicio ? pasoInicio.querySelector('.val').textContent.trim() : '';
-        var inicioDate = parseFechaStr(inicioVal, 2026);
-
-        var isPrioPlan = false;
-        if (!isPlanOk && inicioDate) {
-            var diffDaysPlan = Math.ceil((inicioDate.getTime() - today.getTime()) / (1000 * 3600 * 24));
-            if (diffDaysPlan <= 5) {
-                isPrioPlan = true;
-                if (pasoPlan) pasoPlan.classList.add('paso-prioritario-plan');
-                if (pasoPlanFecha) pasoPlanFecha.classList.add('paso-prioritario-plan');
-            }
-        }
-
-        var isPrioInforme = false;
-        var limiteVal = pasoLimite ? pasoLimite.querySelector('.val').textContent.replace(/\(Mes\)|\(Global\)/gi, '').trim() : '';
-        var limiteDate = parseFechaStr(limiteVal, 2026);
-
-        if (!isInformeOk && limiteDate) {
-            var diffDaysLimite = Math.ceil((today.getTime() - limiteDate.getTime()) / (1000 * 3600 * 24));
-            if (diffDaysLimite >= 0) {
-                isPrioInforme = true;
-                if (pasoInforme) pasoInforme.classList.add('paso-prioritario-informe');
-                if (pasoLimite) pasoLimite.classList.add('paso-prioritario-informe');
-            }
-        }
-
-        if (isPrioPlan || isPrioInforme) {
-            curso.classList.add('curso-prioritario');
-            var tr = curso.closest('tr');
-            if (tr) tr.setAttribute('data-prioritario', '1');
-
-            if (!curso.querySelector('.badge-prioridad')) {
-                var badge = document.createElement('span');
-                badge.className = 'badge badge-prioridad';
-                if (isPrioPlan && isPrioInforme) {
-                    badge.innerHTML = '⚡ Planificación & Final Pendiente';
-                } else if (isPrioPlan) {
-                    badge.innerHTML = '⚡ Planificación URGENTE (≤5d)';
-                } else {
-                    badge.innerHTML = '🚨 Informe Final URGENTE';
-                }
-                curso.insertBefore(badge, curso.firstChild);
-            }
-        }
-    });
-}
-
 function getCursoKey(cursoEl) {
-    var tr = cursoEl.closest('tr');
-    var facTd = tr ? tr.querySelector('td:nth-child(3)') : null;
-    var cicloTd = tr ? tr.querySelector('td:nth-child(1)') : null;
-    var nombreEl = cursoEl.querySelector('.nombre');
-    
-    var fac = facTd ? facTd.textContent.replace(/[^a-zA-Z0-9]/g, '').toLowerCase() : '';
-    var ciclo = cicloTd ? cicloTd.textContent.replace(/[^a-zA-Z0-9]/g, '').toLowerCase().substring(0, 25) : '';
-    var nom = nombreEl ? nombreEl.textContent.replace(/[^a-zA-Z0-9]/g, '').toLowerCase().substring(0, 35) : '';
+    try {
+        var tr = cursoEl.closest('tr');
+        var facTd = tr ? tr.querySelector('td:nth-child(3)') : null;
+        var cicloTd = tr ? tr.querySelector('td:nth-child(1)') : null;
+        var nombreEl = cursoEl.querySelector('.nombre');
+        
+        var fac = facTd ? facTd.textContent.replace(/[^a-zA-Z0-9]/g, '').toLowerCase() : '';
+        var ciclo = cicloTd ? cicloTd.textContent.replace(/[^a-zA-Z0-9]/g, '').toLowerCase().substring(0, 20) : '';
+        var nom = nombreEl ? nombreEl.textContent.replace(/[^a-zA-Z0-9]/g, '').toLowerCase().substring(0, 30) : '';
 
-    var cursoCards = tr ? Array.from(tr.querySelectorAll('.curso')) : [];
-    var cIdx = cursoCards.indexOf(cursoEl);
+        var cursoCards = tr ? Array.from(tr.querySelectorAll('.curso')) : [];
+        var cIdx = cursoCards.indexOf(cursoEl);
 
-    return 'sub_' + fac.substring(0, 20) + '_' + ciclo + '_' + nom + '_' + cIdx;
+        return 'sub_' + fac.substring(0, 15) + '_' + ciclo + '_' + nom + '_' + cIdx;
+    } catch(e) {
+        return 'sub_item_' + Math.random().toString(36).substr(2, 9);
+    }
 }
 
 function getSubsanadosMap() {
@@ -1286,204 +1195,315 @@ function saveSubsanadosMap(map) {
 }
 
 function aplicarEstadoSubsanado(cursoEl, isChecked) {
-    if (isChecked) {
-        cursoEl.classList.add('curso-subsanado');
-    } else {
-        cursoEl.classList.remove('curso-subsanado');
-    }
+    try {
+        if (isChecked) {
+            cursoEl.classList.add('curso-subsanado');
+        } else {
+            cursoEl.classList.remove('curso-subsanado');
+        }
+    } catch(e) {}
 }
 
 function initSubsanaciones() {
-    var subsMap = getSubsanadosMap();
-    var cursos = document.querySelectorAll('.curso');
+    try {
+        var subsMap = getSubsanadosMap();
+        var cursos = document.querySelectorAll('.curso');
 
-    cursos.forEach(function(curso) {
-        var key = getCursoKey(curso);
-        var isChecked = !!subsMap[key];
+        cursos.forEach(function(curso) {
+            var key = getCursoKey(curso);
+            var isChecked = !!subsMap[key];
 
-        aplicarEstadoSubsanado(curso, isChecked);
+            aplicarEstadoSubsanado(curso, isChecked);
 
-        var container = curso.querySelector('.subsanar-check-container');
-        if (!container) {
-            container = document.createElement('label');
-            container.className = 'subsanar-check-container';
-            container.title = 'Marcar como subsanado provisionalmente';
-            container.innerHTML = '<input type="checkbox" ' + (isChecked ? 'checked' : '') + ' data-key="' + key + '"><span>Subsanado</span>';
-            
-            var cb = container.querySelector('input');
-            cb.addEventListener('change', function(e) {
-                e.stopPropagation();
-                var curMap = getSubsanadosMap();
-                if (this.checked) {
-                    curMap[key] = true;
-                } else {
-                    delete curMap[key];
-                }
-                saveSubsanadosMap(curMap);
-                aplicarEstadoSubsanado(curso, this.checked);
-            });
+            var container = curso.querySelector('.subsanar-check-container');
+            if (!container) {
+                container = document.createElement('label');
+                container.className = 'subsanar-check-container';
+                container.title = 'Marcar como subsanado provisionalmente';
+                container.innerHTML = '<input type="checkbox" ' + (isChecked ? 'checked' : '') + ' data-key="' + key + '"><span>Subsanado</span>';
+                
+                var cb = container.querySelector('input');
+                cb.addEventListener('change', function(e) {
+                    e.stopPropagation();
+                    var curMap = getSubsanadosMap();
+                    if (this.checked) {
+                        curMap[key] = true;
+                    } else {
+                        delete curMap[key];
+                    }
+                    saveSubsanadosMap(curMap);
+                    aplicarEstadoSubsanado(curso, this.checked);
+                    buscar();
+                });
 
-            curso.appendChild(container);
-        } else {
-            var cb = container.querySelector('input');
-            if (cb) cb.checked = isChecked;
-        }
-    });
+                curso.appendChild(container);
+            } else {
+                var cb = container.querySelector('input');
+                if (cb) cb.checked = isChecked;
+            }
+        });
+    } catch(e) {
+        console.error('Error en initSubsanaciones:', e);
+    }
 }
 
 function limpiarTodosSubsanados() {
     if (confirm('¿Deseas desmarcar todos los cursos subsanados provisionalmente?')) {
         localStorage.removeItem('reporte_cursos_subsanados');
         initSubsanaciones();
+        buscar();
+    }
+}
+
+function getCursoMesFromFechaInicio(cursoEl) {
+    try {
+        var pasos = cursoEl.querySelectorAll('.paso');
+        var fStr = '';
+        for (var i = 0; i < pasos.length; i++) {
+            var lbl = pasos[i].querySelector('.lbl');
+            if (lbl && lbl.textContent.toLowerCase().includes('fecha de inicio')) {
+                var valEl = pasos[i].querySelector('.val');
+                if (valEl) fStr = valEl.textContent.trim().toLowerCase();
+                break;
+            }
+        }
+        if (fStr.includes('may')) return 'mayo';
+        if (fStr.includes('jun')) return 'junio';
+        if (fStr.includes('jul')) return 'julio';
+        if (fStr.includes('ago')) return 'agosto';
+        if (fStr.includes('sep') || fStr.includes('set')) return 'septiembre';
+        if (fStr.includes('oct')) return 'octubre';
+        if (fStr.includes('nov')) return 'noviembre';
+        if (fStr.includes('dic')) return 'diciembre';
+        if (fStr.includes('ene')) return 'enero';
+        if (fStr.includes('feb')) return 'febrero';
+        if (fStr.includes('mar')) return 'marzo';
+        if (fStr.includes('abr')) return 'abril';
+
+        var attr = cursoEl.getAttribute('data-curso-mes');
+        if (attr) return attr.toLowerCase().trim();
+    } catch(e) {}
+    return '';
+}
+
+function marcarPrioritarios() {
+    try {
+        var cursos = document.querySelectorAll('.curso');
+        cursos.forEach(function(curso) {
+            var pasos = curso.querySelectorAll('.paso');
+            if (!pasos || pasos.length === 0) return;
+
+            var pasoPlan = null, pasoPlanFecha = null;
+            var pasoInforme = null, pasoLimite = null;
+            var pasoEval = null;
+
+            pasos.forEach(function(p) {
+                var lblEl = p.querySelector('.lbl');
+                if (!lblEl) return;
+                var txt = lblEl.textContent.trim().toLowerCase();
+                if (txt === 'planificación') pasoPlan = p;
+                else if (txt === 'planificación fecha') pasoPlanFecha = p;
+                else if (txt === 'informe final') pasoInforme = p;
+                else if (txt === 'fecha límite') pasoLimite = p;
+                else if (txt === 'informe evaluación') pasoEval = p;
+            });
+
+            var isPlanBad = (pasoPlan && pasoPlan.classList.contains('bad')) || (pasoPlanFecha && pasoPlanFecha.classList.contains('bad'));
+            var isInformeBad = (pasoInforme && pasoInforme.classList.contains('bad')) || (pasoLimite && pasoLimite.classList.contains('bad'));
+            var isEvalBad = (pasoEval && pasoEval.classList.contains('bad'));
+
+            if (isPlanBad && pasoPlanFecha) {
+                pasoPlanFecha.classList.add('paso-prioritario-plan');
+            }
+            if (isInformeBad && (pasoInforme || pasoLimite)) {
+                if (pasoInforme) pasoInforme.classList.add('paso-prioritario-informe');
+                if (pasoLimite) pasoLimite.classList.add('paso-prioritario-informe');
+            }
+
+            var isPrioritario = isPlanBad || isInformeBad || isEvalBad;
+            if (isPrioritario) {
+                curso.classList.add('curso-prioritario');
+                var tr = curso.closest('tr');
+                if (tr) tr.setAttribute('data-prioritario', '1');
+
+                var badge = curso.querySelector('.badge-prioridad');
+                if (!badge) {
+                    badge = document.createElement('span');
+                    badge.className = 'badge badge-prioridad';
+                    var nombreEl = curso.querySelector('.nombre');
+                    if (nombreEl) {
+                        curso.insertBefore(badge, nombreEl);
+                    } else {
+                        curso.insertBefore(badge, curso.firstChild);
+                    }
+                }
+                if (isPlanBad && isInformeBad) {
+                    badge.innerHTML = '⚡ Planif. & Final Pendiente';
+                } else if (isPlanBad) {
+                    badge.innerHTML = '⚡ Planificación Pendiente';
+                } else if (isInformeBad) {
+                    badge.innerHTML = '🚨 Informe Final Pendiente';
+                } else {
+                    badge.innerHTML = '⚠️ Evaluación Pendiente';
+                }
+            } else {
+                curso.classList.remove('curso-prioritario');
+                var existingBadge = curso.querySelector('.badge-prioridad');
+                if (existingBadge) existingBadge.remove();
+            }
+        });
+    } catch(e) {
+        console.error('Error en marcarPrioritarios:', e);
     }
 }
 
 function buscar() {
-    marcarPrioritarios();
-    initSubsanaciones();
+    try {
+        marcarPrioritarios();
+        initSubsanaciones();
 
-    var input = document.getElementById('buscar');
-    var filter = input ? input.value.toLowerCase().trim() : '';
-    var tecSelect = document.getElementById('filtroTecnico');
-    var selectedTec = tecSelect ? tecSelect.value : 'todos';
+        var input = document.getElementById('buscar');
+        var filter = input ? input.value.toLowerCase().trim() : '';
+        
+        var tecSelect = document.getElementById('filtroTecnico');
+        var selectedTec = tecSelect ? tecSelect.value.trim() : 'todos';
 
-    var mesSelect = document.getElementById('filtroMes');
-    var selectedMes = mesSelect ? mesSelect.value.toLowerCase().trim() : 'todos';
+        var mesSelect = document.getElementById('filtroMes');
+        var selectedMes = mesSelect ? mesSelect.value.toLowerCase().trim() : 'todos';
 
-    var table = document.getElementById('reportTable');
-    if (!table) return;
-    var tbody = table.getElementsByTagName('tbody')[0];
-    if (!tbody) return;
-    var trs = tbody.getElementsByTagName('tr');
+        var table = document.getElementById('reportTable');
+        if (!table) return;
+        var tbody = table.getElementsByTagName('tbody')[0];
+        if (!tbody) return;
+        var trs = tbody.getElementsByTagName('tr');
 
-    var totalProg = 0;
-    var totalCursos = 0;
-    var okCount = 0;
-    var pendCount = 0;
+        var totalProg = 0;
+        var totalCursos = 0;
+        var okCount = 0;
+        var pendCount = 0;
 
-    var monthAliases = {
-        'mayo': ['mayo', 'may'],
-        'junio': ['junio', 'jun'],
-        'julio': ['julio', 'jul'],
-        'agosto': ['agosto', 'ago'],
-        'septiembre': ['septiembre', 'sep', 'set'],
-        'octubre': ['octubre', 'oct'],
-        'noviembre': ['noviembre', 'nov'],
-        'diciembre': ['diciembre', 'dic']
-    };
-    var aliases = monthAliases[selectedMes] || [selectedMes];
+        for (var i = 0; i < trs.length; i++) {
+            var tr = trs[i];
+            if (tr.id === 'noRowsMsg') continue;
 
-    for (var i = 0; i < trs.length; i++) {
-        var tr = trs[i];
-        if (tr.id === 'noRowsMsg') continue;
+            var text = tr.textContent.toLowerCase();
+            var rowTec = (tr.getAttribute('data-tecnico') || '').trim();
 
-        var text = tr.textContent.toLowerCase();
-        var rowTec = tr.getAttribute('data-tecnico') || '8639300';
-        var rowMes = (tr.getAttribute('data-mes') || '').toLowerCase();
-        var isOk = tr.getAttribute('data-ok') === '1';
-        var isPrio = tr.getAttribute('data-prioritario') === '1';
+            var matchesText = !filter || text.includes(filter);
+            var matchesTec = (selectedTec === 'todos') || (rowTec === selectedTec);
 
-        var matchesText = !filter || text.includes(filter);
-        var matchesTec = (selectedTec === 'todos') || (rowTec === selectedTec);
-        var matchesMes = (selectedMes === 'todos') || aliases.some(function(a) {
-            return rowMes.includes(a) || text.includes(a);
-        });
+            if (!matchesText || !matchesTec) {
+                tr.style.display = 'none';
+                continue;
+            }
 
-        var matchesEstado = true;
-        if (currentFiltroEstado === 'prioritarios') {
-            matchesEstado = isPrio;
-        } else if (currentFiltroEstado === 'pendientes') {
-            matchesEstado = !isOk;
-        } else if (currentFiltroEstado === 'ok') {
-            matchesEstado = isOk;
-        }
+            var visibleCursosInRow = 0;
+            var hasPrioInRow = false;
+            var hasPendInRow = false;
+            var allOkInRow = true;
 
-        var cursosInRow = tr.querySelectorAll('.curso');
-        var matchingCursosInRow = 0;
-
-        if (matchesText && matchesTec && matchesEstado) {
+            var cursosInRow = tr.querySelectorAll('.curso');
             cursosInRow.forEach(function(c) {
-                var cMes = (c.getAttribute('data-curso-mes') || '').toLowerCase();
-                if (!cMes) {
-                    var cText = c.textContent.toLowerCase();
-                    for (var mKey in monthAliases) {
-                        if (monthAliases[mKey].some(function(a) { return cText.includes(a); })) {
-                            cMes = mKey;
-                            break;
-                        }
-                    }
-                }
-                var cMatch = (selectedMes === 'todos') || (cMes === selectedMes) || (aliases.indexOf(cMes) !== -1);
-                if (cMatch) {
+                var cMes = getCursoMesFromFechaInicio(c);
+                var cMatchMes = (selectedMes === 'todos') || (cMes === selectedMes);
+
+                if (cMatchMes) {
                     c.style.display = '';
-                    matchingCursosInRow++;
+                    visibleCursosInRow++;
+
+                    var isSub = c.classList.contains('curso-subsanado');
+                    var isPrio = c.classList.contains('curso-prioritario') && !isSub;
+                    var hasBad = (c.querySelectorAll('.paso.bad').length > 0) && !isSub;
+
+                    if (isPrio) hasPrioInRow = true;
+                    if (hasBad) hasPendInRow = true;
+                    if (hasBad || isPrio) allOkInRow = false;
                 } else {
                     c.style.display = 'none';
                 }
             });
 
-            if (selectedMes !== 'todos' && matchingCursosInRow === 0) {
+            if (selectedMes !== 'todos' && visibleCursosInRow === 0) {
                 tr.style.display = 'none';
-            } else {
+                continue;
+            }
+
+            var matchesEstado = true;
+            if (currentFiltroEstado === 'prioritarios') {
+                matchesEstado = hasPrioInRow;
+            } else if (currentFiltroEstado === 'pendientes') {
+                matchesEstado = hasPendInRow;
+            } else if (currentFiltroEstado === 'ok') {
+                matchesEstado = allOkInRow && (visibleCursosInRow > 0);
+            }
+
+            if (matchesEstado && (selectedMes === 'todos' || visibleCursosInRow > 0)) {
                 tr.style.display = '';
                 totalProg++;
-                totalCursos += matchingCursosInRow;
-                if (isOk) okCount++; else pendCount++;
+                totalCursos += visibleCursosInRow;
+                if (allOkInRow) okCount++; else pendCount++;
+            } else {
+                tr.style.display = 'none';
             }
-        } else {
-            tr.style.display = 'none';
         }
-    }
 
-    var existingNoRow = document.getElementById('noRowsMsg');
-    if (totalProg === 0) {
-        if (!existingNoRow) {
-            existingNoRow = document.createElement('tr');
-            existingNoRow.id = 'noRowsMsg';
-            tbody.appendChild(existingNoRow);
+        var existingNoRow = document.getElementById('noRowsMsg');
+        if (totalProg === 0) {
+            if (!existingNoRow) {
+                existingNoRow = document.createElement('tr');
+                existingNoRow.id = 'noRowsMsg';
+                tbody.appendChild(existingNoRow);
+            }
+            var tecName = (tecSelect && tecSelect.options[tecSelect.selectedIndex]) ? tecSelect.options[tecSelect.selectedIndex].text : '';
+            var msgHtml = '<td colspan="8" style="text-align:center; padding:35px 20px; color:#475569; font-size:14px; background:#f8fafc;">';
+            msgHtml += '🔍 No se encontraron cursos con los filtros seleccionados.';
+            if (selectedTec !== 'todos') {
+                msgHtml += '<br><span style="font-size:12px; color:#64748b;">El técnico <strong>' + tecName + '</strong> no tiene cursos registrados para ';
+                msgHtml += (selectedMes !== 'todos') ? ('el mes de <strong>' + selectedMes.toUpperCase() + '</strong>.') : 'estos filtros.';
+                msgHtml += '</span><br><button onclick="document.getElementById(\\'filtroTecnico\\').value=\\'todos\\'; buscar();" style="margin-top:12px; padding:7px 16px; background:#0284c7; color:#fff; border:none; border-radius:8px; font-size:12px; font-weight:700; cursor:pointer;">Ver todos los técnicos para este mes</button>';
+            }
+            msgHtml += '</td>';
+            existingNoRow.innerHTML = msgHtml;
+            existingNoRow.style.display = '';
+        } else if (existingNoRow) {
+            existingNoRow.style.display = 'none';
         }
-        var tecName = (tecSelect && tecSelect.options[tecSelect.selectedIndex]) ? tecSelect.options[tecSelect.selectedIndex].text : '';
-        var msgHtml = '<td colspan="8" style="text-align:center; padding:35px 20px; color:#475569; font-size:14px; background:#f8fafc;">';
-        msgHtml += '🔍 No se encontraron cursos con los filtros seleccionados.';
-        if (selectedTec !== 'todos') {
-            msgHtml += '<br><span style="font-size:12px; color:#64748b;">El técnico <strong>' + tecName + '</strong> no tiene cursos registrados para ';
-            msgHtml += (selectedMes !== 'todos') ? ('el mes de <strong>' + selectedMes.toUpperCase() + '</strong>.') : 'estos filtros.';
-            msgHtml += '</span><br><button onclick="document.getElementById(\\'filtroTecnico\\').value=\\'todos\\'; buscar();" style="margin-top:12px; padding:7px 16px; background:#0284c7; color:#fff; border:none; border-radius:8px; font-size:12px; font-weight:700; cursor:pointer;">Ver todos los técnicos para este mes</button>';
-        }
-        msgHtml += '</td>';
-        existingNoRow.innerHTML = msgHtml;
-        existingNoRow.style.display = '';
-    } else if (existingNoRow) {
-        existingNoRow.style.display = 'none';
-    }
 
-    var cardValues = document.querySelectorAll('.card .value');
-    if (cardValues.length >= 4) {
-        cardValues[0].innerHTML = totalProg;
-        cardValues[1].innerHTML = totalCursos;
-        cardValues[2].innerHTML = okCount + '<span style="font-size:14px;color:var(--muted);font-weight:400"> / ' + totalProg + '</span>';
-        cardValues[3].innerHTML = pendCount + '<span style="font-size:14px;color:var(--muted);font-weight:400"> / ' + totalProg + '</span>';
+        var cardValues = document.querySelectorAll('.card .value');
+        if (cardValues.length >= 4) {
+            cardValues[0].innerHTML = totalProg;
+            cardValues[1].innerHTML = totalCursos;
+            cardValues[2].innerHTML = okCount + '<span style="font-size:14px;color:var(--muted);font-weight:400"> / ' + totalProg + '</span>';
+            cardValues[3].innerHTML = pendCount + '<span style="font-size:14px;color:var(--muted);font-weight:400"> / ' + totalProg + '</span>';
+        }
+    } catch(e) {
+        console.error('Error en buscar:', e);
     }
 }
 
 function initReporte() {
-    var params = new URLSearchParams(window.location.search);
-    var tecParam = params.get('tecnico');
-    if (tecParam) {
-        var tecSelect = document.getElementById('filtroTecnico');
-        if (tecSelect) {
-            tecSelect.value = tecParam;
+    try {
+        var params = new URLSearchParams(window.location.search);
+        var tecParam = params.get('tecnico');
+        if (tecParam) {
+            var tecSelect = document.getElementById('filtroTecnico');
+            if (tecSelect) {
+                tecSelect.value = tecParam;
+            }
         }
-    }
-    var mesParam = params.get('mes');
-    if (mesParam) {
-        var mesSelect = document.getElementById('filtroMes');
-        if (mesSelect) {
-            mesSelect.value = mesParam.toLowerCase();
+        var mesParam = params.get('mes');
+        if (mesParam) {
+            var mesSelect = document.getElementById('filtroMes');
+            if (mesSelect) {
+                mesSelect.value = mesParam.toLowerCase();
+            }
         }
+        marcarPrioritarios();
+        initSubsanaciones();
+        buscar();
+    } catch(e) {
+        console.error('Error en initReporte:', e);
     }
-    buscar();
-    initSubsanaciones();
 }
 
 if (document.readyState === 'loading') {
