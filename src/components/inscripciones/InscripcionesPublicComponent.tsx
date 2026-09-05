@@ -7,9 +7,28 @@ import {
   AlertTriangle, CheckCircle2, MapPin, Clock, FileCheck, UserCheck, 
   Printer, Sparkles, PhoneCall, MessageCircle, ExternalLink, Layers, 
   Check, Share2, Send, ArrowRight, ArrowLeft, Camera, RefreshCw, Eye,
-  HelpCircle, User, ShieldCheck, FileSpreadsheet, Save, Hand
+  HelpCircle, User, ShieldCheck, FileSpreadsheet, Save, Hand, Calendar
 } from 'lucide-react';
 import Swal from 'sweetalert2';
+
+export const MESES_NOMBRES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
+
+export function getCourseMonth(c: any): string {
+  if (c?.mes && typeof c.mes === 'string') {
+    const norm = c.mes.trim().toLowerCase();
+    for (const m of MESES_NOMBRES) {
+      if (norm.includes(m)) return m;
+    }
+  }
+  if (c?.fecha_inicio) {
+    const match = String(c.fecha_inicio).match(/(\d{4})[/-](\d{1,2})/);
+    if (match) {
+      const mIdx = parseInt(match[2], 10) - 1;
+      if (mIdx >= 0 && mIdx < 12) return MESES_NOMBRES[mIdx];
+    }
+  }
+  return '';
+}
 
 interface EnrolledCourse {
   id: string | number;
@@ -31,6 +50,8 @@ interface EnrolledCourse {
   inscripcion_id?: string | number;
   comprobante_url?: string | null;
   documento_url?: string | null;
+  mes?: string;
+  fecha_inicio?: string;
 }
 
 interface ParticipantData {
@@ -74,6 +95,16 @@ export function InscripcionesPublicComponent() {
   const [participant, setParticipant] = useState<ParticipantData | null>(null);
   const [searched, setSearched] = useState(false);
   const [copied, setCopied] = useState<string | null>(null);
+
+  // Month detection and multi-month courses management
+  const currentMonthIdx = new Date().getMonth();
+  const currentMonthKey = MESES_NOMBRES[currentMonthIdx]; // e.g. "septiembre"
+  const currentMonthLabel = currentMonthKey.charAt(0).toUpperCase() + currentMonthKey.slice(1); // e.g. "Septiembre"
+
+  const [allCourses, setAllCourses] = useState<EnrolledCourse[]>([]);
+  const [previousCourses, setPreviousCourses] = useState<EnrolledCourse[]>([]);
+  const [viewingPrevious, setViewingPrevious] = useState<boolean>(false);
+  const [noCurrentMonthCourses, setNoCurrentMonthCourses] = useState<boolean>(false);
 
   // Progressive Wizard Stage (Niveles 1, 2, 3, 4)
   const [currentStep, setCurrentStep] = useState<number>(1);
@@ -184,6 +215,10 @@ export function InscripcionesPublicComponent() {
     setSearching(true);
     setSearched(false);
     setParticipant(null);
+    setAllCourses([]);
+    setPreviousCourses([]);
+    setViewingPrevious(false);
+    setNoCurrentMonthCourses(false);
     setCurrentStep(1);
     setFichaSaved(false);
     setGuideNextStep(false);
@@ -248,28 +283,14 @@ export function InscripcionesPublicComponent() {
       combineItems(cic2);
 
       const coursesList = Array.from(enrolledMap.values());
+      const currentMonthCourses = coursesList.filter(c => getCourseMonth(c) === currentMonthKey);
+      const prevCourses = coursesList.filter(c => getCourseMonth(c) !== currentMonthKey);
 
-      if (partData || coursesList.length > 0) {
-        const foundPart: ParticipantData = {
-          ci: partData?.ci || ci,
-          nombres: partData?.nombres || '',
-          apellidos: partData?.apellidos || '',
-          rda: partData?.rda || '',
-          celular: partData?.celular || '',
-          correo: partData?.correo || '',
-          unidad_educativa: partData?.unidad_educativa || partData?.colegio || '',
-          distrito: partData?.distrito || 'SANTA CRUZ 1',
-          cargo: partData?.cargo || 'DOCENTE',
-          especialidad: partData?.especialidad || '',
-          sie: partData?.sie || '',
-          fecha_nacimiento: partData?.fecha_nacimiento || '',
-          cursos: coursesList
-        };
+      setAllCourses(coursesList);
+      setPreviousCourses(prevCourses);
 
-        setParticipant(foundPart);
-        setSelectedCourseIdx(0);
-
-        // Check if there are locally stored ficha details (like birth date, funcion, area, etc.)
+      // Helper function to prefill virtual ficha
+      const setupFicha = (foundPart: ParticipantData, docList: EnrolledCourse[]) => {
         let savedLocalFicha: any = null;
         if (typeof window !== 'undefined') {
           try {
@@ -285,7 +306,6 @@ export function InscripcionesPublicComponent() {
         let initialMonth = savedLocalFicha?.mesNacimiento || '';
         let initialYear = savedLocalFicha?.anoNacimiento || '';
 
-        // If we have rawBirthDate and no split fields, parse into Day, Month, Year
         if (rawBirthDate && (!initialDay || !initialMonth || !initialYear)) {
           const matchDe = rawBirthDate.match(/(\d{1,2})\s+de\s+([A-Za-z]+)\s+de\s+(\d{4})/i);
           if (matchDe) {
@@ -316,7 +336,6 @@ export function InscripcionesPublicComponent() {
           }
         }
 
-        // Pre-fill virtual ficha with detected data
         setVirtualFicha({
           nombres: foundPart.nombres,
           apellidos: foundPart.apellidos,
@@ -336,23 +355,131 @@ export function InscripcionesPublicComponent() {
           anoNacimiento: initialYear
         });
 
-        // Set existing document if any
-        const existingDoc = partData?.documento_url || coursesList.find(c => c.documento_url)?.documento_url || null;
+        const existingDoc = partData?.documento_url || docList.find(c => c.documento_url)?.documento_url || null;
         if (existingDoc) {
           setUploadedDocUrl(existingDoc);
         }
+      };
+
+      if (currentMonthCourses.length > 0) {
+        setNoCurrentMonthCourses(false);
+        const foundPart: ParticipantData = {
+          ci: partData?.ci || ci,
+          nombres: partData?.nombres || '',
+          apellidos: partData?.apellidos || '',
+          rda: partData?.rda || '',
+          celular: partData?.celular || '',
+          correo: partData?.correo || '',
+          unidad_educativa: partData?.unidad_educativa || partData?.colegio || '',
+          distrito: partData?.distrito || 'SANTA CRUZ 1',
+          cargo: partData?.cargo || 'DOCENTE',
+          especialidad: partData?.especialidad || '',
+          sie: partData?.sie || '',
+          fecha_nacimiento: partData?.fecha_nacimiento || '',
+          cursos: currentMonthCourses
+        };
+
+        setParticipant(foundPart);
+        setSelectedCourseIdx(0);
+        setupFicha(foundPart, currentMonthCourses);
 
         setTimeout(() => {
           wizardStepsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
         }, 300);
       } else {
-        setParticipant(null);
+        // No registered courses in current month
+        setNoCurrentMonthCourses(true);
+        if (partData || prevCourses.length > 0) {
+          const foundPart: ParticipantData = {
+            ci: partData?.ci || ci,
+            nombres: partData?.nombres || '',
+            apellidos: partData?.apellidos || '',
+            rda: partData?.rda || '',
+            celular: partData?.celular || '',
+            correo: partData?.correo || '',
+            unidad_educativa: partData?.unidad_educativa || partData?.colegio || '',
+            distrito: partData?.distrito || 'SANTA CRUZ 1',
+            cargo: partData?.cargo || 'DOCENTE',
+            especialidad: partData?.especialidad || '',
+            sie: partData?.sie || '',
+            fecha_nacimiento: partData?.fecha_nacimiento || '',
+            cursos: prevCourses
+          };
+          setParticipant(foundPart);
+          setupFicha(foundPart, prevCourses);
+        } else {
+          setParticipant(null);
+        }
+
+        // Alert guiding to WhatsApp channel
+        Swal.fire({
+          icon: 'info',
+          title: `¡Pre-inscríbete a los Cursos de ${currentMonthLabel}!`,
+          html: `
+            <div style="text-align: left; font-size: 0.98rem; color: #334155; line-height: 1.55;">
+              <p style="margin: 0 0 12px 0;">
+                No encontramos cursos registrados a tu carnet <strong>${ci}</strong> para el mes actual (<strong>${currentMonthLabel}</strong>).
+              </p>
+              <div style="background: #f0fdf4; border: 2px solid #22c55e; border-radius: 14px; padding: 12px 14px; margin-bottom: 12px;">
+                <p style="margin: 0 0 6px 0; font-weight: 800; color: #15803d; font-size: 1rem;">
+                  📲 ¿Cómo inscribirte a los cursos de este mes?
+                </p>
+                <ol style="margin: 0; padding-left: 18px; color: #166534; font-size: 0.92rem; font-weight: 600; line-height: 1.5;">
+                  <li>Entra a nuestro <strong>Canal Oficial de WhatsApp</strong>.</li>
+                  <li>Completa el formulario de <strong>pre-inscripción</strong> del curso.</li>
+                  <li>Regresa a este portal para completar tu inscripción oficial y ficha.</li>
+                </ol>
+              </div>
+              ${prevCourses.length > 0 ? `<p style="margin: 8px 0 0 0; font-size: 0.88rem; color: #0284c7; font-weight: 700;">ℹ️ Cuentas con ${prevCourses.length} curso(s) de meses anteriores registrados en el sistema.</p>` : ''}
+            </div>
+          `,
+          showCancelButton: true,
+          confirmButtonText: '📲 Ir al Canal de WhatsApp',
+          cancelButtonText: 'Entendido',
+          confirmButtonColor: '#25D366',
+          cancelButtonColor: '#64748b'
+        }).then((res) => {
+          if (res.isConfirmed) {
+            window.open('https://whatsapp.com/channel/0029VayKa9I2ZjCjgsFmbW1W', '_blank');
+          }
+        });
       }
     } catch (err) {
       console.error('Error al buscar CI:', err);
     } finally {
       setSearching(false);
       setSearched(true);
+    }
+  };
+
+  // Toggle between viewing current month courses vs previous months courses
+  const toggleViewPreviousCourses = () => {
+    if (!participant && previousCourses.length === 0) return;
+    if (!viewingPrevious) {
+      setParticipant(prev => {
+        if (!prev) {
+          return {
+            ci: ciSearch.trim(),
+            nombres: virtualFicha.nombres || '',
+            apellidos: virtualFicha.apellidos || '',
+            cursos: previousCourses
+          };
+        }
+        return { ...prev, cursos: previousCourses };
+      });
+      setSelectedCourseIdx(0);
+      setViewingPrevious(true);
+      setTimeout(() => {
+        wizardStepsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 200);
+    } else {
+      const currentMonthCourses = allCourses.filter(c => getCourseMonth(c) === currentMonthKey);
+      setParticipant(prev => {
+        if (!prev) return null;
+        return { ...prev, cursos: currentMonthCourses };
+      });
+      setSelectedCourseIdx(0);
+      setViewingPrevious(false);
     }
   };
 
@@ -1323,44 +1450,212 @@ export function InscripcionesPublicComponent() {
           </p>
         </form>
 
-        {/* Not found notice */}
-        {searched && !participant && (
+        {/* Pre-inscripción en Canal de WhatsApp / Sin cursos en mes actual */}
+        {searched && ((noCurrentMonthCourses && !viewingPrevious) || !participant || participant.cursos.length === 0) && (
           <div style={{
-            background: '#fff1f2',
-            border: '3px solid #e11d48',
-            borderRadius: '18px',
-            padding: '18px 16px',
-            color: '#9f1239',
-            marginTop: '20px',
-            boxShadow: '0 8px 24px rgba(225, 29, 72, 0.15)'
+            background: 'linear-gradient(135deg, #f0fdf4 0%, #ecfdf5 50%, #d1fae5 100%)',
+            border: '3.5px solid #10b981',
+            borderRadius: '24px',
+            padding: '28px 24px',
+            color: '#064e3b',
+            marginTop: '22px',
+            boxShadow: '0 12px 32px rgba(16, 185, 129, 0.2)'
           }}>
-            <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', marginBottom: '14px' }}>
-              <AlertTriangle size={36} style={{ color: '#e11d48', flexShrink: 0, marginTop: '2px' }} />
-              <div>
-                <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 900, color: '#be123c' }}>
-                  ⚠️ NO TE ENCUENTRAS EN NUESTRA BASE DE DATOS
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: '16px', marginBottom: '16px' }}>
+              <div style={{
+                width: '54px',
+                height: '54px',
+                borderRadius: '16px',
+                background: '#10b981',
+                color: '#ffffff',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexShrink: 0,
+                boxShadow: '0 4px 14px rgba(16, 185, 129, 0.35)'
+              }}>
+                <MessageCircle size={32} />
+              </div>
+              <div style={{ flex: 1 }}>
+                <span style={{
+                  display: 'inline-block',
+                  background: '#047857',
+                  color: '#ffffff',
+                  fontSize: '0.84rem',
+                  fontWeight: 900,
+                  padding: '4px 12px',
+                  borderRadius: '9999px',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.5px',
+                  marginBottom: '8px'
+                }}>
+                  📢 Pre-inscripción {currentMonthLabel}
+                </span>
+                <h3 style={{ margin: 0, fontSize: 'clamp(1.2rem, 3.5vw, 1.55rem)', fontWeight: 900, color: '#065f46' }}>
+                  {noCurrentMonthCourses
+                    ? `¡AÚN NO TIENES CURSOS REGISTRADOS EN ${currentMonthLabel.toUpperCase()}!`
+                    : '⚠️ NO ENCONTRAMOS TU CARNET EN NUESTRA BASE DE DATOS'}
                 </h3>
-                <p style={{ margin: '6px 0 0 0', fontSize: '1.02rem', color: '#881337', fontWeight: 700, lineHeight: 1.55 }}>
-                  Es posible que aún no hayas llenado el formulario de pre-inscripción o tu carnet tenga algún dígito incorrecto.
+                <p style={{ margin: '8px 0 0 0', fontSize: '1.05rem', color: '#047857', fontWeight: 700, lineHeight: 1.55 }}>
+                  {noCurrentMonthCourses
+                    ? `Para participar en las capacitaciones y ciclos formativos de ${currentMonthLabel}, primero debes realizar tu pre-inscripción en nuestro Canal Oficial de WhatsApp.`
+                    : 'Es posible que aún no te hayas pre-inscrito en las ofertas formativas de este mes o tu carnet tenga algún dígito incorrecto.'}
                 </p>
               </div>
             </div>
 
+            {/* DIRECT CTA BUTTON TO WHATSAPP CHANNEL */}
+            <a
+              href="https://whatsapp.com/channel/0029VayKa9I2ZjCjgsFmbW1W"
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{
+                background: 'linear-gradient(135deg, #25D366 0%, #128C7E 100%)',
+                color: '#ffffff',
+                textDecoration: 'none',
+                padding: '18px 26px',
+                borderRadius: '18px',
+                fontSize: 'clamp(1rem, 2.5vw, 1.25rem)',
+                fontWeight: 900,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '12px',
+                boxShadow: '0 8px 26px rgba(37, 211, 102, 0.45)',
+                margin: '20px 0',
+                transition: 'transform 0.15s, box-shadow 0.15s',
+                textAlign: 'center'
+              }}
+            >
+              <MessageCircle size={28} />
+              <span>👉 📲 ENTRAR AL CANAL DE WHATSAPP PARA PRE-INSCRIBIRME</span>
+              <ExternalLink size={22} />
+            </a>
+
+            {/* INSTRUCTIONS STEPS */}
+            <div style={{
+              background: '#ffffff',
+              border: '2px solid #a7f3d0',
+              borderRadius: '18px',
+              padding: '20px',
+              marginTop: '16px'
+            }}>
+              <h4 style={{ margin: '0 0 14px 0', fontSize: '1.1rem', fontWeight: 900, color: '#065f46', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Sparkles size={22} style={{ color: '#10b981' }} /> ¿CÓMO COMPLETAR TU INSCRIPCIÓN?
+              </h4>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '14px' }}>
+                <div style={{ background: '#f8fafc', padding: '16px', borderRadius: '14px', border: '1.5px solid #e2e8f0' }}>
+                  <div style={{ fontWeight: 900, color: '#0f172a', marginBottom: '6px', fontSize: '0.98rem' }}>
+                    1️⃣ Pre-inscríbete en el Canal
+                  </div>
+                  <div style={{ fontSize: '0.9rem', color: '#475569', lineHeight: 1.55 }}>
+                    Haz clic en el botón verde arriba para ir a nuestro <strong>Canal de WhatsApp</strong> y llena el formulario de pre-inscripción del curso que desees.
+                  </div>
+                </div>
+
+                <div style={{ background: '#f8fafc', padding: '16px', borderRadius: '14px', border: '1.5px solid #e2e8f0' }}>
+                  <div style={{ fontWeight: 900, color: '#0f172a', marginBottom: '6px', fontSize: '0.98rem' }}>
+                    2️⃣ Vuelve a este Portal
+                  </div>
+                  <div style={{ fontSize: '0.9rem', color: '#475569', lineHeight: 1.55 }}>
+                    Una vez enviado tu formulario en el canal, regresa a <strong>sistema-maestros.vercel.app/inscripciones</strong> e ingresa nuevamente tu Carnet de Identidad.
+                  </div>
+                </div>
+
+                <div style={{ background: '#f8fafc', padding: '16px', borderRadius: '14px', border: '1.5px solid #e2e8f0' }}>
+                  <div style={{ fontWeight: 900, color: '#0f172a', marginBottom: '6px', fontSize: '0.98rem' }}>
+                    3️⃣ Ficha Oficial y Comprobante
+                  </div>
+                  <div style={{ fontSize: '0.9rem', color: '#475569', lineHeight: 1.55 }}>
+                    Aquí podrás descargar tu <strong>Ficha Oficial</strong> de inscripción, unirte al grupo de WhatsApp del curso y registrar tu comprobante bancario.
+                  </div>
+                </div>
+              </div>
+
+              <div style={{ marginTop: '16px', textAlign: 'center' }}>
+                <button
+                  type="button"
+                  onClick={(e) => handleSearchCI(e)}
+                  style={{
+                    background: '#f1f5f9',
+                    color: '#0f172a',
+                    border: '2px solid #cbd5e1',
+                    borderRadius: '12px',
+                    padding: '10px 20px',
+                    fontSize: '0.95rem',
+                    fontWeight: 800,
+                    cursor: 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '8px'
+                  }}
+                >
+                  <RefreshCw size={16} /> Ya me pre-inscribí en el canal, volver a consultar mi carnet
+                </button>
+              </div>
+            </div>
+
+            {/* Previous months courses toggle button if participant has older enrollments */}
+            {previousCourses.length > 0 && (
+              <div style={{
+                marginTop: '16px',
+                padding: '16px 20px',
+                background: '#ffffff',
+                border: '2px solid #cbd5e1',
+                borderRadius: '16px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                flexWrap: 'wrap',
+                gap: '12px'
+              }}>
+                <div>
+                  <span style={{ fontSize: '0.98rem', fontWeight: 800, color: '#1e293b', display: 'block' }}>
+                    ℹ️ Cuentas con {previousCourses.length} curso(s) registrado(s) en meses anteriores ({previousCourses.map(c => getCourseMonth(c)).filter((v,i,a) => v && a.indexOf(v) === i).join(', ')}).
+                  </span>
+                  <span style={{ fontSize: '0.86rem', color: '#64748b' }}>
+                    Puedes consultar tus cursos pasados, descargar fichas anteriores o revisar comprobantes.
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={toggleViewPreviousCourses}
+                  style={{
+                    background: '#0284c7',
+                    color: '#ffffff',
+                    border: 'none',
+                    padding: '10px 18px',
+                    borderRadius: '12px',
+                    fontWeight: 800,
+                    fontSize: '0.95rem',
+                    cursor: 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '8px'
+                  }}
+                >
+                  <Layers size={18} /> Ver cursos de meses anteriores
+                </button>
+              </div>
+            )}
+
+            {/* Support Contacts */}
             <div style={{
               background: '#ffffff',
               border: '2px solid #fda4af',
-              borderRadius: '14px',
-              padding: '14px 12px',
+              borderRadius: '16px',
+              padding: '16px 18px',
+              marginTop: '16px',
               color: '#4c0519'
             }}>
-              <h4 style={{ margin: '0 0 10px 0', fontSize: '1.1rem', fontWeight: 900, color: '#9f1239' }}>
-                📞 CONTÁCTANOS PARA VERIFICAR TU FORMULARIO:
+              <h4 style={{ margin: '0 0 10px 0', fontSize: '1.05rem', fontWeight: 900, color: '#9f1239' }}>
+                📞 ¿TIENES DUDAS O CONSULTAS SOBRE LA PRE-INSCRIPCIÓN? CONTÁCTANOS:
               </h4>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '10px' }}>
                 {contacts.map((c) => (
                   <a
                     key={c.num}
-                    href={`https://wa.me/591${c.num}?text=Hola,%20consulte%20mi%20carnet%20y%20no%20aparezco%20registrado.`}
+                    href={`https://wa.me/591${c.num}?text=Hola,%20tengo%20una%20consulta%20sobre%20la%20pre-inscripcion%20a%20los%20cursos%20de%20${currentMonthLabel}.`}
                     target="_blank"
                     rel="noopener noreferrer"
                     style={{
@@ -1376,7 +1671,7 @@ export function InscripcionesPublicComponent() {
                       justifyContent: 'space-between'
                     }}
                   >
-                    <span>{c.num}</span>
+                    <span>{c.name} ({c.num})</span>
                     <MessageCircle size={18} />
                   </a>
                 ))}
@@ -1386,9 +1681,82 @@ export function InscripcionesPublicComponent() {
         )}
       </div>
 
-      {/* PROGRESSIVE WIZARD (Visible when participant is found) */}
-      {participant && (
+      {/* PROGRESSIVE WIZARD (Visible when participant has courses to display) */}
+      {participant && participant.cursos.length > 0 && (!noCurrentMonthCourses || viewingPrevious) && (
         <div ref={wizardStepsRef} style={{ scrollMarginTop: '20px' }}>
+          {/* Active month status banner */}
+          <div style={{
+            background: viewingPrevious ? '#eff6ff' : '#f0fdf4',
+            border: viewingPrevious ? '2px solid #93c5fd' : '2px solid #86efac',
+            borderRadius: '16px',
+            padding: '14px 20px',
+            marginBottom: '20px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            flexWrap: 'wrap',
+            gap: '12px'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <Calendar size={22} style={{ color: viewingPrevious ? '#2563eb' : '#16a34a' }} />
+              <div>
+                <span style={{ fontSize: '1rem', fontWeight: 900, color: viewingPrevious ? '#1e40af' : '#166534', display: 'block' }}>
+                  {viewingPrevious
+                    ? `📂 Visualizando cursos registrados en meses anteriores (${participant.cursos.length})`
+                    : `✨ Mostrando cursos inscritos en el mes actual: ${currentMonthLabel} (${participant.cursos.length})`}
+                </span>
+                <span style={{ fontSize: '0.86rem', color: viewingPrevious ? '#3b82f6' : '#15803d', fontWeight: 600 }}>
+                  {viewingPrevious
+                    ? 'Estás revisando tu historial de capacitaciones de ciclos pasados.'
+                    : 'Cursos activos correspondientes al ciclo formativo vigente.'}
+                </span>
+              </div>
+            </div>
+
+            {viewingPrevious ? (
+              <button
+                type="button"
+                onClick={toggleViewPreviousCourses}
+                style={{
+                  background: '#2563eb',
+                  color: '#ffffff',
+                  border: 'none',
+                  padding: '8px 16px',
+                  borderRadius: '10px',
+                  fontSize: '0.9rem',
+                  fontWeight: 800,
+                  cursor: 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px'
+                }}
+              >
+                ⬅ Volver a cursos de {currentMonthLabel}
+              </button>
+            ) : (
+              previousCourses.length > 0 && (
+                <button
+                  type="button"
+                  onClick={toggleViewPreviousCourses}
+                  style={{
+                    background: '#ffffff',
+                    color: '#0284c7',
+                    border: '1.5px solid #0284c7',
+                    padding: '8px 16px',
+                    borderRadius: '10px',
+                    fontSize: '0.88rem',
+                    fontWeight: 800,
+                    cursor: 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px'
+                  }}
+                >
+                  <Layers size={16} /> Ver cursos de meses anteriores ({previousCourses.length})
+                </button>
+              )
+            )}
+          </div>
           {/* Multi-cycle Selector Tabs if more than 1 cycle */}
           {participant.cursos.length > 1 && (
             <div style={{
