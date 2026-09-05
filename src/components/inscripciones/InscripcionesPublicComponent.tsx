@@ -44,7 +44,10 @@ interface EnrolledCourse {
   facilitador_nombre?: string;
   tecnico_nombre?: string;
   distrito?: string;
+  sede_distrito?: string;
   lugar?: string;
+  modalidad?: string;
+  horario_cronograma?: string;
   area_urbano_rural?: string;
   link_whatsapp?: string | null;
   inscripcion_id?: string | number;
@@ -52,6 +55,7 @@ interface EnrolledCourse {
   documento_url?: string | null;
   mes?: string;
   fecha_inicio?: string;
+  [key: string]: any;
 }
 
 interface ParticipantData {
@@ -96,14 +100,11 @@ export function InscripcionesPublicComponent() {
   const [searched, setSearched] = useState(false);
   const [copied, setCopied] = useState<string | null>(null);
 
-  // Month detection and multi-month courses management
+  // Month detection - current month only
   const currentMonthIdx = new Date().getMonth();
   const currentMonthKey = MESES_NOMBRES[currentMonthIdx]; // e.g. "septiembre"
   const currentMonthLabel = currentMonthKey.charAt(0).toUpperCase() + currentMonthKey.slice(1); // e.g. "Septiembre"
 
-  const [allCourses, setAllCourses] = useState<EnrolledCourse[]>([]);
-  const [previousCourses, setPreviousCourses] = useState<EnrolledCourse[]>([]);
-  const [viewingPrevious, setViewingPrevious] = useState<boolean>(false);
   const [noCurrentMonthCourses, setNoCurrentMonthCourses] = useState<boolean>(false);
 
   // Progressive Wizard Stage (Niveles 1, 2, 3, 4)
@@ -215,9 +216,6 @@ export function InscripcionesPublicComponent() {
     setSearching(true);
     setSearched(false);
     setParticipant(null);
-    setAllCourses([]);
-    setPreviousCourses([]);
-    setViewingPrevious(false);
     setNoCurrentMonthCourses(false);
     setCurrentStep(1);
     setFichaSaved(false);
@@ -283,11 +281,8 @@ export function InscripcionesPublicComponent() {
       combineItems(cic2);
 
       const coursesList = Array.from(enrolledMap.values());
+      // Estrictamente ciclos del mes actual (meses anteriores no interesan ya que no se regularizan)
       const currentMonthCourses = coursesList.filter(c => getCourseMonth(c) === currentMonthKey);
-      const prevCourses = coursesList.filter(c => getCourseMonth(c) !== currentMonthKey);
-
-      setAllCourses(coursesList);
-      setPreviousCourses(prevCourses);
 
       // Helper function to prefill virtual ficha
       const setupFicha = (foundPart: ParticipantData, docList: EnrolledCourse[]) => {
@@ -387,50 +382,29 @@ export function InscripcionesPublicComponent() {
           wizardStepsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
         }, 300);
       } else {
-        // No registered courses in current month
+        // No registered cycles in current month (past months are not regularized)
         setNoCurrentMonthCourses(true);
-        if (partData || prevCourses.length > 0) {
-          const foundPart: ParticipantData = {
-            ci: partData?.ci || ci,
-            nombres: partData?.nombres || '',
-            apellidos: partData?.apellidos || '',
-            rda: partData?.rda || '',
-            celular: partData?.celular || '',
-            correo: partData?.correo || '',
-            unidad_educativa: partData?.unidad_educativa || partData?.colegio || '',
-            distrito: partData?.distrito || 'SANTA CRUZ 1',
-            cargo: partData?.cargo || 'DOCENTE',
-            especialidad: partData?.especialidad || '',
-            sie: partData?.sie || '',
-            fecha_nacimiento: partData?.fecha_nacimiento || '',
-            cursos: prevCourses
-          };
-          setParticipant(foundPart);
-          setupFicha(foundPart, prevCourses);
-        } else {
-          setParticipant(null);
-        }
+        setParticipant(null);
 
         // Alert guiding to WhatsApp channel
         Swal.fire({
           icon: 'info',
-          title: `¡Pre-inscríbete a los Cursos de ${currentMonthLabel}!`,
+          title: `¡Pre-inscríbete al Ciclo de ${currentMonthLabel}!`,
           html: `
             <div style="text-align: left; font-size: 0.98rem; color: #334155; line-height: 1.55;">
               <p style="margin: 0 0 12px 0;">
-                No encontramos cursos registrados a tu carnet <strong>${ci}</strong> para el mes actual (<strong>${currentMonthLabel}</strong>).
+                No encontramos ningún ciclo formativo registrado para tu carnet <strong>${ci}</strong> en el mes actual (<strong>${currentMonthLabel}</strong>).
               </p>
               <div style="background: #f0fdf4; border: 2px solid #22c55e; border-radius: 14px; padding: 12px 14px; margin-bottom: 12px;">
                 <p style="margin: 0 0 6px 0; font-weight: 800; color: #15803d; font-size: 1rem;">
-                  📲 ¿Cómo inscribirte a los cursos de este mes?
+                  📲 ¿Cómo realizar tu pre-inscripción al ciclo formativo de este mes?
                 </p>
                 <ol style="margin: 0; padding-left: 18px; color: #166534; font-size: 0.92rem; font-weight: 600; line-height: 1.5;">
                   <li>Entra a nuestro <strong>Canal Oficial de WhatsApp</strong>.</li>
-                  <li>Completa el formulario de <strong>pre-inscripción</strong> del curso.</li>
+                  <li>Completa el formulario de <strong>pre-inscripción del ciclo</strong>.</li>
                   <li>Regresa a este portal para completar tu inscripción oficial y ficha.</li>
                 </ol>
               </div>
-              ${prevCourses.length > 0 ? `<p style="margin: 8px 0 0 0; font-size: 0.88rem; color: #0284c7; font-weight: 700;">ℹ️ Cuentas con ${prevCourses.length} curso(s) de meses anteriores registrados en el sistema.</p>` : ''}
             </div>
           `,
           showCancelButton: true,
@@ -449,37 +423,6 @@ export function InscripcionesPublicComponent() {
     } finally {
       setSearching(false);
       setSearched(true);
-    }
-  };
-
-  // Toggle between viewing current month courses vs previous months courses
-  const toggleViewPreviousCourses = () => {
-    if (!participant && previousCourses.length === 0) return;
-    if (!viewingPrevious) {
-      setParticipant(prev => {
-        if (!prev) {
-          return {
-            ci: ciSearch.trim(),
-            nombres: virtualFicha.nombres || '',
-            apellidos: virtualFicha.apellidos || '',
-            cursos: previousCourses
-          };
-        }
-        return { ...prev, cursos: previousCourses };
-      });
-      setSelectedCourseIdx(0);
-      setViewingPrevious(true);
-      setTimeout(() => {
-        wizardStepsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      }, 200);
-    } else {
-      const currentMonthCourses = allCourses.filter(c => getCourseMonth(c) === currentMonthKey);
-      setParticipant(prev => {
-        if (!prev) return null;
-        return { ...prev, cursos: currentMonthCourses };
-      });
-      setSelectedCourseIdx(0);
-      setViewingPrevious(false);
     }
   };
 
@@ -1450,8 +1393,8 @@ export function InscripcionesPublicComponent() {
           </p>
         </form>
 
-        {/* Pre-inscripción en Canal de WhatsApp / Sin cursos en mes actual */}
-        {searched && ((noCurrentMonthCourses && !viewingPrevious) || !participant || participant.cursos.length === 0) && (
+        {/* Pre-inscripción en Canal de WhatsApp / Sin ciclos en mes actual */}
+        {searched && (noCurrentMonthCourses || !participant || participant.cursos.length === 0) && (
           <div style={{
             background: 'linear-gradient(135deg, #f0fdf4 0%, #ecfdf5 50%, #d1fae5 100%)',
             border: '3.5px solid #10b981',
@@ -1489,17 +1432,17 @@ export function InscripcionesPublicComponent() {
                   letterSpacing: '0.5px',
                   marginBottom: '8px'
                 }}>
-                  📢 Pre-inscripción {currentMonthLabel}
+                  📢 Pre-inscripción del Ciclo - {currentMonthLabel}
                 </span>
                 <h3 style={{ margin: 0, fontSize: 'clamp(1.2rem, 3.5vw, 1.55rem)', fontWeight: 900, color: '#065f46' }}>
                   {noCurrentMonthCourses
-                    ? `¡AÚN NO TIENES CURSOS REGISTRADOS EN ${currentMonthLabel.toUpperCase()}!`
+                    ? `¡AÚN NO TE HAS PRE-INSCRITO AL CICLO DE ${currentMonthLabel.toUpperCase()}!`
                     : '⚠️ NO ENCONTRAMOS TU CARNET EN NUESTRA BASE DE DATOS'}
                 </h3>
                 <p style={{ margin: '8px 0 0 0', fontSize: '1.05rem', color: '#047857', fontWeight: 700, lineHeight: 1.55 }}>
                   {noCurrentMonthCourses
-                    ? `Para participar en las capacitaciones y ciclos formativos de ${currentMonthLabel}, primero debes realizar tu pre-inscripción en nuestro Canal Oficial de WhatsApp.`
-                    : 'Es posible que aún no te hayas pre-inscrito en las ofertas formativas de este mes o tu carnet tenga algún dígito incorrecto.'}
+                    ? `Para participar en las capacitaciones de ${currentMonthLabel}, primero debes completar el formulario de pre-inscripción del ciclo en nuestro Canal Oficial de WhatsApp.`
+                    : 'Es posible que aún no hayas completado el formulario de pre-inscripción del ciclo este mes o tu carnet tenga algún dígito incorrecto.'}
                 </p>
               </div>
             </div>
@@ -1528,7 +1471,7 @@ export function InscripcionesPublicComponent() {
               }}
             >
               <MessageCircle size={28} />
-              <span>👉 📲 ENTRAR AL CANAL DE WHATSAPP PARA PRE-INSCRIBIRME</span>
+              <span>👉 📲 ENTRAR AL CANAL DE WHATSAPP PARA PRE-INSCRIBIRME AL CICLO</span>
               <ExternalLink size={22} />
             </a>
 
@@ -1546,10 +1489,10 @@ export function InscripcionesPublicComponent() {
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '14px' }}>
                 <div style={{ background: '#f8fafc', padding: '16px', borderRadius: '14px', border: '1.5px solid #e2e8f0' }}>
                   <div style={{ fontWeight: 900, color: '#0f172a', marginBottom: '6px', fontSize: '0.98rem' }}>
-                    1️⃣ Pre-inscríbete en el Canal
+                    1️⃣ Pre-inscríbete al Ciclo en el Canal
                   </div>
                   <div style={{ fontSize: '0.9rem', color: '#475569', lineHeight: 1.55 }}>
-                    Haz clic en el botón verde arriba para ir a nuestro <strong>Canal de WhatsApp</strong> y llena el formulario de pre-inscripción del curso que desees.
+                    Haz clic en el botón verde arriba para ir a nuestro <strong>Canal Oficial de WhatsApp</strong> y llena el <strong>formulario de pre-inscripción del ciclo</strong> que desees cursar.
                   </div>
                 </div>
 
@@ -1558,7 +1501,7 @@ export function InscripcionesPublicComponent() {
                     2️⃣ Vuelve a este Portal
                   </div>
                   <div style={{ fontSize: '0.9rem', color: '#475569', lineHeight: 1.55 }}>
-                    Una vez enviado tu formulario en el canal, regresa a <strong>sistema-maestros.vercel.app/inscripciones</strong> e ingresa nuevamente tu Carnet de Identidad.
+                    Una vez enviado tu formulario de pre-inscripción del ciclo en el canal, regresa a <strong>sistema-maestros.vercel.app/inscripciones</strong> e ingresa nuevamente tu Carnet de Identidad.
                   </div>
                 </div>
 
@@ -1567,7 +1510,7 @@ export function InscripcionesPublicComponent() {
                     3️⃣ Ficha Oficial y Comprobante
                   </div>
                   <div style={{ fontSize: '0.9rem', color: '#475569', lineHeight: 1.55 }}>
-                    Aquí podrás descargar tu <strong>Ficha Oficial</strong> de inscripción, unirte al grupo de WhatsApp del curso y registrar tu comprobante bancario.
+                    Aquí podrás descargar tu <strong>Ficha Oficial</strong> de inscripción, unirte al grupo de WhatsApp del ciclo formativo y registrar tu comprobante bancario.
                   </div>
                 </div>
               </div>
@@ -1590,54 +1533,10 @@ export function InscripcionesPublicComponent() {
                     gap: '8px'
                   }}
                 >
-                  <RefreshCw size={16} /> Ya me pre-inscribí en el canal, volver a consultar mi carnet
+                  <RefreshCw size={16} /> Ya completé el formulario de pre-inscripción del ciclo, volver a consultar carnet
                 </button>
               </div>
             </div>
-
-            {/* Previous months courses toggle button if participant has older enrollments */}
-            {previousCourses.length > 0 && (
-              <div style={{
-                marginTop: '16px',
-                padding: '16px 20px',
-                background: '#ffffff',
-                border: '2px solid #cbd5e1',
-                borderRadius: '16px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                flexWrap: 'wrap',
-                gap: '12px'
-              }}>
-                <div>
-                  <span style={{ fontSize: '0.98rem', fontWeight: 800, color: '#1e293b', display: 'block' }}>
-                    ℹ️ Cuentas con {previousCourses.length} curso(s) registrado(s) en meses anteriores ({previousCourses.map(c => getCourseMonth(c)).filter((v,i,a) => v && a.indexOf(v) === i).join(', ')}).
-                  </span>
-                  <span style={{ fontSize: '0.86rem', color: '#64748b' }}>
-                    Puedes consultar tus cursos pasados, descargar fichas anteriores o revisar comprobantes.
-                  </span>
-                </div>
-                <button
-                  type="button"
-                  onClick={toggleViewPreviousCourses}
-                  style={{
-                    background: '#0284c7',
-                    color: '#ffffff',
-                    border: 'none',
-                    padding: '10px 18px',
-                    borderRadius: '12px',
-                    fontWeight: 800,
-                    fontSize: '0.95rem',
-                    cursor: 'pointer',
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '8px'
-                  }}
-                >
-                  <Layers size={18} /> Ver cursos de meses anteriores
-                </button>
-              </div>
-            )}
 
             {/* Support Contacts */}
             <div style={{
@@ -1655,7 +1554,7 @@ export function InscripcionesPublicComponent() {
                 {contacts.map((c) => (
                   <a
                     key={c.num}
-                    href={`https://wa.me/591${c.num}?text=Hola,%20tengo%20una%20consulta%20sobre%20la%20pre-inscripcion%20a%20los%20cursos%20de%20${currentMonthLabel}.`}
+                    href={`https://wa.me/591${c.num}?text=Hola,%20tengo%20una%20consulta%20sobre%20la%20pre-inscripcion%20al%20ciclo%20de%20${currentMonthLabel}.`}
                     target="_blank"
                     rel="noopener noreferrer"
                     style={{
@@ -1681,118 +1580,318 @@ export function InscripcionesPublicComponent() {
         )}
       </div>
 
-      {/* PROGRESSIVE WIZARD (Visible when participant has courses to display) */}
-      {participant && participant.cursos.length > 0 && (!noCurrentMonthCourses || viewingPrevious) && (
+      {/* PROGRESSIVE WIZARD (Visible when participant has current month courses to display) */}
+      {participant && participant.cursos.length > 0 && !noCurrentMonthCourses && (
         <div ref={wizardStepsRef} style={{ scrollMarginTop: '20px' }}>
-          {/* Active month status banner */}
-          <div style={{
-            background: viewingPrevious ? '#eff6ff' : '#f0fdf4',
-            border: viewingPrevious ? '2px solid #93c5fd' : '2px solid #86efac',
-            borderRadius: '16px',
-            padding: '14px 20px',
-            marginBottom: '20px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            flexWrap: 'wrap',
-            gap: '12px'
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <Calendar size={22} style={{ color: viewingPrevious ? '#2563eb' : '#16a34a' }} />
-              <div>
-                <span style={{ fontSize: '1rem', fontWeight: 900, color: viewingPrevious ? '#1e40af' : '#166534', display: 'block' }}>
-                  {viewingPrevious
-                    ? `📂 Visualizando cursos registrados en meses anteriores (${participant.cursos.length})`
-                    : `✨ Mostrando cursos inscritos en el mes actual: ${currentMonthLabel} (${participant.cursos.length})`}
-                </span>
-                <span style={{ fontSize: '0.86rem', color: viewingPrevious ? '#3b82f6' : '#15803d', fontWeight: 600 }}>
-                  {viewingPrevious
-                    ? 'Estás revisando tu historial de capacitaciones de ciclos pasados.'
-                    : 'Cursos activos correspondientes al ciclo formativo vigente.'}
-                </span>
-              </div>
-            </div>
-
-            {viewingPrevious ? (
-              <button
-                type="button"
-                onClick={toggleViewPreviousCourses}
-                style={{
-                  background: '#2563eb',
-                  color: '#ffffff',
-                  border: 'none',
-                  padding: '8px 16px',
-                  borderRadius: '10px',
-                  fontSize: '0.9rem',
-                  fontWeight: 800,
-                  cursor: 'pointer',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '6px'
-                }}
-              >
-                ⬅ Volver a cursos de {currentMonthLabel}
-              </button>
-            ) : (
-              previousCourses.length > 0 && (
-                <button
-                  type="button"
-                  onClick={toggleViewPreviousCourses}
-                  style={{
-                    background: '#ffffff',
-                    color: '#0284c7',
-                    border: '1.5px solid #0284c7',
-                    padding: '8px 16px',
-                    borderRadius: '10px',
+          {/* ========================================================
+              CASO 1: CICLO FORMATIVO REGISTRADO PROMINENTE (1 SOLO CICLO)
+             ======================================================== */}
+          {participant.cursos.length === 1 && (
+            <div style={{
+              background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 60%, #0c4a6e 100%)',
+              border: '3.5px solid #bfa05e',
+              borderRadius: '24px',
+              padding: '24px 26px',
+              marginBottom: '24px',
+              color: '#ffffff',
+              boxShadow: '0 12px 32px rgba(15, 23, 42, 0.25)',
+              position: 'relative',
+              overflow: 'hidden'
+            }}>
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                flexWrap: 'wrap',
+                gap: '10px',
+                marginBottom: '12px'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                  <span style={{
+                    background: '#bfa05e',
+                    color: '#0f172a',
                     fontSize: '0.88rem',
-                    fontWeight: 800,
-                    cursor: 'pointer',
+                    fontWeight: 900,
+                    padding: '6px 14px',
+                    borderRadius: '12px',
+                    letterSpacing: '0.5px',
                     display: 'inline-flex',
                     alignItems: 'center',
                     gap: '6px'
-                  }}
-                >
-                  <Layers size={16} /> Ver cursos de meses anteriores ({previousCourses.length})
-                </button>
-              )
-            )}
-          </div>
-          {/* Multi-cycle Selector Tabs if more than 1 cycle */}
+                  }}>
+                    🎓 CICLO FORMATIVO REGISTRADO - {currentMonthLabel.toUpperCase()}
+                  </span>
+                  <span style={{
+                    background: 'rgba(34, 197, 94, 0.2)',
+                    border: '1.5px solid #22c55e',
+                    color: '#4ade80',
+                    fontSize: '0.84rem',
+                    fontWeight: 800,
+                    padding: '5px 12px',
+                    borderRadius: '12px'
+                  }}>
+                    ✓ PRE-INSCRIPCIÓN ACTIVA
+                  </span>
+                </div>
+                <div style={{
+                  background: 'rgba(255, 255, 255, 0.12)',
+                  border: '1px solid rgba(255, 255, 255, 0.25)',
+                  padding: '6px 14px',
+                  borderRadius: '12px',
+                  fontSize: '0.95rem',
+                  fontWeight: 900,
+                  color: '#fbbf24'
+                }}>
+                  💰 Inversión: Bs. {activeCourse?.costo || 150}
+                </div>
+              </div>
+
+              <h2 style={{
+                margin: '0 0 12px 0',
+                fontSize: 'clamp(1.25rem, 3.8vw, 1.85rem)',
+                fontWeight: 900,
+                color: '#ffffff',
+                lineHeight: 1.3
+              }}>
+                {activeCourse?.ciclo_nombre || activeCourse?.grupo_nombre || activeCourse?.area_formativa || 'Programa Formativo UNEFCO'}
+              </h2>
+
+              <div style={{
+                display: 'flex',
+                flexWrap: 'wrap',
+                gap: '12px',
+                fontSize: '0.95rem',
+                color: '#e2e8f0',
+                paddingTop: '8px',
+                borderTop: '1px solid rgba(255, 255, 255, 0.15)'
+              }}>
+                {activeCourse?.area_formativa && (
+                  <div>
+                    <span style={{ color: '#94a3b8', fontWeight: 600 }}>Área:</span>{' '}
+                    <strong style={{ color: '#ffffff' }}>{activeCourse.area_formativa}</strong>
+                  </div>
+                )}
+                {activeCourse?.sede_distrito && (
+                  <div>
+                    <span style={{ color: '#94a3b8', fontWeight: 600 }}>Sede / Distrito:</span>{' '}
+                    <strong style={{ color: '#38bdf8' }}>{activeCourse.sede_distrito}</strong>
+                  </div>
+                )}
+                {activeCourse?.modalidad && (
+                  <div>
+                    <span style={{ color: '#94a3b8', fontWeight: 600 }}>Modalidad:</span>{' '}
+                    <strong style={{ color: '#ffffff' }}>{activeCourse.modalidad}</strong>
+                  </div>
+                )}
+                {activeCourse?.horario_cronograma && (
+                  <div>
+                    <span style={{ color: '#94a3b8', fontWeight: 600 }}>Horario:</span>{' '}
+                    <strong style={{ color: '#ffffff' }}>{activeCourse.horario_cronograma}</strong>
+                  </div>
+                )}
+              </div>
+              <div style={{
+                marginTop: '12px',
+                background: 'rgba(2, 132, 199, 0.15)',
+                border: '1px solid rgba(56, 189, 248, 0.3)',
+                borderRadius: '12px',
+                padding: '8px 14px',
+                fontSize: '0.88rem',
+                color: '#bae6fd',
+                fontWeight: 600
+              }}>
+                💡 Estás completando tu inscripción oficial para este ciclo formativo. Revisa tus datos abajo, descarga tu ficha oficial y registra tu comprobante.
+              </div>
+            </div>
+          )}
+
+          {/* ========================================================
+              CASO 2: SELECTOR DE CICLO FORMATIVO (2 O MÁS CICLOS REGISTRADOS)
+             ======================================================== */}
           {participant.cursos.length > 1 && (
             <div style={{
-              background: '#f8fafc',
-              border: '2.5px solid #cbd5e1',
-              borderRadius: '18px',
-              padding: '14px 16px',
-              marginBottom: '20px'
+              background: 'linear-gradient(135deg, #f8fafc 0%, #eff6ff 100%)',
+              border: '3px solid #0284c7',
+              borderRadius: '24px',
+              padding: '24px 22px',
+              marginBottom: '24px',
+              boxShadow: '0 10px 28px rgba(2, 132, 199, 0.15)'
             }}>
-              <span style={{ fontSize: '0.95rem', fontWeight: 900, color: '#0f172a', display: 'block', marginBottom: '8px' }}>
-                📚 ESTÁS INSCRITO EN {participant.cursos.length} CICLOS. SELECCIONA EL CICLO A GESTIONAR:
-              </span>
-              <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
-                {participant.cursos.map((c, idx) => (
-                  <button
-                    key={c.id || idx}
-                    type="button"
-                    onClick={() => {
-                      setSelectedCourseIdx(idx);
-                      setGuideNextStep(false);
-                    }}
-                    style={{
-                      padding: '10px 18px',
-                      borderRadius: '12px',
-                      fontSize: '0.98rem',
-                      fontWeight: 900,
-                      cursor: 'pointer',
-                      border: selectedCourseIdx === idx ? '2.5px solid #0284c7' : '1.5px solid #cbd5e1',
-                      background: selectedCourseIdx === idx ? '#0284c7' : '#ffffff',
-                      color: selectedCourseIdx === idx ? '#ffffff' : '#334155',
-                      boxShadow: selectedCourseIdx === idx ? '0 4px 12px rgba(2, 132, 199, 0.3)' : 'none'
-                    }}
-                  >
-                    CICLO {idx + 1}: {c.ciclo_nombre || c.area_formativa} (Bs. {c.costo || 150})
-                  </button>
-                ))}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
+                <span style={{
+                  background: '#0284c7',
+                  color: '#ffffff',
+                  fontSize: '0.88rem',
+                  fontWeight: 900,
+                  padding: '5px 14px',
+                  borderRadius: '12px',
+                  letterSpacing: '0.5px'
+                }}>
+                  📢 {participant.cursos.length} CICLOS REGISTRADOS EN {currentMonthLabel.toUpperCase()}
+                </span>
+              </div>
+              <h3 style={{
+                margin: '0 0 6px 0',
+                fontSize: 'clamp(1.15rem, 3.2vw, 1.45rem)',
+                fontWeight: 900,
+                color: '#0f172a'
+              }}>
+                👉 SELECCIONA EL CICLO EN EL CUAL VAS A REALIZAR TU INSCRIPCIÓN:
+              </h3>
+              <p style={{ margin: '0 0 18px 0', fontSize: '0.98rem', color: '#475569', fontWeight: 600 }}>
+                Te registraste a más de un ciclo formativo este mes. Haz clic sobre el ciclo que deseas inscribir y gestionar ahora (su ficha virtual, grupo de WhatsApp y comprobante se adaptarán a tu selección):
+              </p>
+
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+                gap: '14px'
+              }}>
+                {participant.cursos.map((c, idx) => {
+                  const isSelected = selectedCourseIdx === idx;
+                  return (
+                    <div
+                      key={c.id || idx}
+                      onClick={() => {
+                        setSelectedCourseIdx(idx);
+                        setGuideNextStep(false);
+                      }}
+                      style={{
+                        cursor: 'pointer',
+                        borderRadius: '18px',
+                        padding: '18px',
+                        transition: 'all 0.2s ease',
+                        border: isSelected ? '3.5px solid #0284c7' : '2px solid #cbd5e1',
+                        background: isSelected
+                          ? 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)'
+                          : '#ffffff',
+                        color: isSelected ? '#ffffff' : '#0f172a',
+                        boxShadow: isSelected
+                          ? '0 10px 24px rgba(2, 132, 199, 0.35)'
+                          : '0 4px 12px rgba(0,0,0,0.04)',
+                        transform: isSelected ? 'scale(1.02)' : 'scale(1)',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        justifyContent: 'space-between',
+                        gap: '12px'
+                      }}
+                    >
+                      <div>
+                        <div style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          marginBottom: '10px'
+                        }}>
+                          <span style={{
+                            background: isSelected ? '#ffffff' : '#e2e8f0',
+                            color: isSelected ? '#0369a1' : '#475569',
+                            fontSize: '0.82rem',
+                            fontWeight: 900,
+                            padding: '4px 10px',
+                            borderRadius: '8px'
+                          }}>
+                            CICLO {idx + 1}
+                          </span>
+                          <span style={{
+                            background: isSelected ? '#fef08a' : '#f0fdf4',
+                            color: isSelected ? '#854d0e' : '#15803d',
+                            fontSize: '0.85rem',
+                            fontWeight: 900,
+                            padding: '4px 10px',
+                            borderRadius: '8px'
+                          }}>
+                            Bs. {c.costo || 150}
+                          </span>
+                        </div>
+                        <h4 style={{
+                          margin: '0 0 6px 0',
+                          fontSize: '1.08rem',
+                          fontWeight: 900,
+                          lineHeight: 1.35,
+                          color: isSelected ? '#ffffff' : '#0f172a'
+                        }}>
+                          {c.ciclo_nombre || c.grupo_nombre || c.area_formativa}
+                        </h4>
+                        {c.area_formativa && (
+                          <div style={{
+                            fontSize: '0.86rem',
+                            color: isSelected ? '#bae6fd' : '#64748b',
+                            fontWeight: 600
+                          }}>
+                            Área: {c.area_formativa}
+                          </div>
+                        )}
+                        {c.sede_distrito && (
+                          <div style={{
+                            fontSize: '0.86rem',
+                            color: isSelected ? '#bae6fd' : '#64748b',
+                            fontWeight: 600
+                          }}>
+                            Sede: {c.sede_distrito}
+                          </div>
+                        )}
+                      </div>
+
+                      <div style={{
+                        paddingTop: '10px',
+                        borderTop: isSelected ? '1px solid rgba(255,255,255,0.25)' : '1px solid #e2e8f0',
+                        textAlign: 'center'
+                      }}>
+                        {isSelected ? (
+                          <span style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                            fontWeight: 900,
+                            fontSize: '0.92rem',
+                            color: '#ffffff',
+                            background: 'rgba(255,255,255,0.2)',
+                            padding: '6px 14px',
+                            borderRadius: '10px',
+                            width: '100%',
+                            justifyContent: 'center',
+                            boxSizing: 'border-box'
+                          }}>
+                            ✓ SELECCIONADO PARA INSCRIBIR
+                          </span>
+                        ) : (
+                          <span style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                            fontWeight: 800,
+                            fontSize: '0.9rem',
+                            color: '#0284c7',
+                            padding: '6px 10px'
+                          }}>
+                            👉 Clic para seleccionar este ciclo
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Confirmation tag of currently selected cycle */}
+              <div style={{
+                marginTop: '16px',
+                background: '#ffffff',
+                border: '1.5px solid #93c5fd',
+                borderRadius: '14px',
+                padding: '10px 16px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                color: '#0369a1',
+                fontSize: '0.92rem',
+                fontWeight: 800
+              }}>
+                <span>🎯 Estás gestionando la inscripción de:</span>
+                <strong style={{ color: '#0f172a' }}>
+                  {activeCourse?.ciclo_nombre || activeCourse?.grupo_nombre || activeCourse?.area_formativa} (Bs. {activeCourse?.costo || 150})
+                </strong>
               </div>
             </div>
           )}
@@ -3246,7 +3345,7 @@ export function InscripcionesPublicComponent() {
                 <strong>NO REALIZAR NINGÚN DEPÓSITO</strong> hasta contar con la <strong>confirmación directa del técnico departamental asignado</strong>.
               </p>
               <p style={{ margin: '8px 0 0 0', fontSize: '1rem', color: '#881337', lineHeight: 1.55, fontWeight: 800 }}>
-                📲 <em>Cualquier comunicado oficial se dará únicamente a través del <strong>grupo de WhatsApp oficial</strong> del curso.</em>
+                📲 <em>Cualquier comunicado oficial se dará únicamente a través del <strong>grupo de WhatsApp oficial</strong> del ciclo formativo.</em>
               </p>
               <p style={{ margin: '6px 0 0 0', fontSize: '0.98rem', color: '#9f1239', lineHeight: 1.5, fontWeight: 700 }}>
                 ⚠️ <em>Toma en cuenta que los depósitos bancarios son válidos <strong>ÚNICAMENTE DENTRO DEL MES EN EL QUE SE REALIZAN</strong>.</em>
