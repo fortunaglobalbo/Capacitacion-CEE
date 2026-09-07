@@ -2,9 +2,9 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Sistema de Control de Maestros | UNEFCO",
-  description: "Sistema de control y seguimiento de cursos UNEFCO. Gestión de notas, grupos, calendario, agenda, participantes y cumplimiento operativo.",
-  keywords: "UNEFCO, cursos, maestros, control, seguimiento, educación, Bolivia",
+  title: "Curso de Capacitación | C.E.A. Martha Mendoza",
+  description: "Sistema de inscripción y gestión de participantes del Curso de Capacitación - Centro de Educación Alternativa Martha Mendoza, Sucre - Bolivia.",
+  keywords: "Curso de Capacitación, CEA Martha Mendoza, Sucre, Bolivia, Inscripciones, Formación Continua",
 };
 
 export default function RootLayout({
@@ -15,7 +15,7 @@ export default function RootLayout({
   return (
     <html lang="es" suppressHydrationWarning>
       <head>
-        <link rel="icon" href="/favicon.ico" />
+        <link rel="icon" href="/logo-cee.png" />
       </head>
       <body suppressHydrationWarning>
         {children}

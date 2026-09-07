@@ -1,34 +1,82 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Sistema "Curso de Capacitación" (Capacitacion-CEE)
 
-## Getting Started
+Sistema de gestión, inscripción digital y validación de pagos para los cursos de formación continua del **Centro de Educación Alternativa "Martha Mendoza"** (Sucre, Bolivia).
 
-First, run the development server:
+![Logo CEE Martha Mendoza](/public/logo-cee.png)
 
+---
+
+## 📌 Características Principales
+
+1. **Panel Principal de Control**:
+   - Encabezado institucional con el logotipo oficial del CEA "Martha Mendoza".
+   - Pestaña **"Participantes"** con buscador en tiempo real, filtro por estado de pago y métricas de recaudación.
+   - Visores modales integrados para inspección detallada de **Cédula de Identidad (anverso/reverso o escaneado)** y **Comprobantes de Pago**.
+   - Cambio rápido de estados de pago: `PENDIENTE`, `VERIFICADO`, `OBSERVADO`.
+   - Exportación de la nómina completa a formato Excel (`.csv` optimizado).
+   - Registro manual rápido de participantes desde el panel.
+
+2. **Formulario de Inscripción Pública (`/inscripciones`)**:
+   - Registro ágil y directo: Cédula de Identidad (CI), Nombres, Apellidos y Teléfono/WhatsApp.
+   - Eliminación de formularios burocráticos y fichas complejas.
+   - **Pago por QR Oficial de Banco BISA**:
+     - Banco: Banco BISA
+     - Cuenta: `4983644011`
+     - Beneficiario: `TORREZ SANCHEZ MISAEL`
+     - Motivo: `CURSOS DE FORMACIÓN CONTINUA`
+     - Monto: `BOB 150.00`
+     - Botón de descarga de imagen QR y copia de número de cuenta en un clic.
+   - **Cédula de Identidad**: Opción para subir fotos de anverso y reverso, o archivo escaneado (PDF/imagen).
+   - **Subida de Comprobante**: Carga directa con vista previa inmediata.
+   - Módulo de **Consulta de Estado por CI** para que los inscritos verifiquen su aprobación.
+
+3. **Base de Datos Supabase (`nueva_base_datos.sql`)**:
+   - Tabla optimizada `participantes` con índices, triggers automáticos y políticas RLS públicas.
+   - Configuración de almacenamiento en Supabase Storage (Buckets `comprobantes` y `carnets`).
+
+---
+
+## 🚀 Despliegue y Ejecución Local
+
+### Prerrequisitos
+- Node.js 18+ instalado.
+- Proyecto en Supabase configurado con las variables en `.env.local`:
+  ```env
+  NEXT_PUBLIC_SUPABASE_URL=https://tu-proyecto.supabase.co
+  NEXT_PUBLIC_SUPABASE_ANON_KEY=tu-anon-key
+  ```
+
+### Instalación y Ejecución
 ```bash
+# Instalar dependencias
+npm install
+
+# Iniciar servidor de desarrollo
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+
+# Compilar para producción
+npm run build
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+---
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## 🗄️ Estructura del Proyecto
 
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+```text
+├── public/
+│   ├── logo-cee.png           # Logotipo del CEA Martha Mendoza
+│   └── qr-pago-bisa.png       # QR oficial de Banco BISA (Bs. 150)
+├── src/
+│   ├── app/
+│   │   ├── layout.tsx         # Layout general con metadatos del centro
+│   │   ├── page.tsx           # Panel principal de administración
+│   │   └── inscripciones/     # Ruta del formulario público
+│   ├── components/
+│   │   ├── participantes/     # Componente de gestión de participantes y visores
+│   │   └── inscripciones/     # Componente de inscripción y QR de pago
+│   ├── lib/
+│   │   └── supabase/          # Cliente Supabase
+│   └── types/                 # Definiciones de TypeScript
+├── nueva_base_datos.sql       # Script SQL para Supabase
+└── README.md
+```

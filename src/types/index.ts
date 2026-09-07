@@ -1,3 +1,4 @@
+export type { Participante, ParticipanteFormData } from './participante';
 export type { Curso, CursoFormData, Grupo, HorarioSlot } from './curso';
 export type { AgendaContacto, AgendaFormData } from './agenda';
 export type { Tecnico, Facilitador, CicloFormativo, SieUe } from './catalogos';
