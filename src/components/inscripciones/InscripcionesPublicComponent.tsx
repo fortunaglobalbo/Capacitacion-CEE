@@ -1,44 +1,66 @@
 'use client';
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useEffect, useRef, Suspense } from 'react';
 import Image from 'next/image';
+import { useSearchParams } from 'next/navigation';
 import { supabase } from '@/lib/supabase/client';
 import Swal from 'sweetalert2';
 import {
   QrCode,
   UploadCloud,
   FileCheck2,
-  UserCheck,
+  User,
   CreditCard,
   Camera,
   CheckCircle2,
-  AlertCircle,
   Copy,
   Download,
   Search,
   ArrowRight,
+  ArrowLeft,
   ShieldCheck,
   RefreshCw,
-  Eye,
-  FileText,
   Phone,
-  User,
-  BadgeAlert,
-  Sparkles
+  BookOpen,
+  MessageCircle,
+  ExternalLink,
+  Sparkles,
+  Check,
+  BadgeAlert
 } from 'lucide-react';
-import { Participante } from '@/types';
+import { Participante, CursoCapacitacion } from '@/types';
 
 export function InscripcionesPublicComponent() {
-  // Tab activo: Formulario de Registro o Consulta de Estado por CI
+  return (
+    <Suspense fallback={<div style={{ textAlign: 'center', padding: '40px', color: '#64748b' }}>Cargando formulario...</div>}>
+      <InscripcionesPublicContent />
+    </Suspense>
+  );
+}
+
+function InscripcionesPublicContent() {
+  const searchParams = useSearchParams();
+  const urlCursoId = searchParams.get('curso') || '';
+
+  // Tab activo: Formulario o Consulta
   const [activeTab, setActiveTab] = useState<'formulario' | 'consulta'>('formulario');
 
-  // Datos del formulario
+  // Cursos disponibles
+  const [cursos, setCursos] = useState<CursoCapacitacion[]>([]);
+  const [selectedCursoId, setSelectedCursoId] = useState<string>(urlCursoId);
+  const [selectedCurso, setSelectedCurso] = useState<CursoCapacitacion | null>(null);
+  const [loadingCursos, setLoadingCursos] = useState(true);
+
+  // Paso actual del Wizard: 1 = Datos, 2 = Carnet, 3 = Pago QR
+  const [currentStep, setCurrentStep] = useState<1 | 2 | 3 | 4>(1);
+
+  // Datos del participante (Paso 1)
   const [ci, setCi] = useState('');
   const [nombres, setNombres] = useState('');
   const [apellidos, setApellidos] = useState('');
   const [telefono, setTelefono] = useState('');
 
-  // Tipo de subida de carnet: 'fotos' (anverso y reverso) o 'escaneado' (un archivo/pdf)
+  // Carnet (Paso 2)
   const [carnetMode, setCarnetMode] = useState<'fotos' | 'escaneado'>('fotos');
   const [carnetAnverso, setCarnetAnverso] = useState<File | null>(null);
   const [carnetAnversoPreview, setCarnetAnversoPreview] = useState<string | null>(null);
@@ -47,27 +69,72 @@ export function InscripcionesPublicComponent() {
   const [carnetEscaneado, setCarnetEscaneado] = useState<File | null>(null);
   const [carnetEscaneadoName, setCarnetEscaneadoName] = useState<string | null>(null);
 
-  // Comprobante de Pago
+  // Comprobante de Pago (Paso 3)
   const [comprobante, setComprobante] = useState<File | null>(null);
   const [comprobantePreview, setComprobantePreview] = useState<string | null>(null);
 
-  // Estados de carga y envío
+  // Estados de envío y éxito (Paso 4)
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [submitSuccess, setSubmitSuccess] = useState<Participante | null>(null);
+  const [registeredParticipant, setRegisteredParticipant] = useState<Participante | null>(null);
 
   // Estado de consulta
   const [searchCi, setSearchCi] = useState('');
   const [isSearching, setIsSearching] = useState(false);
-  const [searchResult, setSearchResult] = useState<Participante | null>(null);
+  const [searchResults, setSearchResults] = useState<Participante[]>([]);
   const [searchPerformed, setSearchPerformed] = useState(false);
 
-  // Refs de archivos
+  // Refs para inputs file
   const anversoInputRef = useRef<HTMLInputElement>(null);
   const reversoInputRef = useRef<HTMLInputElement>(null);
   const escaneadoInputRef = useRef<HTMLInputElement>(null);
   const comprobanteInputRef = useRef<HTMLInputElement>(null);
 
-  // Copiar datos bancarios
+  // 1. Cargar lista de cursos activos
+  useEffect(() => {
+    const loadCursos = async () => {
+      setLoadingCursos(true);
+      try {
+        const { data, error } = await supabase
+          .from('cursos')
+          .select('*')
+          .order('nombre', { ascending: true });
+
+        if (!error && data) {
+          setCursos(data);
+
+          // Si vino urlCursoId, seleccionarlo
+          if (urlCursoId) {
+            const found = data.find(c => c.id === urlCursoId);
+            if (found) {
+              setSelectedCursoId(found.id);
+              setSelectedCurso(found);
+            } else if (data.length > 0) {
+              setSelectedCursoId(data[0].id);
+              setSelectedCurso(data[0]);
+            }
+          } else if (data.length > 0) {
+            setSelectedCursoId(data[0].id);
+            setSelectedCurso(data[0]);
+          }
+        }
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setLoadingCursos(false);
+      }
+    };
+
+    loadCursos();
+  }, [urlCursoId]);
+
+  // Actualizar objeto selectedCurso cuando cambie selectedCursoId
+  const handleSelectCurso = (id: string) => {
+    setSelectedCursoId(id);
+    const found = cursos.find(c => c.id === id);
+    setSelectedCurso(found || null);
+  };
+
+  // Copiar cuenta bancaria
   const handleCopyAccount = () => {
     navigator.clipboard.writeText('4983644011');
     Swal.fire({
@@ -81,16 +148,14 @@ export function InscripcionesPublicComponent() {
     });
   };
 
-  // Manejo de archivo a preview y base64
+  // Previsualización de archivos
   const fileToPreview = (file: File, callback: (url: string) => void) => {
     const reader = new FileReader();
-    reader.onload = () => {
-      callback(reader.result as string);
-    };
+    reader.onload = () => callback(reader.result as string);
     reader.readAsDataURL(file);
   };
 
-  // Función auxiliar para subir a Supabase Storage con fallback
+  // Subir archivo a Supabase Storage con fallback
   const uploadFile = async (bucket: string, folder: string, file: File, prefix: string): Promise<string> => {
     try {
       const fileExt = file.name.split('.').pop() || 'jpg';
@@ -107,13 +172,13 @@ export function InscripcionesPublicComponent() {
         const { data: publicUrlData } = supabase.storage.from(bucket).getPublicUrl(filePath);
         return publicUrlData.publicUrl;
       }
-      // Fallback a base64 si el bucket no tiene permisos o no existe
+
       return await new Promise((resolve) => {
         const reader = new FileReader();
         reader.onloadend = () => resolve(reader.result as string);
         reader.readAsDataURL(file);
       });
-    } catch (e) {
+    } catch {
       return await new Promise((resolve) => {
         const reader = new FileReader();
         reader.onloadend = () => resolve(reader.result as string);
@@ -122,63 +187,56 @@ export function InscripcionesPublicComponent() {
     }
   };
 
-  // Envío del formulario
-  const handleSubmit = async (e: React.FormEvent) => {
+  // Validaciones y avance de pasos
+  const handleNextStep1 = (e: React.FormEvent) => {
     e.preventDefault();
-
-    const cleanCi = ci.trim().toUpperCase();
-    const cleanNombres = nombres.trim().toUpperCase();
-    const cleanApellidos = apellidos.trim().toUpperCase();
-    const cleanTelefono = telefono.trim();
-
-    if (!cleanCi || !cleanNombres || !cleanApellidos) {
-      Swal.fire({
-        icon: 'warning',
-        title: 'Campos obligatorios',
-        text: 'Por favor complete su CI, Nombres y Apellidos.',
-        confirmButtonColor: '#2563eb'
-      });
+    if (!selectedCursoId) {
+      Swal.fire('Seleccione un Curso', 'Por favor seleccione el curso en el que desea capacitarse.', 'warning');
       return;
     }
+    if (!ci.trim() || !nombres.trim() || !apellidos.trim()) {
+      Swal.fire('Campos requeridos', 'Por favor complete su Cédula de Identidad (CI), Nombres y Apellidos.', 'warning');
+      return;
+    }
+    setCurrentStep(2);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
 
-    // Validar Carnet
+  const handleNextStep2 = (e: React.FormEvent) => {
+    e.preventDefault();
     if (carnetMode === 'fotos') {
       if (!carnetAnverso || !carnetReverso) {
-        Swal.fire({
-          icon: 'warning',
-          title: 'Fotos de Carnet requeridas',
-          text: 'Por favor suba tanto la foto de anverso (frontal) como la de reverso de su cédula de identidad.',
-          confirmButtonColor: '#2563eb'
-        });
+        Swal.fire('Cédula de Identidad', 'Por favor adjunte o tome la foto tanto del Anverso (frente) como del Reverso (atrás) de su carnet.', 'warning');
         return;
       }
     } else {
       if (!carnetEscaneado) {
-        Swal.fire({
-          icon: 'warning',
-          title: 'Carnet escaneado requerido',
-          text: 'Por favor adjunte el archivo escaneado de su cédula de identidad.',
-          confirmButtonColor: '#2563eb'
-        });
+        Swal.fire('Carnet escaneado', 'Por favor adjunte el archivo escaneado de su cédula de identidad.', 'warning');
         return;
       }
     }
+    setCurrentStep(3);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
 
-    // Validar comprobante
+  // Envío final (Paso 3 a Paso 4)
+  const handleSubmitFinal = async (e: React.FormEvent) => {
+    e.preventDefault();
+
     if (!comprobante) {
-      Swal.fire({
-        icon: 'warning',
-        title: 'Comprobante requerido',
-        text: 'Por favor adjunte el comprobante del depósito o transferencia bancaria por Bs. 150.',
-        confirmButtonColor: '#2563eb'
-      });
+      Swal.fire('Comprobante requerido', 'Por favor adjunte la captura o foto del comprobante de pago.', 'warning');
       return;
     }
 
     setIsSubmitting(true);
 
     try {
-      // 1. Subir carnet y comprobante
+      const cleanCi = ci.trim().toUpperCase();
+      const cleanNombres = nombres.trim().toUpperCase();
+      const cleanApellidos = apellidos.trim().toUpperCase();
+      const cleanTelefono = telefono.trim();
+
+      // 1. Subir archivos
       let anversoUrl = '';
       let reversoUrl = '';
       let escaneadoUrl = '';
@@ -193,49 +251,54 @@ export function InscripcionesPublicComponent() {
 
       comprobanteUrl = await uploadFile('comprobantes', 'pagos', comprobante, 'pago_150');
 
-      // 2. Guardar en tabla participantes
-      const newParticipant: any = {
+      // 2. Guardar participante
+      const payload: any = {
         ci: cleanCi,
         nombres: cleanNombres,
         apellidos: cleanApellidos,
         telefono: cleanTelefono || null,
+        curso_id: selectedCursoId,
         carnet_anverso_url: anversoUrl || null,
         carnet_reverso_url: reversoUrl || null,
         carnet_escaneado_url: escaneadoUrl || null,
         comprobante_url: comprobanteUrl || null,
-        monto_pago: 150.00,
+        monto_pago: selectedCurso?.costo || 150.00,
         estado_pago: 'PENDIENTE',
         updated_at: new Date().toISOString()
       };
 
       const { data, error } = await supabase
         .from('participantes')
-        .upsert(newParticipant, { onConflict: 'ci' })
-        .select()
+        .upsert(payload, { onConflict: 'ci,curso_id' })
+        .select('*, curso:cursos(*)')
         .single();
 
       if (error) {
-        console.error('Error supabase:', error);
-        throw new Error(error.message || 'Error al registrar en la base de datos');
+        // Si no tiene constraint compuesta aún, intentar por CI
+        const { data: dataFallback, error: errFallback } = await supabase
+          .from('participantes')
+          .upsert(payload, { onConflict: 'ci' })
+          .select('*, curso:cursos(*)')
+          .single();
+
+        if (errFallback) throw errFallback;
+        setRegisteredParticipant((dataFallback as any) || payload);
+      } else {
+        setRegisteredParticipant((data as any) || payload);
       }
 
-      setSubmitSuccess(data as Participante);
+      setCurrentStep(4);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
 
       Swal.fire({
         icon: 'success',
-        title: '¡Inscripción Registrada!',
-        text: `Estimado(a) ${cleanNombres}, su inscripción al Curso de Capacitación se ha recibido exitosamente.`,
+        title: '¡Inscripción Exitosa!',
+        text: 'Tus datos y comprobante fueron recibidos. Ahora puedes unirte al Grupo de WhatsApp del curso.',
         confirmButtonColor: '#16a34a'
       });
-
     } catch (err: any) {
       console.error(err);
-      Swal.fire({
-        icon: 'error',
-        title: 'Error de registro',
-        text: err.message || 'Ocurrió un inconveniente al registrar sus datos. Verifique su conexión y vuelva a intentar.',
-        confirmButtonColor: '#dc2626'
-      });
+      Swal.fire('Error al enviar', err.message || 'Ocurrió un error. Verifique su conexión y vuelva a intentar.', 'error');
     } finally {
       setIsSubmitting(false);
     }
@@ -249,32 +312,25 @@ export function InscripcionesPublicComponent() {
 
     setIsSearching(true);
     setSearchPerformed(true);
-    setSearchResult(null);
+    setSearchResults([]);
 
     try {
       const { data, error } = await supabase
         .from('participantes')
-        .select('*')
-        .eq('ci', cleanCi)
-        .maybeSingle();
+        .select('*, curso:cursos(*)')
+        .eq('ci', cleanCi);
 
       if (error) throw error;
-      setSearchResult(data as Participante);
+      setSearchResults(data || []);
     } catch (err: any) {
-      console.error(err);
-      Swal.fire({
-        icon: 'error',
-        title: 'Error al consultar',
-        text: err.message || 'No se pudo consultar el estado.',
-        confirmButtonColor: '#dc2626'
-      });
+      Swal.fire('Error', err.message || 'No se pudo consultar el estado.', 'error');
     } finally {
       setIsSearching(false);
     }
   };
 
-  // Resetear formulario para nueva inscripción
-  const handleResetForm = () => {
+  // Reiniciar formulario
+  const handleReset = () => {
     setCi('');
     setNombres('');
     setApellidos('');
@@ -287,44 +343,44 @@ export function InscripcionesPublicComponent() {
     setCarnetEscaneadoName(null);
     setComprobante(null);
     setComprobantePreview(null);
-    setSubmitSuccess(null);
+    setRegisteredParticipant(null);
+    setCurrentStep(1);
   };
 
   return (
-    <div style={{ maxWidth: '960px', margin: '0 auto', fontFamily: 'system-ui, -apple-system, sans-serif' }}>
-      {/* Encabezado Institucional */}
+    <div style={{ maxWidth: '880px', margin: '0 auto', fontFamily: 'system-ui, -apple-system, sans-serif' }}>
+      {/* ENCABEZADO INSTITUCIONAL */}
       <header style={{
         background: 'linear-gradient(135deg, #1e3a8a 0%, #0f172a 100%)',
         borderRadius: '20px',
         padding: '24px 20px',
         color: '#ffffff',
-        boxShadow: '0 12px 30px rgba(0, 0, 0, 0.15)',
-        marginBottom: '24px',
+        boxShadow: '0 12px 30px rgba(0, 0, 0, 0.12)',
+        marginBottom: '20px',
         display: 'flex',
         flexWrap: 'wrap',
         alignItems: 'center',
         justifyContent: 'space-between',
-        gap: '20px',
-        border: '1px solid rgba(255, 255, 255, 0.1)'
+        gap: '16px'
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
           <div style={{
             background: '#ffffff',
             borderRadius: '50%',
-            padding: '4px',
-            width: '80px',
-            height: '80px',
+            padding: '3px',
+            width: '70px',
+            height: '70px',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
+            boxShadow: '0 4px 10px rgba(0,0,0,0.2)',
             flexShrink: 0
           }}>
             <Image
               src="/logo-cee.png"
               alt="Logo Martha Mendoza"
-              width={72}
-              height={72}
+              width={64}
+              height={64}
               style={{ objectFit: 'contain' }}
               priority
             />
@@ -336,74 +392,833 @@ export function InscripcionesPublicComponent() {
               color: '#93c5fd',
               fontSize: '11px',
               fontWeight: 700,
-              letterSpacing: '1px',
+              letterSpacing: '0.5px',
               textTransform: 'uppercase',
-              padding: '4px 10px',
+              padding: '3px 8px',
               borderRadius: '9999px',
-              marginBottom: '4px',
+              marginBottom: '3px',
               border: '1px solid rgba(147, 197, 253, 0.3)'
             }}>
               C.E.A. Martha Mendoza • Sucre - Bolivia
             </span>
-            <h1 style={{ margin: 0, fontSize: '26px', fontWeight: 800, letterSpacing: '-0.5px' }}>
+            <h1 style={{ margin: 0, fontSize: '24px', fontWeight: 800, letterSpacing: '-0.5px' }}>
               Curso de Capacitación
             </h1>
-            <p style={{ margin: '4px 0 0 0', color: '#cbd5e1', fontSize: '13px' }}>
-              Formulario de Inscripción y Validación de Pago Oficial
+            <p style={{ margin: '2px 0 0 0', color: '#cbd5e1', fontSize: '13px' }}>
+              Formulario de Inscripción y Validación de Pago
             </p>
           </div>
         </div>
 
-        {/* Pestañas / Acciones Rápidas */}
-        <div style={{ display: 'flex', gap: '8px', background: 'rgba(255,255,255,0.08)', padding: '6px', borderRadius: '12px' }}>
+        {/* Pestañas Formulario / Consulta */}
+        <div style={{ display: 'flex', gap: '6px', background: 'rgba(255,255,255,0.1)', padding: '4px', borderRadius: '10px' }}>
           <button
             type="button"
             onClick={() => setActiveTab('formulario')}
             style={{
-              padding: '8px 16px',
+              padding: '8px 14px',
               borderRadius: '8px',
               border: 'none',
               cursor: 'pointer',
-              fontWeight: 600,
-              fontSize: '13px',
+              fontWeight: 700,
+              fontSize: '12px',
               display: 'flex',
               alignItems: 'center',
               gap: '6px',
-              transition: 'all 0.2s ease',
               background: activeTab === 'formulario' ? '#3b82f6' : 'transparent',
-              color: activeTab === 'formulario' ? '#ffffff' : '#94a3b8'
+              color: '#ffffff'
             }}
           >
-            <Sparkles size={16} /> Inscribirme
+            <Sparkles size={15} /> Inscribirme
           </button>
           <button
             type="button"
             onClick={() => setActiveTab('consulta')}
             style={{
-              padding: '8px 16px',
+              padding: '8px 14px',
               borderRadius: '8px',
               border: 'none',
               cursor: 'pointer',
-              fontWeight: 600,
-              fontSize: '13px',
+              fontWeight: 700,
+              fontSize: '12px',
               display: 'flex',
               alignItems: 'center',
               gap: '6px',
-              transition: 'all 0.2s ease',
               background: activeTab === 'consulta' ? '#3b82f6' : 'transparent',
-              color: activeTab === 'consulta' ? '#ffffff' : '#94a3b8'
+              color: '#ffffff'
             }}
           >
-            <Search size={16} /> Consultar Estado
+            <Search size={15} /> Consultar Estado
           </button>
         </div>
       </header>
 
-      {/* PESTAÑA 1: FORMULARIO DE INSCRIPCIÓN */}
+      {/* PESTAÑA FORMULARIO */}
       {activeTab === 'formulario' && (
-        <>
-          {submitSuccess ? (
-            /* Pantalla de Éxito */
+        <div>
+          {/* CURSO SELECCIONADO (BANNER DESTACADO) */}
+          {selectedCurso && currentStep !== 4 && (
+            <div style={{
+              background: '#eff6ff',
+              borderRadius: '14px',
+              border: '1px solid #bfdbfe',
+              padding: '14px 18px',
+              marginBottom: '20px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              flexWrap: 'wrap',
+              gap: '10px'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <div style={{ background: '#2563eb', color: '#fff', width: '36px', height: '36px', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  <BookOpen size={20} />
+                </div>
+                <div>
+                  <span style={{ fontSize: '11px', fontWeight: 700, color: '#1d4ed8', textTransform: 'uppercase' }}>
+                    Curso Seleccionado:
+                  </span>
+                  <h2 style={{ margin: 0, fontSize: '16px', fontWeight: 800, color: '#0f172a' }}>
+                    {selectedCurso.nombre}
+                  </h2>
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <span style={{ background: '#dcfce7', color: '#15803d', padding: '4px 10px', borderRadius: '8px', fontSize: '13px', fontWeight: 800 }}>
+                  Matrícula: Bs. {selectedCurso.costo || 150}
+                </span>
+
+                {cursos.length > 1 && currentStep === 1 && (
+                  <select
+                    value={selectedCursoId}
+                    onChange={(e) => handleSelectCurso(e.target.value)}
+                    style={{
+                      padding: '6px 10px',
+                      borderRadius: '8px',
+                      border: '1px solid #cbd5e1',
+                      fontSize: '12px',
+                      background: '#fff',
+                      fontWeight: 600,
+                      color: '#334155'
+                    }}
+                  >
+                    {cursos.map(c => (
+                      <option key={c.id} value={c.id}>
+                        Cambiar a: {c.nombre}
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* INDICADOR DE PASOS (WIZARD) */}
+          {currentStep !== 4 && (
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              marginBottom: '24px',
+              position: 'relative'
+            }}>
+              {[
+                { step: 1, label: '1. Datos Personales', icon: User },
+                { step: 2, label: '2. Carnet de Identidad', icon: CreditCard },
+                { step: 3, label: '3. Pago QR Banco BISA', icon: QrCode },
+              ].map((item, idx) => {
+                const IconComponent = item.icon;
+                const isCurrent = currentStep === item.step;
+                const isPassed = currentStep > item.step;
+
+                return (
+                  <div
+                    key={item.step}
+                    style={{
+                      flex: 1,
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      textAlign: 'center',
+                      position: 'relative',
+                      zIndex: 2
+                    }}
+                  >
+                    <div style={{
+                      width: '38px',
+                      height: '38px',
+                      borderRadius: '50%',
+                      background: isPassed ? '#16a34a' : isCurrent ? '#2563eb' : '#e2e8f0',
+                      color: isPassed || isCurrent ? '#ffffff' : '#64748b',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontWeight: 800,
+                      fontSize: '14px',
+                      boxShadow: isCurrent ? '0 0 0 4px rgba(37,99,235,0.2)' : 'none',
+                      transition: 'all 0.2s ease',
+                      marginBottom: '6px'
+                    }}>
+                      {isPassed ? <Check size={18} /> : <IconComponent size={18} />}
+                    </div>
+                    <span style={{
+                      fontSize: '12px',
+                      fontWeight: isCurrent ? 800 : 600,
+                      color: isCurrent ? '#1e293b' : '#64748b'
+                    }}>
+                      {item.label}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {/* PASO 1: DATOS PERSONALES */}
+          {currentStep === 1 && (
+            <form onSubmit={handleNextStep1} style={{
+              background: '#ffffff',
+              borderRadius: '16px',
+              padding: '24px',
+              border: '1px solid #e2e8f0',
+              boxShadow: '0 4px 16px rgba(0,0,0,0.03)'
+            }}>
+              <div style={{ marginBottom: '18px' }}>
+                <h3 style={{ margin: '0 0 4px 0', fontSize: '18px', fontWeight: 800, color: '#0f172a' }}>
+                  Paso 1: Datos Personales del Participante
+                </h3>
+                <p style={{ margin: 0, fontSize: '13px', color: '#64748b' }}>
+                  Complete su información tal como figura en su documento de identidad.
+                </p>
+              </div>
+
+              {/* Selector de Curso si hay varios y no vino fijado */}
+              {cursos.length > 0 && (
+                <div style={{ marginBottom: '16px' }}>
+                  <label style={{ display: 'block', fontSize: '13px', fontWeight: 700, color: '#1e293b', marginBottom: '6px' }}>
+                    Seleccione el Curso de Capacitación *
+                  </label>
+                  <select
+                    required
+                    value={selectedCursoId}
+                    onChange={(e) => handleSelectCurso(e.target.value)}
+                    style={{
+                      width: '100%',
+                      padding: '11px 14px',
+                      borderRadius: '10px',
+                      border: '1px solid #cbd5e1',
+                      fontSize: '14px',
+                      color: '#0f172a',
+                      outline: 'none',
+                      boxSizing: 'border-box',
+                      background: '#f8fafc'
+                    }}
+                  >
+                    {cursos.map(c => (
+                      <option key={c.id} value={c.id}>
+                        {c.nombre} — (Matrícula: Bs. {c.costo || 150})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', marginBottom: '24px' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: '#334155', marginBottom: '6px' }}>
+                    Cédula de Identidad (CI) <span style={{ color: '#ef4444' }}>*</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={ci}
+                    onChange={(e) => setCi(e.target.value)}
+                    placeholder="Ej: 8934521 CH"
+                    style={{
+                      width: '100%',
+                      padding: '11px 14px',
+                      borderRadius: '10px',
+                      border: '1px solid #cbd5e1',
+                      fontSize: '14px',
+                      boxSizing: 'border-box'
+                    }}
+                  />
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '14px' }}>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: '#334155', marginBottom: '6px' }}>
+                      Nombres <span style={{ color: '#ef4444' }}>*</span>
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={nombres}
+                      onChange={(e) => setNombres(e.target.value)}
+                      placeholder="Ej: Juan Carlos"
+                      style={{
+                        width: '100%',
+                        padding: '11px 14px',
+                        borderRadius: '10px',
+                        border: '1px solid #cbd5e1',
+                        fontSize: '14px',
+                        boxSizing: 'border-box'
+                      }}
+                    />
+                  </div>
+
+                  <div>
+                    <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: '#334155', marginBottom: '6px' }}>
+                      Apellidos <span style={{ color: '#ef4444' }}>*</span>
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={apellidos}
+                      onChange={(e) => setApellidos(e.target.value)}
+                      placeholder="Ej: Perez Mamani"
+                      style={{
+                        width: '100%',
+                        padding: '11px 14px',
+                        borderRadius: '10px',
+                        border: '1px solid #cbd5e1',
+                        fontSize: '14px',
+                        boxSizing: 'border-box'
+                      }}
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: '#334155', marginBottom: '6px' }}>
+                    Teléfono Celular / WhatsApp <span style={{ color: '#16a34a', fontSize: '12px' }}>(Muy importante para contacto)</span>
+                  </label>
+                  <div style={{ position: 'relative' }}>
+                    <Phone size={16} style={{ position: 'absolute', left: '12px', top: '13px', color: '#94a3b8' }} />
+                    <input
+                      type="tel"
+                      value={telefono}
+                      onChange={(e) => setTelefono(e.target.value)}
+                      placeholder="Ej: 71234567"
+                      style={{
+                        width: '100%',
+                        padding: '11px 14px 11px 36px',
+                        borderRadius: '10px',
+                        border: '1px solid #cbd5e1',
+                        fontSize: '14px',
+                        boxSizing: 'border-box'
+                      }}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                <button
+                  type="submit"
+                  style={{
+                    padding: '12px 24px',
+                    borderRadius: '10px',
+                    border: 'none',
+                    background: '#2563eb',
+                    color: '#fff',
+                    fontWeight: 700,
+                    fontSize: '14px',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    boxShadow: '0 4px 12px rgba(37,99,235,0.25)'
+                  }}
+                >
+                  Siguiente: Subir Carnet <ArrowRight size={16} />
+                </button>
+              </div>
+            </form>
+          )}
+
+          {/* PASO 2: CÉDULA DE IDENTIDAD */}
+          {currentStep === 2 && (
+            <form onSubmit={handleNextStep2} style={{
+              background: '#ffffff',
+              borderRadius: '16px',
+              padding: '24px',
+              border: '1px solid #e2e8f0',
+              boxShadow: '0 4px 16px rgba(0,0,0,0.03)'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '18px', flexWrap: 'wrap', gap: '10px' }}>
+                <div>
+                  <h3 style={{ margin: '0 0 4px 0', fontSize: '18px', fontWeight: 800, color: '#0f172a' }}>
+                    Paso 2: Cédula de Identidad de {nombres || 'Participante'}
+                  </h3>
+                  <p style={{ margin: 0, fontSize: '13px', color: '#64748b' }}>
+                    Suba fotos legibles de su documento o un archivo escaneado.
+                  </p>
+                </div>
+
+                {/* Alternar modo */}
+                <div style={{ display: 'flex', background: '#f1f5f9', padding: '3px', borderRadius: '8px' }}>
+                  <button
+                    type="button"
+                    onClick={() => setCarnetMode('fotos')}
+                    style={{
+                      padding: '6px 12px',
+                      fontSize: '12px',
+                      fontWeight: 700,
+                      borderRadius: '6px',
+                      border: 'none',
+                      cursor: 'pointer',
+                      background: carnetMode === 'fotos' ? '#ffffff' : 'transparent',
+                      color: carnetMode === 'fotos' ? '#1e293b' : '#64748b',
+                      boxShadow: carnetMode === 'fotos' ? '0 2px 4px rgba(0,0,0,0.06)' : 'none'
+                    }}
+                  >
+                    Fotos (Anverso y Reverso)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setCarnetMode('escaneado')}
+                    style={{
+                      padding: '6px 12px',
+                      fontSize: '12px',
+                      fontWeight: 700,
+                      borderRadius: '6px',
+                      border: 'none',
+                      cursor: 'pointer',
+                      background: carnetMode === 'escaneado' ? '#ffffff' : 'transparent',
+                      color: carnetMode === 'escaneado' ? '#1e293b' : '#64748b',
+                      boxShadow: carnetMode === 'escaneado' ? '0 2px 4px rgba(0,0,0,0.06)' : 'none'
+                    }}
+                  >
+                    Escaneado (PDF/Doc)
+                  </button>
+                </div>
+              </div>
+
+              {carnetMode === 'fotos' ? (
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '16px', marginBottom: '24px' }}>
+                  {/* Foto Anverso */}
+                  <div>
+                    <label style={{ display: 'block', fontSize: '13px', fontWeight: 700, color: '#334155', marginBottom: '6px' }}>
+                      Foto Anverso (Frente) <span style={{ color: '#ef4444' }}>*</span>
+                    </label>
+                    <input
+                      ref={anversoInputRef}
+                      type="file"
+                      accept="image/*"
+                      style={{ display: 'none' }}
+                      onChange={(e) => {
+                        const f = e.target.files?.[0];
+                        if (f) {
+                          setCarnetAnverso(f);
+                          fileToPreview(f, (url) => setCarnetAnversoPreview(url));
+                        }
+                      }}
+                    />
+                    <div
+                      onClick={() => anversoInputRef.current?.click()}
+                      style={{
+                        border: '2px dashed #cbd5e1',
+                        borderRadius: '12px',
+                        padding: '16px',
+                        textAlign: 'center',
+                        cursor: 'pointer',
+                        background: carnetAnversoPreview ? '#f8fafc' : '#fcfcfd',
+                        minHeight: '140px',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '8px'
+                      }}
+                    >
+                      {carnetAnversoPreview ? (
+                        <div style={{ position: 'relative', width: '100%', height: '120px' }}>
+                          <img src={carnetAnversoPreview} alt="Anverso" style={{ width: '100%', height: '100%', objectFit: 'contain', borderRadius: '8px' }} />
+                          <span style={{ position: 'absolute', bottom: '4px', right: '4px', background: 'rgba(0,0,0,0.7)', color: '#fff', fontSize: '10px', padding: '2px 8px', borderRadius: '4px' }}>
+                            Cambiar
+                          </span>
+                        </div>
+                      ) : (
+                        <>
+                          <Camera size={28} color="#3b82f6" />
+                          <span style={{ fontSize: '13px', fontWeight: 700, color: '#334155' }}>Subir o Tomar Foto</span>
+                          <span style={{ fontSize: '11px', color: '#94a3b8' }}>Parte frontal de su carnet</span>
+                        </>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Foto Reverso */}
+                  <div>
+                    <label style={{ display: 'block', fontSize: '13px', fontWeight: 700, color: '#334155', marginBottom: '6px' }}>
+                      Foto Reverso (Atrás) <span style={{ color: '#ef4444' }}>*</span>
+                    </label>
+                    <input
+                      ref={reversoInputRef}
+                      type="file"
+                      accept="image/*"
+                      style={{ display: 'none' }}
+                      onChange={(e) => {
+                        const f = e.target.files?.[0];
+                        if (f) {
+                          setCarnetReverso(f);
+                          fileToPreview(f, (url) => setCarnetReversoPreview(url));
+                        }
+                      }}
+                    />
+                    <div
+                      onClick={() => reversoInputRef.current?.click()}
+                      style={{
+                        border: '2px dashed #cbd5e1',
+                        borderRadius: '12px',
+                        padding: '16px',
+                        textAlign: 'center',
+                        cursor: 'pointer',
+                        background: carnetReversoPreview ? '#f8fafc' : '#fcfcfd',
+                        minHeight: '140px',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '8px'
+                      }}
+                    >
+                      {carnetReversoPreview ? (
+                        <div style={{ position: 'relative', width: '100%', height: '120px' }}>
+                          <img src={carnetReversoPreview} alt="Reverso" style={{ width: '100%', height: '100%', objectFit: 'contain', borderRadius: '8px' }} />
+                          <span style={{ position: 'absolute', bottom: '4px', right: '4px', background: 'rgba(0,0,0,0.7)', color: '#fff', fontSize: '10px', padding: '2px 8px', borderRadius: '4px' }}>
+                            Cambiar
+                          </span>
+                        </div>
+                      ) : (
+                        <>
+                          <Camera size={28} color="#3b82f6" />
+                          <span style={{ fontSize: '13px', fontWeight: 700, color: '#334155' }}>Subir o Tomar Foto</span>
+                          <span style={{ fontSize: '11px', color: '#94a3b8' }}>Parte posterior de su carnet</span>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                /* Modo Escaneado */
+                <div style={{ marginBottom: '24px' }}>
+                  <input
+                    ref={escaneadoInputRef}
+                    type="file"
+                    accept="image/*,.pdf"
+                    style={{ display: 'none' }}
+                    onChange={(e) => {
+                      const f = e.target.files?.[0];
+                      if (f) {
+                        setCarnetEscaneado(f);
+                        setCarnetEscaneadoName(f.name);
+                      }
+                    }}
+                  />
+                  <div
+                    onClick={() => escaneadoInputRef.current?.click()}
+                    style={{
+                      border: '2px dashed #cbd5e1',
+                      borderRadius: '12px',
+                      padding: '28px 16px',
+                      textAlign: 'center',
+                      cursor: 'pointer',
+                      background: carnetEscaneadoName ? '#f0fdf4' : '#fcfcfd',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      gap: '8px'
+                    }}
+                  >
+                    {carnetEscaneadoName ? (
+                      <>
+                        <FileCheck2 size={36} color="#16a34a" />
+                        <span style={{ fontSize: '14px', fontWeight: 700, color: '#15803d' }}>
+                          {carnetEscaneadoName}
+                        </span>
+                        <span style={{ fontSize: '11px', color: '#64748b' }}>Clic para cambiar archivo</span>
+                      </>
+                    ) : (
+                      <>
+                        <UploadCloud size={32} color="#64748b" />
+                        <span style={{ fontSize: '13px', fontWeight: 700, color: '#334155' }}>
+                          Adjuntar Cédula Escaneada (PDF o Imagen)
+                        </span>
+                        <span style={{ fontSize: '11px', color: '#94a3b8' }}>
+                          Documento completo anverso y reverso
+                        </span>
+                      </>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Botones de navegación */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <button
+                  type="button"
+                  onClick={() => setCurrentStep(1)}
+                  style={{
+                    padding: '10px 18px',
+                    borderRadius: '8px',
+                    border: '1px solid #cbd5e1',
+                    background: '#f8fafc',
+                    color: '#475569',
+                    fontWeight: 600,
+                    fontSize: '13px',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px'
+                  }}
+                >
+                  <ArrowLeft size={16} /> Volver a Datos
+                </button>
+
+                <button
+                  type="submit"
+                  style={{
+                    padding: '12px 24px',
+                    borderRadius: '10px',
+                    border: 'none',
+                    background: '#2563eb',
+                    color: '#fff',
+                    fontWeight: 700,
+                    fontSize: '14px',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    boxShadow: '0 4px 12px rgba(37,99,235,0.25)'
+                  }}
+                >
+                  Siguiente: Pago QR <ArrowRight size={16} />
+                </button>
+              </div>
+            </form>
+          )}
+
+          {/* PASO 3: PAGO QR BANCO BISA Y COMPROBANTE */}
+          {currentStep === 3 && (
+            <form onSubmit={handleSubmitFinal} style={{
+              background: '#ffffff',
+              borderRadius: '16px',
+              padding: '24px',
+              border: '1px solid #e2e8f0',
+              boxShadow: '0 4px 16px rgba(0,0,0,0.03)'
+            }}>
+              <div style={{ marginBottom: '18px' }}>
+                <h3 style={{ margin: '0 0 4px 0', fontSize: '18px', fontWeight: 800, color: '#0f172a' }}>
+                  Paso 3: Pago Oficial con QR Banco BISA
+                </h3>
+                <p style={{ margin: 0, fontSize: '13px', color: '#64748b' }}>
+                  Realice la transferencia bancaria por el monto oficial y suba su comprobante.
+                </p>
+              </div>
+
+              {/* Tarjeta del QR Banco BISA */}
+              <div style={{
+                background: 'linear-gradient(135deg, #f8fafc 0%, #edf2f7 100%)',
+                borderRadius: '16px',
+                padding: '18px',
+                border: '1px solid #cbd5e1',
+                marginBottom: '20px',
+                display: 'flex',
+                flexWrap: 'wrap',
+                alignItems: 'center',
+                justifyContent: 'space-around',
+                gap: '16px'
+              }}>
+                <div style={{ textAlign: 'center' }}>
+                  <div style={{
+                    width: '180px',
+                    height: '180px',
+                    background: '#ffffff',
+                    padding: '8px',
+                    borderRadius: '12px',
+                    boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
+                    margin: '0 auto 8px auto',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center'
+                  }}>
+                    <img
+                      src="/qr-pago-bisa.png"
+                      alt="QR Banco BISA"
+                      style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+                    />
+                  </div>
+                  <a
+                    href="/qr-pago-bisa.png"
+                    download="QR_Pago_Banco_BISA_150Bs.png"
+                    style={{
+                      padding: '5px 10px',
+                      background: '#334155',
+                      color: '#ffffff',
+                      borderRadius: '6px',
+                      fontSize: '11px',
+                      fontWeight: 600,
+                      textDecoration: 'none',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '4px'
+                    }}
+                  >
+                    <Download size={12} /> Descargar QR
+                  </a>
+                </div>
+
+                <div style={{ flex: '1 1 260px', background: '#ffffff', borderRadius: '12px', padding: '16px', border: '1px solid #e2e8f0', fontSize: '13px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
+                    <span style={{ color: '#64748b' }}>Entidad:</span>
+                    <strong style={{ color: '#0f172a' }}>Banco BISA</strong>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
+                    <span style={{ color: '#64748b' }}>Cuenta:</span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <strong style={{ color: '#0f172a' }}>4983644011</strong>
+                      <button
+                        type="button"
+                        onClick={handleCopyAccount}
+                        style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#2563eb', padding: 0 }}
+                        title="Copiar cuenta"
+                      >
+                        <Copy size={13} />
+                      </button>
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
+                    <span style={{ color: '#64748b' }}>Beneficiario:</span>
+                    <strong style={{ color: '#0f172a' }}>TORREZ SANCHEZ MISAEL</strong>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
+                    <span style={{ color: '#64748b' }}>Motivo:</span>
+                    <strong style={{ color: '#0f172a' }}>CURSOS DE FORMACIÓN CONTINUA</strong>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px dashed #cbd5e1', paddingTop: '6px', marginTop: '6px' }}>
+                    <span style={{ fontWeight: 700, color: '#16a34a' }}>Monto a Pagar:</span>
+                    <strong style={{ fontWeight: 800, fontSize: '15px', color: '#16a34a' }}>
+                      BOB {selectedCurso?.costo || 150}.00
+                    </strong>
+                  </div>
+                </div>
+              </div>
+
+              {/* Subida del comprobante */}
+              <div style={{ marginBottom: '24px' }}>
+                <label style={{ display: 'block', fontSize: '13px', fontWeight: 700, color: '#1e293b', marginBottom: '6px' }}>
+                  Subir Comprobante de Depósito / Transferencia <span style={{ color: '#ef4444' }}>*</span>
+                </label>
+                <input
+                  ref={comprobanteInputRef}
+                  type="file"
+                  accept="image/*,.pdf"
+                  style={{ display: 'none' }}
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    if (f) {
+                      setComprobante(f);
+                      fileToPreview(f, (url) => setComprobantePreview(url));
+                    }
+                  }}
+                />
+                <div
+                  onClick={() => comprobanteInputRef.current?.click()}
+                  style={{
+                    border: '2px dashed #93c5fd',
+                    borderRadius: '12px',
+                    padding: '20px',
+                    textAlign: 'center',
+                    cursor: 'pointer',
+                    background: comprobantePreview ? '#f0fdf4' : '#eff6ff',
+                    minHeight: '130px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '8px'
+                  }}
+                >
+                  {comprobantePreview ? (
+                    <div style={{ position: 'relative', width: '100%', height: '120px' }}>
+                      <img src={comprobantePreview} alt="Comprobante" style={{ width: '100%', height: '100%', objectFit: 'contain', borderRadius: '8px' }} />
+                      <span style={{ position: 'absolute', bottom: '4px', right: '4px', background: 'rgba(0,0,0,0.7)', color: '#fff', fontSize: '10px', padding: '2px 8px', borderRadius: '4px' }}>
+                        Cambiar Comprobante
+                      </span>
+                    </div>
+                  ) : (
+                    <>
+                      <UploadCloud size={30} color="#2563eb" />
+                      <span style={{ fontSize: '13px', fontWeight: 700, color: '#1d4ed8' }}>
+                        Adjuntar Comprobante o Captura de Pantalla
+                      </span>
+                      <span style={{ fontSize: '11px', color: '#64748b' }}>
+                        Foto o imagen nítida del recibo de pago
+                      </span>
+                    </>
+                  )}
+                </div>
+              </div>
+
+              {/* Botones de navegación */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <button
+                  type="button"
+                  onClick={() => setCurrentStep(2)}
+                  style={{
+                    padding: '10px 18px',
+                    borderRadius: '8px',
+                    border: '1px solid #cbd5e1',
+                    background: '#f8fafc',
+                    color: '#475569',
+                    fontWeight: 600,
+                    fontSize: '13px',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px'
+                  }}
+                >
+                  <ArrowLeft size={16} /> Volver a Carnet
+                </button>
+
+                <button
+                  type="submit"
+                  disabled={isSubmitting}
+                  style={{
+                    padding: '14px 28px',
+                    borderRadius: '10px',
+                    border: 'none',
+                    background: isSubmitting ? '#94a3b8' : '#16a34a',
+                    color: '#fff',
+                    fontWeight: 800,
+                    fontSize: '14px',
+                    cursor: isSubmitting ? 'not-allowed' : 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    boxShadow: '0 4px 14px rgba(22,163,74,0.3)'
+                  }}
+                >
+                  {isSubmitting ? (
+                    <>
+                      <RefreshCw size={16} className="animate-spin" /> Registrando Inscripción...
+                    </>
+                  ) : (
+                    <>
+                      Confirmar y Finalizar Inscripción 🚀
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
+          )}
+
+          {/* PASO 4: CONFIRMACIÓN EXITOSA + ENLACE GRUPO DE WHATSAPP */}
+          {currentStep === 4 && registeredParticipant && (
             <div style={{
               background: '#ffffff',
               borderRadius: '20px',
@@ -425,693 +1240,111 @@ export function InscripcionesPublicComponent() {
               }}>
                 <CheckCircle2 size={42} />
               </div>
+
               <h2 style={{ fontSize: '24px', fontWeight: 800, color: '#0f172a', margin: '0 0 8px 0' }}>
-                ¡Inscripción Registrada Correctamente!
+                ¡Inscripción Recibida Exitosamente!
               </h2>
-              <p style={{ color: '#64748b', fontSize: '15px', maxWidth: '560px', margin: '0 auto 24px auto' }}>
-                Hemos recibido tus datos, el comprobante del pago de <strong>Bs. 150</strong> y la documentación de identidad.
+              <p style={{ color: '#64748b', fontSize: '14px', maxWidth: '540px', margin: '0 auto 20px auto' }}>
+                Estimado(a) <strong>{registeredParticipant.nombres} {registeredParticipant.apellidos}</strong>, su solicitud fue registrada.
               </p>
 
-              {/* Tarjeta Resumen */}
+              {/* BOTÓN DESTACADO DE WHATSAPP */}
+              {selectedCurso?.whatsapp_url && (
+                <div style={{
+                  background: 'linear-gradient(135deg, #25d366 0%, #128c7e 100%)',
+                  borderRadius: '16px',
+                  padding: '20px',
+                  color: '#ffffff',
+                  maxWidth: '520px',
+                  margin: '0 auto 24px auto',
+                  boxShadow: '0 8px 24px rgba(37, 211, 102, 0.35)',
+                  textAlign: 'center'
+                }}>
+                  <span style={{ fontSize: '12px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1px', opacity: 0.9, display: 'block', marginBottom: '6px' }}>
+                    Paso Importante para Clases
+                  </span>
+                  <h3 style={{ margin: '0 0 10px 0', fontSize: '18px', fontWeight: 800 }}>
+                    Únase al Grupo Oficial de WhatsApp
+                  </h3>
+                  <p style={{ margin: '0 0 16px 0', fontSize: '13px', opacity: 0.95 }}>
+                    Por este medio se coordinarán los enlaces de clases, cronogramas y comunicados del curso <strong>"{selectedCurso.nombre}"</strong>.
+                  </p>
+                  <a
+                    href={selectedCurso.whatsapp_url}
+                    target="_blank"
+                    rel="noreferrer"
+                    style={{
+                      padding: '12px 24px',
+                      background: '#ffffff',
+                      color: '#075e54',
+                      borderRadius: '10px',
+                      fontWeight: 800,
+                      fontSize: '14px',
+                      textDecoration: 'none',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      boxShadow: '0 4px 12px rgba(0,0,0,0.15)'
+                    }}
+                  >
+                    <MessageCircle size={18} /> Ingresar al Grupo de WhatsApp <ExternalLink size={14} />
+                  </a>
+                </div>
+              )}
+
+              {/* Resumen del registro */}
               <div style={{
                 background: '#f8fafc',
-                borderRadius: '16px',
-                padding: '20px',
-                maxWidth: '480px',
+                borderRadius: '14px',
+                padding: '16px',
+                maxWidth: '460px',
                 margin: '0 auto 24px auto',
                 border: '1px solid #e2e8f0',
-                textAlign: 'left'
+                textAlign: 'left',
+                fontSize: '13px'
               }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #e2e8f0', paddingBottom: '8px', marginBottom: '8px' }}>
-                  <span style={{ color: '#64748b', fontSize: '13px' }}>Participante:</span>
-                  <span style={{ fontWeight: 700, color: '#0f172a', fontSize: '13px' }}>{submitSuccess.nombres} {submitSuccess.apellidos}</span>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
+                  <span style={{ color: '#64748b' }}>Curso:</span>
+                  <strong style={{ color: '#0f172a' }}>{selectedCurso?.nombre}</strong>
                 </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #e2e8f0', paddingBottom: '8px', marginBottom: '8px' }}>
-                  <span style={{ color: '#64748b', fontSize: '13px' }}>Cédula de Identidad (CI):</span>
-                  <span style={{ fontWeight: 700, color: '#0f172a', fontSize: '13px' }}>{submitSuccess.ci}</span>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
+                  <span style={{ color: '#64748b' }}>Cédula (CI):</span>
+                  <strong style={{ color: '#0f172a' }}>{registeredParticipant.ci}</strong>
                 </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #e2e8f0', paddingBottom: '8px', marginBottom: '8px' }}>
-                  <span style={{ color: '#64748b', fontSize: '13px' }}>Monto de Pago:</span>
-                  <span style={{ fontWeight: 800, color: '#16a34a', fontSize: '14px' }}>BOB 150.00</span>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
+                  <span style={{ color: '#64748b' }}>Monto Pagado:</span>
+                  <strong style={{ color: '#16a34a' }}>BOB {registeredParticipant.monto_pago || 150}.00</strong>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ color: '#64748b', fontSize: '13px' }}>Estado Actual:</span>
-                  <span style={{
-                    background: '#fef3c7',
-                    color: '#92400e',
-                    padding: '3px 10px',
-                    borderRadius: '9999px',
-                    fontSize: '12px',
-                    fontWeight: 700
-                  }}>
+                  <span style={{ color: '#64748b' }}>Estado:</span>
+                  <span style={{ background: '#fef3c7', color: '#92400e', padding: '2px 8px', borderRadius: '9999px', fontSize: '11px', fontWeight: 700 }}>
                     PENDIENTE DE VALIDACIÓN
                   </span>
                 </div>
               </div>
 
-              <div style={{ display: 'flex', justifyContent: 'center', gap: '12px', flexWrap: 'wrap' }}>
-                <button
-                  type="button"
-                  onClick={handleResetForm}
-                  style={{
-                    padding: '12px 24px',
-                    background: '#2563eb',
-                    color: '#ffffff',
-                    border: 'none',
-                    borderRadius: '10px',
-                    fontWeight: 700,
-                    fontSize: '14px',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '8px',
-                    boxShadow: '0 4px 12px rgba(37, 99, 235, 0.25)'
-                  }}
-                >
-                  <RefreshCw size={16} /> Realizar Otra Inscripción
-                </button>
-              </div>
+              <button
+                type="button"
+                onClick={handleReset}
+                style={{
+                  padding: '10px 20px',
+                  background: '#2563eb',
+                  color: '#fff',
+                  border: 'none',
+                  borderRadius: '8px',
+                  fontSize: '13px',
+                  fontWeight: 700,
+                  cursor: 'pointer'
+                }}
+              >
+                Inscribir a Otra Persona
+              </button>
             </div>
-          ) : (
-            /* Formulario Principal */
-            <form onSubmit={handleSubmit}>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '20px', marginBottom: '24px' }}>
-                
-                {/* COLUMNA 1: Datos Personales + Carnet */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                  {/* SECCIÓN: DATOS PERSONALES */}
-                  <div style={{
-                    background: '#ffffff',
-                    borderRadius: '16px',
-                    padding: '24px',
-                    border: '1px solid #e2e8f0',
-                    boxShadow: '0 4px 16px rgba(0,0,0,0.03)'
-                  }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '18px' }}>
-                      <div style={{ background: '#dbeafe', color: '#1d4ed8', width: '32px', height: '32px', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        <User size={18} />
-                      </div>
-                      <div>
-                        <h2 style={{ margin: 0, fontSize: '17px', fontWeight: 700, color: '#0f172a' }}>
-                          1. Datos del Participante
-                        </h2>
-                        <p style={{ margin: 0, fontSize: '12px', color: '#64748b' }}>
-                          Ingrese sus datos tal como figuran en su documento
-                        </p>
-                      </div>
-                    </div>
-
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-                      <div>
-                        <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: '#334155', marginBottom: '6px' }}>
-                          Cédula de Identidad (CI) <span style={{ color: '#ef4444' }}>*</span>
-                        </label>
-                        <input
-                          type="text"
-                          required
-                          value={ci}
-                          onChange={(e) => setCi(e.target.value)}
-                          placeholder="Ej: 8934521 CH"
-                          style={{
-                            width: '100%',
-                            padding: '11px 14px',
-                            borderRadius: '10px',
-                            border: '1px solid #cbd5e1',
-                            fontSize: '14px',
-                            color: '#0f172a',
-                            outline: 'none',
-                            transition: 'border 0.2s',
-                            boxSizing: 'border-box'
-                          }}
-                        />
-                      </div>
-
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                        <div>
-                          <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: '#334155', marginBottom: '6px' }}>
-                            Nombres <span style={{ color: '#ef4444' }}>*</span>
-                          </label>
-                          <input
-                            type="text"
-                            required
-                            value={nombres}
-                            onChange={(e) => setNombres(e.target.value)}
-                            placeholder="Ej: Juan Carlos"
-                            style={{
-                              width: '100%',
-                              padding: '11px 14px',
-                              borderRadius: '10px',
-                              border: '1px solid #cbd5e1',
-                              fontSize: '14px',
-                              color: '#0f172a',
-                              outline: 'none',
-                              boxSizing: 'border-box'
-                            }}
-                          />
-                        </div>
-
-                        <div>
-                          <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: '#334155', marginBottom: '6px' }}>
-                            Apellidos <span style={{ color: '#ef4444' }}>*</span>
-                          </label>
-                          <input
-                            type="text"
-                            required
-                            value={apellidos}
-                            onChange={(e) => setApellidos(e.target.value)}
-                            placeholder="Ej: Perez Mamani"
-                            style={{
-                              width: '100%',
-                              padding: '11px 14px',
-                              borderRadius: '10px',
-                              border: '1px solid #cbd5e1',
-                              fontSize: '14px',
-                              color: '#0f172a',
-                              outline: 'none',
-                              boxSizing: 'border-box'
-                            }}
-                          />
-                        </div>
-                      </div>
-
-                      <div>
-                        <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: '#334155', marginBottom: '6px' }}>
-                          Celular / WhatsApp <span style={{ color: '#64748b', fontSize: '12px' }}>(Opcional para contacto)</span>
-                        </label>
-                        <div style={{ position: 'relative' }}>
-                          <Phone size={16} style={{ position: 'absolute', left: '14px', top: '13px', color: '#94a3b8' }} />
-                          <input
-                            type="tel"
-                            value={telefono}
-                            onChange={(e) => setTelefono(e.target.value)}
-                            placeholder="Ej: 71234567"
-                            style={{
-                              width: '100%',
-                              padding: '11px 14px 11px 38px',
-                              borderRadius: '10px',
-                              border: '1px solid #cbd5e1',
-                              fontSize: '14px',
-                              color: '#0f172a',
-                              outline: 'none',
-                              boxSizing: 'border-box'
-                            }}
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* SECCIÓN: CARNET DE IDENTIDAD (ANVERSO Y REVERSO O ESCANEADO) */}
-                  <div style={{
-                    background: '#ffffff',
-                    borderRadius: '16px',
-                    padding: '24px',
-                    border: '1px solid #e2e8f0',
-                    boxShadow: '0 4px 16px rgba(0,0,0,0.03)'
-                  }}>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                        <div style={{ background: '#fef3c7', color: '#d97706', width: '32px', height: '32px', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                          <CreditCard size={18} />
-                        </div>
-                        <div>
-                          <h2 style={{ margin: 0, fontSize: '17px', fontWeight: 700, color: '#0f172a' }}>
-                            2. Cédula de Identidad
-                          </h2>
-                          <p style={{ margin: 0, fontSize: '12px', color: '#64748b' }}>
-                            Suba fotos legibles o escaneado
-                          </p>
-                        </div>
-                      </div>
-
-                      {/* Selector de modo */}
-                      <div style={{ display: 'flex', background: '#f1f5f9', padding: '3px', borderRadius: '8px' }}>
-                        <button
-                          type="button"
-                          onClick={() => setCarnetMode('fotos')}
-                          style={{
-                            padding: '4px 10px',
-                            fontSize: '11px',
-                            fontWeight: 700,
-                            borderRadius: '6px',
-                            border: 'none',
-                            cursor: 'pointer',
-                            background: carnetMode === 'fotos' ? '#ffffff' : 'transparent',
-                            color: carnetMode === 'fotos' ? '#1e293b' : '#64748b',
-                            boxShadow: carnetMode === 'fotos' ? '0 2px 4px rgba(0,0,0,0.05)' : 'none'
-                          }}
-                        >
-                          Fotos (Anverso / Reverso)
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setCarnetMode('escaneado')}
-                          style={{
-                            padding: '4px 10px',
-                            fontSize: '11px',
-                            fontWeight: 700,
-                            borderRadius: '6px',
-                            border: 'none',
-                            cursor: 'pointer',
-                            background: carnetMode === 'escaneado' ? '#ffffff' : 'transparent',
-                            color: carnetMode === 'escaneado' ? '#1e293b' : '#64748b',
-                            boxShadow: carnetMode === 'escaneado' ? '0 2px 4px rgba(0,0,0,0.05)' : 'none'
-                          }}
-                        >
-                          Escaneado (PDF/Doc)
-                        </button>
-                      </div>
-                    </div>
-
-                    {carnetMode === 'fotos' ? (
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
-                        {/* Foto Anverso */}
-                        <div>
-                          <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#475569', marginBottom: '6px' }}>
-                            Carnet Anverso (Frente) <span style={{ color: '#ef4444' }}>*</span>
-                          </label>
-                          <input
-                            ref={anversoInputRef}
-                            type="file"
-                            accept="image/*"
-                            style={{ display: 'none' }}
-                            onChange={(e) => {
-                              const f = e.target.files?.[0];
-                              if (f) {
-                                setCarnetAnverso(f);
-                                fileToPreview(f, (url) => setCarnetAnversoPreview(url));
-                              }
-                            }}
-                          />
-                          <div
-                            onClick={() => anversoInputRef.current?.click()}
-                            style={{
-                              border: '2px dashed #cbd5e1',
-                              borderRadius: '12px',
-                              padding: '16px 10px',
-                              textAlign: 'center',
-                              cursor: 'pointer',
-                              background: carnetAnversoPreview ? '#f8fafc' : '#fcfcfd',
-                              transition: 'all 0.2s ease',
-                              minHeight: '130px',
-                              display: 'flex',
-                              flexDirection: 'column',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              gap: '6px'
-                            }}
-                          >
-                            {carnetAnversoPreview ? (
-                              <div style={{ position: 'relative', width: '100%', height: '110px' }}>
-                                <img
-                                  src={carnetAnversoPreview}
-                                  alt="Carnet Anverso"
-                                  style={{ width: '100%', height: '100%', objectFit: 'contain', borderRadius: '8px' }}
-                                />
-                                <span style={{
-                                  position: 'absolute',
-                                  bottom: '4px',
-                                  right: '4px',
-                                  background: 'rgba(0,0,0,0.6)',
-                                  color: '#fff',
-                                  fontSize: '10px',
-                                  padding: '2px 6px',
-                                  borderRadius: '4px'
-                                }}>
-                                  Cambiar
-                                </span>
-                              </div>
-                            ) : (
-                              <>
-                                <Camera size={26} color="#3b82f6" />
-                                <span style={{ fontSize: '12px', fontWeight: 600, color: '#334155' }}>Subir o Tomar Foto</span>
-                                <span style={{ fontSize: '11px', color: '#94a3b8' }}>Anverso / Frontal</span>
-                              </>
-                            )}
-                          </div>
-                        </div>
-
-                        {/* Foto Reverso */}
-                        <div>
-                          <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#475569', marginBottom: '6px' }}>
-                            Carnet Reverso (Atrás) <span style={{ color: '#ef4444' }}>*</span>
-                          </label>
-                          <input
-                            ref={reversoInputRef}
-                            type="file"
-                            accept="image/*"
-                            style={{ display: 'none' }}
-                            onChange={(e) => {
-                              const f = e.target.files?.[0];
-                              if (f) {
-                                setCarnetReverso(f);
-                                fileToPreview(f, (url) => setCarnetReversoPreview(url));
-                              }
-                            }}
-                          />
-                          <div
-                            onClick={() => reversoInputRef.current?.click()}
-                            style={{
-                              border: '2px dashed #cbd5e1',
-                              borderRadius: '12px',
-                              padding: '16px 10px',
-                              textAlign: 'center',
-                              cursor: 'pointer',
-                              background: carnetReversoPreview ? '#f8fafc' : '#fcfcfd',
-                              transition: 'all 0.2s ease',
-                              minHeight: '130px',
-                              display: 'flex',
-                              flexDirection: 'column',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              gap: '6px'
-                            }}
-                          >
-                            {carnetReversoPreview ? (
-                              <div style={{ position: 'relative', width: '100%', height: '110px' }}>
-                                <img
-                                  src={carnetReversoPreview}
-                                  alt="Carnet Reverso"
-                                  style={{ width: '100%', height: '100%', objectFit: 'contain', borderRadius: '8px' }}
-                                />
-                                <span style={{
-                                  position: 'absolute',
-                                  bottom: '4px',
-                                  right: '4px',
-                                  background: 'rgba(0,0,0,0.6)',
-                                  color: '#fff',
-                                  fontSize: '10px',
-                                  padding: '2px 6px',
-                                  borderRadius: '4px'
-                                }}>
-                                  Cambiar
-                                </span>
-                              </div>
-                            ) : (
-                              <>
-                                <Camera size={26} color="#3b82f6" />
-                                <span style={{ fontSize: '12px', fontWeight: 600, color: '#334155' }}>Subir o Tomar Foto</span>
-                                <span style={{ fontSize: '11px', color: '#94a3b8' }}>Reverso / Posterior</span>
-                              </>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    ) : (
-                      /* Carnet Escaneado único */
-                      <div>
-                        <input
-                          ref={escaneadoInputRef}
-                          type="file"
-                          accept="image/*,.pdf"
-                          style={{ display: 'none' }}
-                          onChange={(e) => {
-                            const f = e.target.files?.[0];
-                            if (f) {
-                              setCarnetEscaneado(f);
-                              setCarnetEscaneadoName(f.name);
-                            }
-                          }}
-                        />
-                        <div
-                          onClick={() => escaneadoInputRef.current?.click()}
-                          style={{
-                            border: '2px dashed #cbd5e1',
-                            borderRadius: '12px',
-                            padding: '24px 16px',
-                            textAlign: 'center',
-                            cursor: 'pointer',
-                            background: carnetEscaneadoName ? '#f0fdf4' : '#fcfcfd',
-                            display: 'flex',
-                            flexDirection: 'column',
-                            alignItems: 'center',
-                            gap: '8px'
-                          }}
-                        >
-                          {carnetEscaneadoName ? (
-                            <>
-                              <FileCheck2 size={36} color="#16a34a" />
-                              <span style={{ fontSize: '13px', fontWeight: 700, color: '#15803d' }}>
-                                {carnetEscaneadoName}
-                              </span>
-                              <span style={{ fontSize: '11px', color: '#64748b' }}>Clic para cambiar archivo</span>
-                            </>
-                          ) : (
-                            <>
-                              <UploadCloud size={32} color="#64748b" />
-                              <span style={{ fontSize: '13px', fontWeight: 600, color: '#334155' }}>
-                                Adjuntar carnet escaneado (PDF o Imagen)
-                              </span>
-                              <span style={{ fontSize: '11px', color: '#94a3b8' }}>
-                                Máximo 15 MB
-                              </span>
-                            </>
-                          )}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                {/* COLUMNA 2: PAGO QR BANCO BISA + SUBIDA DE COMPROBANTE */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                  <div style={{
-                    background: '#ffffff',
-                    borderRadius: '16px',
-                    padding: '24px',
-                    border: '1px solid #e2e8f0',
-                    boxShadow: '0 4px 16px rgba(0,0,0,0.03)',
-                    height: '100%',
-                    display: 'flex',
-                    flexDirection: 'column'
-                  }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
-                      <div style={{ background: '#dcfce7', color: '#15803d', width: '32px', height: '32px', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        <QrCode size={18} />
-                      </div>
-                      <div>
-                        <h2 style={{ margin: 0, fontSize: '17px', fontWeight: 700, color: '#0f172a' }}>
-                          3. Pago Oficial con QR
-                        </h2>
-                        <p style={{ margin: 0, fontSize: '12px', color: '#64748b' }}>
-                          Banco BISA • Monto oficial: Bs. 150.00
-                        </p>
-                      </div>
-                    </div>
-
-                    {/* Tarjeta del QR Banco BISA */}
-                    <div style={{
-                      background: 'linear-gradient(145deg, #f8fafc 0%, #edf2f7 100%)',
-                      borderRadius: '16px',
-                      padding: '16px',
-                      border: '1px solid #cbd5e1',
-                      textAlign: 'center',
-                      marginBottom: '18px',
-                      boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.02)'
-                    }}>
-                      <div style={{
-                        width: '200px',
-                        height: '200px',
-                        margin: '0 auto 12px auto',
-                        background: '#ffffff',
-                        padding: '8px',
-                        borderRadius: '12px',
-                        boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center'
-                      }}>
-                        <img
-                          src="/qr-pago-bisa.png"
-                          alt="QR Pago Banco BISA"
-                          style={{ width: '100%', height: '100%', objectFit: 'contain' }}
-                        />
-                      </div>
-
-                      {/* Detalles del Pago */}
-                      <div style={{ fontSize: '12px', color: '#334155', textAlign: 'left', background: '#ffffff', padding: '12px', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
-                          <span style={{ color: '#64748b' }}>Banco:</span>
-                          <span style={{ fontWeight: 700, color: '#0f172a' }}>Banco BISA</span>
-                        </div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
-                          <span style={{ color: '#64748b' }}>Cuenta:</span>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                            <span style={{ fontWeight: 700, color: '#0f172a' }}>4983644011</span>
-                            <button
-                              type="button"
-                              onClick={handleCopyAccount}
-                              style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#2563eb', padding: 0 }}
-                              title="Copiar cuenta"
-                            >
-                              <Copy size={13} />
-                            </button>
-                          </div>
-                        </div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
-                          <span style={{ color: '#64748b' }}>Beneficiario:</span>
-                          <span style={{ fontWeight: 700, color: '#0f172a' }}>TORREZ SANCHEZ MISAEL</span>
-                        </div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
-                          <span style={{ color: '#64748b' }}>Motivo:</span>
-                          <span style={{ fontWeight: 600, color: '#0f172a' }}>CURSOS DE FORMACIÓN CONTINUA</span>
-                        </div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px dashed #cbd5e1', paddingTop: '6px', marginTop: '6px' }}>
-                          <span style={{ fontWeight: 700, color: '#16a34a' }}>Monto a Transferir:</span>
-                          <span style={{ fontWeight: 800, fontSize: '15px', color: '#16a34a' }}>BOB 150.00</span>
-                        </div>
-                      </div>
-
-                      {/* Botones de acción del QR */}
-                      <div style={{ display: 'flex', justifyContent: 'center', gap: '8px', marginTop: '10px' }}>
-                        <a
-                          href="/qr-pago-bisa.png"
-                          download="QR_Pago_Banco_BISA_150Bs.png"
-                          style={{
-                            padding: '6px 12px',
-                            background: '#334155',
-                            color: '#ffffff',
-                            borderRadius: '8px',
-                            fontSize: '11px',
-                            fontWeight: 600,
-                            textDecoration: 'none',
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: '5px'
-                          }}
-                        >
-                          <Download size={13} /> Descargar QR
-                        </a>
-                      </div>
-                    </div>
-
-                    {/* Subida del Comprobante */}
-                    <div>
-                      <label style={{ display: 'block', fontSize: '13px', fontWeight: 700, color: '#1e293b', marginBottom: '6px' }}>
-                        Subir Comprobante de Pago <span style={{ color: '#ef4444' }}>*</span>
-                      </label>
-                      <input
-                        ref={comprobanteInputRef}
-                        type="file"
-                        accept="image/*,.pdf"
-                        style={{ display: 'none' }}
-                        onChange={(e) => {
-                          const f = e.target.files?.[0];
-                          if (f) {
-                            setComprobante(f);
-                            fileToPreview(f, (url) => setComprobantePreview(url));
-                          }
-                        }}
-                      />
-                      <div
-                        onClick={() => comprobanteInputRef.current?.click()}
-                        style={{
-                          border: '2px dashed #93c5fd',
-                          borderRadius: '12px',
-                          padding: '18px 12px',
-                          textAlign: 'center',
-                          cursor: 'pointer',
-                          background: comprobantePreview ? '#f0fdf4' : '#eff6ff',
-                          transition: 'all 0.2s ease',
-                          display: 'flex',
-                          flexDirection: 'column',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          gap: '6px',
-                          minHeight: '130px'
-                        }}
-                      >
-                        {comprobantePreview ? (
-                          <div style={{ position: 'relative', width: '100%', height: '110px' }}>
-                            <img
-                              src={comprobantePreview}
-                              alt="Comprobante"
-                              style={{ width: '100%', height: '100%', objectFit: 'contain', borderRadius: '8px' }}
-                            />
-                            <span style={{
-                              position: 'absolute',
-                              bottom: '4px',
-                              right: '4px',
-                              background: 'rgba(0,0,0,0.6)',
-                              color: '#fff',
-                              fontSize: '10px',
-                              padding: '2px 6px',
-                              borderRadius: '4px'
-                            }}>
-                              Cambiar Comprobante
-                            </span>
-                          </div>
-                        ) : (
-                          <>
-                            <UploadCloud size={28} color="#2563eb" />
-                            <span style={{ fontSize: '13px', fontWeight: 700, color: '#1d4ed8' }}>
-                              Adjuntar Comprobante o Captura
-                            </span>
-                            <span style={{ fontSize: '11px', color: '#64748b' }}>
-                              Captura de pantalla de la transferencia o foto del recibo
-                            </span>
-                          </>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Botón de Enviar Inscripción */}
-              <div style={{
-                background: '#ffffff',
-                borderRadius: '16px',
-                padding: '20px 24px',
-                border: '1px solid #e2e8f0',
-                boxShadow: '0 4px 16px rgba(0,0,0,0.03)',
-                display: 'flex',
-                flexWrap: 'wrap',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                gap: '16px'
-              }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', color: '#64748b', fontSize: '12px' }}>
-                  <ShieldCheck size={20} color="#16a34a" />
-                  <span>Sus datos y comprobantes se almacenarán de forma segura en el sistema oficial.</span>
-                </div>
-
-                <button
-                  type="submit"
-                  disabled={isSubmitting}
-                  style={{
-                    padding: '14px 32px',
-                    borderRadius: '12px',
-                    border: 'none',
-                    background: isSubmitting ? '#94a3b8' : 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)',
-                    color: '#ffffff',
-                    fontSize: '15px',
-                    fontWeight: 700,
-                    cursor: isSubmitting ? 'not-allowed' : 'pointer',
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '10px',
-                    boxShadow: isSubmitting ? 'none' : '0 8px 20px rgba(37, 99, 235, 0.35)',
-                    transition: 'all 0.2s ease'
-                  }}
-                >
-                  {isSubmitting ? (
-                    <>
-                      <RefreshCw size={18} className="animate-spin" /> Guardando Inscripción...
-                    </>
-                  ) : (
-                    <>
-                      Confirmar y Enviar Inscripción <ArrowRight size={18} />
-                    </>
-                  )}
-                </button>
-              </div>
-            </form>
           )}
-        </>
+        </div>
       )}
 
-      {/* PESTAÑA 2: CONSULTA DE ESTADO POR CI */}
+      {/* PESTAÑA CONSULTA DE ESTADO */}
       {activeTab === 'consulta' && (
         <div style={{
           background: '#ffffff',
@@ -1120,18 +1353,18 @@ export function InscripcionesPublicComponent() {
           boxShadow: '0 10px 25px rgba(0,0,0,0.05)',
           border: '1px solid #e2e8f0'
         }}>
-          <div style={{ maxWidth: '540px', margin: '0 auto', textAlign: 'center' }}>
-            <div style={{ width: '56px', height: '56px', background: '#dbeafe', color: '#1d4ed8', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px auto' }}>
-              <Search size={28} />
+          <div style={{ maxWidth: '520px', margin: '0 auto', textAlign: 'center' }}>
+            <div style={{ width: '50px', height: '50px', background: '#dbeafe', color: '#1d4ed8', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 12px auto' }}>
+              <Search size={24} />
             </div>
-            <h2 style={{ fontSize: '22px', fontWeight: 800, color: '#0f172a', margin: '0 0 6px 0' }}>
+            <h2 style={{ fontSize: '20px', fontWeight: 800, color: '#0f172a', margin: '0 0 6px 0' }}>
               Consultar Estado de Inscripción
             </h2>
-            <p style={{ color: '#64748b', fontSize: '14px', margin: '0 0 24px 0' }}>
-              Ingrese su número de Cédula de Identidad (CI) para verificar si su pago y documentos fueron aprobados.
+            <p style={{ color: '#64748b', fontSize: '13px', margin: '0 0 20px 0' }}>
+              Ingrese su Cédula de Identidad (CI) para verificar sus cursos y pagos.
             </p>
 
-            <form onSubmit={handleSearchCi} style={{ display: 'flex', gap: '8px', marginBottom: '28px' }}>
+            <form onSubmit={handleSearchCi} style={{ display: 'flex', gap: '8px', marginBottom: '24px' }}>
               <input
                 type="text"
                 required
@@ -1140,11 +1373,10 @@ export function InscripcionesPublicComponent() {
                 placeholder="Número de CI (Ej: 8934521)"
                 style={{
                   flex: 1,
-                  padding: '12px 16px',
+                  padding: '11px 14px',
                   borderRadius: '10px',
                   border: '1px solid #cbd5e1',
-                  fontSize: '15px',
-                  color: '#0f172a',
+                  fontSize: '14px',
                   outline: 'none'
                 }}
               />
@@ -1152,95 +1384,89 @@ export function InscripcionesPublicComponent() {
                 type="submit"
                 disabled={isSearching}
                 style={{
-                  padding: '12px 24px',
+                  padding: '11px 20px',
                   borderRadius: '10px',
                   border: 'none',
                   background: '#2563eb',
                   color: '#ffffff',
                   fontWeight: 700,
-                  fontSize: '14px',
-                  cursor: isSearching ? 'not-allowed' : 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px'
+                  fontSize: '13px',
+                  cursor: isSearching ? 'not-allowed' : 'pointer'
                 }}
               >
-                {isSearching ? <RefreshCw size={16} className="animate-spin" /> : <Search size={16} />} Consultar
+                {isSearching ? 'Buscando...' : 'Consultar'}
               </button>
             </form>
 
-            {/* Resultado de Búsqueda */}
             {searchPerformed && (
               <>
-                {searchResult ? (
-                  <div style={{
-                    background: '#f8fafc',
-                    borderRadius: '16px',
-                    padding: '24px',
-                    border: '1px solid #cbd5e1',
-                    textAlign: 'left'
-                  }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-                      <span style={{ fontSize: '12px', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>
-                        Registro Encontrado
-                      </span>
-                      <span style={{
-                        padding: '4px 12px',
-                        borderRadius: '9999px',
-                        fontSize: '12px',
-                        fontWeight: 700,
-                        background: searchResult.estado_pago === 'VERIFICADO' ? '#dcfce7' : searchResult.estado_pago === 'OBSERVADO' ? '#fee2e2' : '#fef3c7',
-                        color: searchResult.estado_pago === 'VERIFICADO' ? '#15803d' : searchResult.estado_pago === 'OBSERVADO' ? '#b91c1c' : '#92400e'
+                {searchResults.length > 0 ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', textAlign: 'left' }}>
+                    {searchResults.map((item, idx) => (
+                      <div key={idx} style={{
+                        background: '#f8fafc',
+                        borderRadius: '14px',
+                        padding: '16px',
+                        border: '1px solid #cbd5e1'
                       }}>
-                        {searchResult.estado_pago === 'VERIFICADO' ? '✓ PAGO VERIFICADO' : searchResult.estado_pago === 'OBSERVADO' ? '⚠ OBSERVADO' : '⏳ PAGO EN REVISIÓN'}
-                      </span>
-                    </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                          <strong style={{ color: '#0f172a', fontSize: '15px' }}>
+                            {item.curso?.nombre || 'Curso de Capacitación'}
+                          </strong>
+                          <span style={{
+                            padding: '3px 8px',
+                            borderRadius: '9999px',
+                            fontSize: '11px',
+                            fontWeight: 700,
+                            background: item.estado_pago === 'VERIFICADO' ? '#dcfce7' : item.estado_pago === 'OBSERVADO' ? '#fee2e2' : '#fef3c7',
+                            color: item.estado_pago === 'VERIFICADO' ? '#15803d' : item.estado_pago === 'OBSERVADO' ? '#b91c1c' : '#92400e'
+                          }}>
+                            {item.estado_pago || 'PENDIENTE'}
+                          </span>
+                        </div>
 
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '14px' }}>
-                      <div>
-                        <span style={{ fontSize: '11px', color: '#64748b', display: 'block' }}>Participante</span>
-                        <strong style={{ fontSize: '15px', color: '#0f172a' }}>{searchResult.nombres} {searchResult.apellidos}</strong>
-                      </div>
-                      <div>
-                        <span style={{ fontSize: '11px', color: '#64748b', display: 'block' }}>CI</span>
-                        <strong style={{ fontSize: '15px', color: '#0f172a' }}>{searchResult.ci}</strong>
-                      </div>
-                    </div>
+                        <p style={{ margin: '0 0 8px 0', fontSize: '13px', color: '#475569' }}>
+                          Participante: <strong>{item.nombres} {item.apellidos}</strong> (CI: {item.ci})
+                        </p>
 
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '14px' }}>
-                      <div>
-                        <span style={{ fontSize: '11px', color: '#64748b', display: 'block' }}>Monto</span>
-                        <strong style={{ fontSize: '14px', color: '#16a34a' }}>BOB 150.00</strong>
+                        {/* Botón WhatsApp si el curso tiene enlace */}
+                        {item.curso?.whatsapp_url && (
+                          <div style={{ marginTop: '10px' }}>
+                            <a
+                              href={item.curso.whatsapp_url}
+                              target="_blank"
+                              rel="noreferrer"
+                              style={{
+                                padding: '8px 14px',
+                                background: '#25d366',
+                                color: '#ffffff',
+                                borderRadius: '8px',
+                                fontSize: '12px',
+                                fontWeight: 700,
+                                textDecoration: 'none',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '6px'
+                              }}
+                            >
+                              <MessageCircle size={14} /> Entrar al Grupo de WhatsApp
+                            </a>
+                          </div>
+                        )}
                       </div>
-                      <div>
-                        <span style={{ fontSize: '11px', color: '#64748b', display: 'block' }}>Fecha de Registro</span>
-                        <span style={{ fontSize: '13px', color: '#334155' }}>
-                          {searchResult.created_at ? new Date(searchResult.created_at).toLocaleDateString() : 'Reciente'}
-                        </span>
-                      </div>
-                    </div>
-
-                    {searchResult.observaciones && (
-                      <div style={{ background: '#fffbeb', padding: '10px', borderRadius: '8px', border: '1px solid #fde68a', marginTop: '12px' }}>
-                        <span style={{ fontSize: '11px', fontWeight: 700, color: '#b45309', display: 'block' }}>Observaciones del Administrador:</span>
-                        <p style={{ margin: '4px 0 0 0', fontSize: '12px', color: '#78350f' }}>{searchResult.observaciones}</p>
-                      </div>
-                    )}
+                    ))}
                   </div>
                 ) : (
                   <div style={{
                     background: '#fff1f2',
-                    borderRadius: '16px',
-                    padding: '24px',
+                    borderRadius: '14px',
+                    padding: '20px',
                     border: '1px solid #fecdd3',
-                    textAlign: 'center',
                     color: '#9f1239'
                   }}>
-                    <BadgeAlert size={32} style={{ margin: '0 auto 8px auto', display: 'block' }} />
-                    <strong style={{ fontSize: '15px', display: 'block', marginBottom: '4px' }}>No se encontró ninguna inscripción</strong>
-                    <p style={{ margin: 0, fontSize: '13px' }}>
-                      El CI <strong>{searchCi}</strong> no figura en la lista de inscritos. Asegúrese de haber enviado el formulario de inscripción.
-                    </p>
+                    <BadgeAlert size={28} style={{ margin: '0 auto 6px auto', display: 'block' }} />
+                    <strong style={{ display: 'block', fontSize: '14px' }}>No se encontró inscripción</strong>
+                    <span style={{ fontSize: '12px' }}>El CI {searchCi} no tiene registros activos.</span>
                   </div>
                 )}
               </>

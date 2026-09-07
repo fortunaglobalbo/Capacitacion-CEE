@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useState, useEffect, useMemo } from 'react';
-import Image from 'next/image';
 import { supabase } from '@/lib/supabase/client';
 import Swal from 'sweetalert2';
 import {
@@ -11,28 +10,24 @@ import {
   Download,
   Plus,
   RefreshCw,
-  Eye,
   CheckCircle,
-  XCircle,
   Clock,
   ExternalLink,
   Trash2,
-  Edit2,
   FileText,
   Phone,
-  CreditCard,
-  Image as ImageIcon,
-  X,
-  AlertTriangle,
-  ZoomIn
+  BookOpen,
+  X
 } from 'lucide-react';
-import { Participante } from '@/types';
+import { Participante, CursoCapacitacion } from '@/types';
 
 export default function GestionParticipantes() {
   const [participantes, setParticipantes] = useState<Participante[]>([]);
+  const [cursos, setCursos] = useState<CursoCapacitacion[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterEstado, setFilterEstado] = useState<'TODOS' | 'PENDIENTE' | 'VERIFICADO' | 'OBSERVADO'>('TODOS');
+  const [filterCurso, setFilterCurso] = useState<string>('TODOS');
 
   // Modal para ver imagen/documento en grande
   const [modalImage, setModalImage] = useState<{ url: string; title: string } | null>(null);
@@ -43,21 +38,34 @@ export default function GestionParticipantes() {
   const [newNombres, setNewNombres] = useState('');
   const [newApellidos, setNewApellidos] = useState('');
   const [newTelefono, setNewTelefono] = useState('');
+  const [newCursoId, setNewCursoId] = useState('');
   const [isSaving, setIsSaving] = useState(false);
 
-  // Cargar participantes desde Supabase
-  const fetchParticipantes = async () => {
+  // Cargar datos desde Supabase
+  const fetchData = async () => {
     setLoading(true);
     try {
-      const { data, error } = await supabase
-        .from('participantes')
+      // 1. Cursos
+      const { data: cursosData } = await supabase
+        .from('cursos')
         .select('*')
+        .order('nombre', { ascending: true });
+
+      setCursos(cursosData || []);
+      if (cursosData && cursosData.length > 0 && !newCursoId) {
+        setNewCursoId(cursosData[0].id);
+      }
+
+      // 2. Participantes con datos del curso
+      const { data: partData, error } = await supabase
+        .from('participantes')
+        .select('*, curso:cursos(*)')
         .order('created_at', { ascending: false });
 
       if (error) {
         console.error('Error cargando participantes:', error);
       } else {
-        setParticipantes(data || []);
+        setParticipantes(partData || []);
       }
     } catch (err) {
       console.error(err);
@@ -67,10 +75,10 @@ export default function GestionParticipantes() {
   };
 
   useEffect(() => {
-    fetchParticipantes();
+    fetchData();
   }, []);
 
-  // Cambiar estado de pago rápidamente
+  // Cambiar estado de pago
   const handleUpdateEstado = async (ci: string, nuevoEstado: 'PENDIENTE' | 'VERIFICADO' | 'OBSERVADO') => {
     try {
       const { error } = await supabase
@@ -102,7 +110,7 @@ export default function GestionParticipantes() {
   const handleDeleteParticipante = async (ci: string, nombreCompleto: string) => {
     const result = await Swal.fire({
       title: '¿Eliminar participante?',
-      text: `Se eliminará el registro de ${nombreCompleto} (CI: ${ci}). Esta acción no se puede deshacer.`,
+      text: `Se eliminará el registro de ${nombreCompleto} (CI: ${ci}).`,
       icon: 'warning',
       showCancelButton: true,
       confirmButtonColor: '#dc2626',
@@ -143,16 +151,15 @@ export default function GestionParticipantes() {
         nombres: newNombres.trim().toUpperCase(),
         apellidos: newApellidos.trim().toUpperCase(),
         telefono: newTelefono.trim() || null,
+        curso_id: newCursoId || null,
         monto_pago: 150.00,
-        estado_pago: 'VERIFICADO', // Si se registra manualmente suele estar ya validado
+        estado_pago: 'VERIFICADO',
         created_at: new Date().toISOString()
       };
 
-      const { data, error } = await supabase
+      const { error } = await supabase
         .from('participantes')
-        .upsert(nuevo, { onConflict: 'ci' })
-        .select()
-        .single();
+        .upsert(nuevo, { onConflict: 'ci' });
 
       if (error) throw error;
 
@@ -161,7 +168,7 @@ export default function GestionParticipantes() {
       setNewNombres('');
       setNewApellidos('');
       setNewTelefono('');
-      fetchParticipantes();
+      fetchData();
 
       Swal.fire('Registrado', 'Participante añadido con éxito.', 'success');
     } catch (err: any) {
@@ -171,19 +178,20 @@ export default function GestionParticipantes() {
     }
   };
 
-  // Exportar a Excel (CSV con formato compatible con Excel)
+  // Exportar a Excel
   const handleExportExcel = () => {
     if (participantes.length === 0) {
       Swal.fire('Sin datos', 'No hay participantes para exportar.', 'info');
       return;
     }
 
-    const headers = ['NRO', 'CI', 'NOMBRES', 'APELLIDOS', 'TELEFONO', 'ESTADO_PAGO', 'MONTO_BS', 'TIENE_COMPROBANTE', 'TIENE_CARNET', 'FECHA_REGISTRO'];
+    const headers = ['NRO', 'CI', 'NOMBRES', 'APELLIDOS', 'CURSO', 'TELEFONO', 'ESTADO_PAGO', 'MONTO_BS', 'TIENE_COMPROBANTE', 'TIENE_CARNET', 'FECHA_REGISTRO'];
     const rows = filteredParticipantes.map((p, index) => [
       index + 1,
       `"${p.ci}"`,
       `"${p.nombres}"`,
       `"${p.apellidos}"`,
+      `"${p.curso?.nombre || p.curso_id || 'General'}"`,
       `"${p.telefono || ''}"`,
       `"${p.estado_pago || 'PENDIENTE'}"`,
       p.monto_pago || 150,
@@ -203,7 +211,7 @@ export default function GestionParticipantes() {
     document.body.removeChild(link);
   };
 
-  // Filtros de búsqueda
+  // Filtrado de participantes
   const filteredParticipantes = useMemo(() => {
     return participantes.filter(p => {
       const matchSearch =
@@ -213,57 +221,36 @@ export default function GestionParticipantes() {
         p.telefono?.toLowerCase().includes(searchTerm.toLowerCase());
 
       const matchEstado = filterEstado === 'TODOS' || p.estado_pago === filterEstado;
+      const matchCurso = filterCurso === 'TODOS' || p.curso_id === filterCurso;
 
-      return matchSearch && matchEstado;
+      return matchSearch && matchEstado && matchCurso;
     });
-  }, [participantes, searchTerm, filterEstado]);
+  }, [participantes, searchTerm, filterEstado, filterCurso]);
 
   // Estadísticas
   const stats = useMemo(() => {
-    const total = participantes.length;
-    const verificados = participantes.filter(p => p.estado_pago === 'VERIFICADO').length;
-    const pendientes = participantes.filter(p => p.estado_pago === 'PENDIENTE').length;
+    const total = filteredParticipantes.length;
+    const verificados = filteredParticipantes.filter(p => p.estado_pago === 'VERIFICADO').length;
+    const pendientes = filteredParticipantes.filter(p => p.estado_pago === 'PENDIENTE').length;
     const recaudado = verificados * 150;
     return { total, verificados, pendientes, recaudado };
-  }, [participantes]);
+  }, [filteredParticipantes]);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
       {/* Tarjetas de Métricas */}
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
-        gap: '16px'
-      }}>
-        <div style={{
-          background: '#ffffff',
-          borderRadius: '16px',
-          padding: '20px',
-          border: '1px solid #e2e8f0',
-          boxShadow: '0 2px 10px rgba(0,0,0,0.03)',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '16px'
-        }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '16px' }}>
+        <div style={{ background: '#ffffff', borderRadius: '16px', padding: '20px', border: '1px solid #e2e8f0', boxShadow: '0 2px 10px rgba(0,0,0,0.03)', display: 'flex', alignItems: 'center', gap: '16px' }}>
           <div style={{ width: '48px', height: '48px', borderRadius: '12px', background: '#eff6ff', color: '#2563eb', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <Users size={24} />
           </div>
           <div>
-            <span style={{ fontSize: '12px', fontWeight: 600, color: '#64748b', textTransform: 'uppercase' }}>Total Inscritos</span>
+            <span style={{ fontSize: '12px', fontWeight: 600, color: '#64748b', textTransform: 'uppercase' }}>Inscritos Mostrados</span>
             <h3 style={{ margin: 0, fontSize: '24px', fontWeight: 800, color: '#0f172a' }}>{stats.total}</h3>
           </div>
         </div>
 
-        <div style={{
-          background: '#ffffff',
-          borderRadius: '16px',
-          padding: '20px',
-          border: '1px solid #e2e8f0',
-          boxShadow: '0 2px 10px rgba(0,0,0,0.03)',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '16px'
-        }}>
+        <div style={{ background: '#ffffff', borderRadius: '16px', padding: '20px', border: '1px solid #e2e8f0', boxShadow: '0 2px 10px rgba(0,0,0,0.03)', display: 'flex', alignItems: 'center', gap: '16px' }}>
           <div style={{ width: '48px', height: '48px', borderRadius: '12px', background: '#f0fdf4', color: '#16a34a', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <CheckCircle size={24} />
           </div>
@@ -274,16 +261,7 @@ export default function GestionParticipantes() {
           </div>
         </div>
 
-        <div style={{
-          background: '#ffffff',
-          borderRadius: '16px',
-          padding: '20px',
-          border: '1px solid #e2e8f0',
-          boxShadow: '0 2px 10px rgba(0,0,0,0.03)',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '16px'
-        }}>
+        <div style={{ background: '#ffffff', borderRadius: '16px', padding: '20px', border: '1px solid #e2e8f0', boxShadow: '0 2px 10px rgba(0,0,0,0.03)', display: 'flex', alignItems: 'center', gap: '16px' }}>
           <div style={{ width: '48px', height: '48px', borderRadius: '12px', background: '#fef3c7', color: '#d97706', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <Clock size={24} />
           </div>
@@ -294,7 +272,7 @@ export default function GestionParticipantes() {
         </div>
       </div>
 
-      {/* Barra de Control y Filtros */}
+      {/* Barra de Control, Búsqueda y Filtros */}
       <div style={{
         background: '#ffffff',
         borderRadius: '16px',
@@ -308,26 +286,35 @@ export default function GestionParticipantes() {
         boxShadow: '0 2px 10px rgba(0,0,0,0.03)'
       }}>
         {/* Buscador */}
-        <div style={{ position: 'relative', flex: '1 1 280px', maxWidth: '400px' }}>
+        <div style={{ position: 'relative', flex: '1 1 240px', maxWidth: '340px' }}>
           <Search size={18} style={{ position: 'absolute', left: '12px', top: '11px', color: '#94a3b8' }} />
           <input
             type="text"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            placeholder="Buscar por CI, Nombres o Apellidos..."
-            style={{
-              width: '100%',
-              padding: '9px 12px 9px 38px',
-              borderRadius: '10px',
-              border: '1px solid #cbd5e1',
-              fontSize: '13px',
-              outline: 'none',
-              boxSizing: 'border-box'
-            }}
+            placeholder="Buscar por CI o Nombre..."
+            style={{ width: '100%', padding: '9px 12px 9px 38px', borderRadius: '10px', border: '1px solid #cbd5e1', fontSize: '13px', outline: 'none', boxSizing: 'border-box' }}
           />
         </div>
 
-        {/* Filtro por estado */}
+        {/* Filtro por Curso */}
+        {cursos.length > 0 && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <BookOpen size={16} color="#64748b" />
+            <select
+              value={filterCurso}
+              onChange={(e) => setFilterCurso(e.target.value)}
+              style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '12px', fontWeight: 600, color: '#334155', background: '#fff' }}
+            >
+              <option value="TODOS">Todos los Cursos ({cursos.length})</option>
+              {cursos.map(c => (
+                <option key={c.id} value={c.id}>{c.nombre}</option>
+              ))}
+            </select>
+          </div>
+        )}
+
+        {/* Filtro por Estado */}
         <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap' }}>
           {(['TODOS', 'PENDIENTE', 'VERIFICADO', 'OBSERVADO'] as const).map(estado => (
             <button
@@ -342,8 +329,7 @@ export default function GestionParticipantes() {
                 fontWeight: 600,
                 cursor: 'pointer',
                 background: filterEstado === estado ? '#2563eb' : '#f1f5f9',
-                color: filterEstado === estado ? '#ffffff' : '#475569',
-                transition: 'all 0.15s ease'
+                color: filterEstado === estado ? '#ffffff' : '#475569'
               }}
             >
               {estado === 'TODOS' ? 'Todos' : estado === 'PENDIENTE' ? 'Pendientes' : estado === 'VERIFICADO' ? 'Verificados' : 'Observados'}
@@ -355,18 +341,9 @@ export default function GestionParticipantes() {
         <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
           <button
             type="button"
-            onClick={fetchParticipantes}
+            onClick={fetchData}
             title="Recargar datos"
-            style={{
-              padding: '8px 12px',
-              background: '#f8fafc',
-              border: '1px solid #cbd5e1',
-              borderRadius: '8px',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              color: '#475569'
-            }}
+            style={{ padding: '8px 12px', background: '#f8fafc', border: '1px solid #cbd5e1', borderRadius: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center', color: '#475569' }}
           >
             <RefreshCw size={15} className={loading ? 'animate-spin' : ''} />
           </button>
@@ -374,19 +351,7 @@ export default function GestionParticipantes() {
           <button
             type="button"
             onClick={handleExportExcel}
-            style={{
-              padding: '8px 14px',
-              background: '#16a34a',
-              color: '#ffffff',
-              border: 'none',
-              borderRadius: '8px',
-              fontSize: '12px',
-              fontWeight: 700,
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px'
-            }}
+            style={{ padding: '8px 14px', background: '#16a34a', color: '#ffffff', border: 'none', borderRadius: '8px', fontSize: '12px', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
           >
             <Download size={15} /> Exportar Excel
           </button>
@@ -394,19 +359,7 @@ export default function GestionParticipantes() {
           <button
             type="button"
             onClick={() => setShowAddModal(true)}
-            style={{
-              padding: '8px 16px',
-              background: '#2563eb',
-              color: '#ffffff',
-              border: 'none',
-              borderRadius: '8px',
-              fontSize: '12px',
-              fontWeight: 700,
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px'
-            }}
+            style={{ padding: '8px 16px', background: '#2563eb', color: '#ffffff', border: 'none', borderRadius: '8px', fontSize: '12px', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
           >
             <Plus size={15} /> Nuevo Participante
           </button>
@@ -414,22 +367,17 @@ export default function GestionParticipantes() {
       </div>
 
       {/* Tabla de Participantes */}
-      <div style={{
-        background: '#ffffff',
-        borderRadius: '16px',
-        border: '1px solid #e2e8f0',
-        overflow: 'hidden',
-        boxShadow: '0 4px 16px rgba(0,0,0,0.03)'
-      }}>
+      <div style={{ background: '#ffffff', borderRadius: '16px', border: '1px solid #e2e8f0', overflow: 'hidden', boxShadow: '0 4px 16px rgba(0,0,0,0.03)' }}>
         <div style={{ overflowX: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '13px' }}>
             <thead>
               <tr style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0', color: '#64748b' }}>
                 <th style={{ padding: '14px 16px', fontWeight: 700 }}>CI</th>
-                <th style={{ padding: '14px 16px', fontWeight: 700 }}>Participante (Nombre y Apellido)</th>
-                <th style={{ padding: '14px 16px', fontWeight: 700 }}>Teléfono</th>
+                <th style={{ padding: '14px 16px', fontWeight: 700 }}>Participante</th>
+                <th style={{ padding: '14px 16px', fontWeight: 700 }}>Curso</th>
+                <th style={{ padding: '14px 16px', fontWeight: 700 }}>Teléfono / WhatsApp</th>
                 <th style={{ padding: '14px 16px', fontWeight: 700 }}>Carnet Escaneado / Fotos</th>
-                <th style={{ padding: '14px 16px', fontWeight: 700 }}>Comprobante Pago (Bs. 150)</th>
+                <th style={{ padding: '14px 16px', fontWeight: 700 }}>Comprobante Pago</th>
                 <th style={{ padding: '14px 16px', fontWeight: 700 }}>Estado de Pago</th>
                 <th style={{ padding: '14px 16px', fontWeight: 700, textAlign: 'center' }}>Acciones</th>
               </tr>
@@ -437,20 +385,20 @@ export default function GestionParticipantes() {
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={7} style={{ padding: '40px', textAlign: 'center', color: '#64748b' }}>
+                  <td colSpan={8} style={{ padding: '40px', textAlign: 'center', color: '#64748b' }}>
                     <RefreshCw size={24} className="animate-spin" style={{ margin: '0 auto 8px auto', display: 'block' }} />
                     Cargando lista de participantes...
                   </td>
                 </tr>
               ) : filteredParticipantes.length === 0 ? (
                 <tr>
-                  <td colSpan={7} style={{ padding: '40px', textAlign: 'center', color: '#94a3b8' }}>
-                    No se encontraron participantes registrados con los criterios seleccionados.
+                  <td colSpan={8} style={{ padding: '40px', textAlign: 'center', color: '#94a3b8' }}>
+                    No se encontraron participantes con los filtros seleccionados.
                   </td>
                 </tr>
               ) : (
                 filteredParticipantes.map((p) => (
-                  <tr key={p.ci} style={{ borderBottom: '1px solid #f1f5f9', transition: 'background 0.15s' }}>
+                  <tr key={p.ci + (p.curso_id || '')} style={{ borderBottom: '1px solid #f1f5f9' }}>
                     {/* CI */}
                     <td style={{ padding: '14px 16px', fontWeight: 700, color: '#0f172a' }}>
                       {p.ci}
@@ -460,7 +408,22 @@ export default function GestionParticipantes() {
                     <td style={{ padding: '14px 16px' }}>
                       <strong style={{ color: '#1e293b', display: 'block' }}>{p.nombres} {p.apellidos}</strong>
                       <span style={{ fontSize: '11px', color: '#94a3b8' }}>
-                        Reg: {p.created_at ? new Date(p.created_at).toLocaleDateString() : 'Manual'}
+                        {p.created_at ? new Date(p.created_at).toLocaleDateString() : 'Manual'}
+                      </span>
+                    </td>
+
+                    {/* Curso */}
+                    <td style={{ padding: '14px 16px' }}>
+                      <span style={{
+                        background: '#eff6ff',
+                        color: '#1d4ed8',
+                        padding: '3px 8px',
+                        borderRadius: '6px',
+                        fontSize: '11px',
+                        fontWeight: 700,
+                        display: 'inline-block'
+                      }}>
+                        {p.curso?.nombre || p.curso_id || 'Capacitación General'}
                       </span>
                     </td>
 
@@ -471,7 +434,7 @@ export default function GestionParticipantes() {
                           href={`https://wa.me/591${p.telefono.replace(/\D/g, '')}`}
                           target="_blank"
                           rel="noreferrer"
-                          style={{ color: '#2563eb', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '4px', fontWeight: 600 }}
+                          style={{ color: '#16a34a', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '4px', fontWeight: 700 }}
                         >
                           <Phone size={13} /> {p.telefono}
                         </a>
@@ -487,15 +450,7 @@ export default function GestionParticipantes() {
                           <button
                             type="button"
                             onClick={() => setModalImage({ url: p.carnet_anverso_url!, title: `Carnet Anverso - ${p.nombres} ${p.apellidos}` })}
-                            style={{
-                              border: '1px solid #cbd5e1',
-                              borderRadius: '6px',
-                              padding: '2px',
-                              cursor: 'pointer',
-                              background: '#fff',
-                              display: 'flex',
-                              alignItems: 'center'
-                            }}
+                            style={{ border: '1px solid #cbd5e1', borderRadius: '6px', padding: '2px', cursor: 'pointer', background: '#fff', display: 'flex' }}
                             title="Ver Anverso"
                           >
                             <img src={p.carnet_anverso_url} alt="Anverso" style={{ width: '32px', height: '24px', objectFit: 'cover', borderRadius: '4px' }} />
@@ -505,15 +460,7 @@ export default function GestionParticipantes() {
                           <button
                             type="button"
                             onClick={() => setModalImage({ url: p.carnet_reverso_url!, title: `Carnet Reverso - ${p.nombres} ${p.apellidos}` })}
-                            style={{
-                              border: '1px solid #cbd5e1',
-                              borderRadius: '6px',
-                              padding: '2px',
-                              cursor: 'pointer',
-                              background: '#fff',
-                              display: 'flex',
-                              alignItems: 'center'
-                            }}
+                            style={{ border: '1px solid #cbd5e1', borderRadius: '6px', padding: '2px', cursor: 'pointer', background: '#fff', display: 'flex' }}
                             title="Ver Reverso"
                           >
                             <img src={p.carnet_reverso_url} alt="Reverso" style={{ width: '32px', height: '24px', objectFit: 'cover', borderRadius: '4px' }} />
@@ -524,18 +471,7 @@ export default function GestionParticipantes() {
                             href={p.carnet_escaneado_url}
                             target="_blank"
                             rel="noreferrer"
-                            style={{
-                              padding: '4px 8px',
-                              background: '#f1f5f9',
-                              borderRadius: '6px',
-                              color: '#334155',
-                              fontSize: '11px',
-                              fontWeight: 600,
-                              textDecoration: 'none',
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: '4px'
-                            }}
+                            style={{ padding: '4px 8px', background: '#f1f5f9', borderRadius: '6px', color: '#334155', fontSize: '11px', fontWeight: 600, textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
                           >
                             <FileText size={12} /> Doc
                           </a>
@@ -552,25 +488,17 @@ export default function GestionParticipantes() {
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                           <button
                             type="button"
-                            onClick={() => setModalImage({ url: p.comprobante_url!, title: `Comprobante de Pago - ${p.nombres} ${p.apellidos} (CI: ${p.ci})` })}
-                            style={{
-                              border: '1px solid #cbd5e1',
-                              borderRadius: '6px',
-                              padding: '2px',
-                              cursor: 'pointer',
-                              background: '#fff',
-                              display: 'flex',
-                              alignItems: 'center'
-                            }}
+                            onClick={() => setModalImage({ url: p.comprobante_url!, title: `Comprobante - ${p.nombres} ${p.apellidos} (CI: ${p.ci})` })}
+                            style={{ border: '1px solid #cbd5e1', borderRadius: '6px', padding: '2px', cursor: 'pointer', background: '#fff', display: 'flex' }}
                             title="Ver Comprobante"
                           >
                             <img src={p.comprobante_url} alt="Comprobante" style={{ width: '36px', height: '36px', objectFit: 'cover', borderRadius: '4px' }} />
                           </button>
                           <div>
-                            <span style={{ fontSize: '11px', fontWeight: 700, color: '#16a34a', display: 'block' }}>Bs. 150</span>
+                            <span style={{ fontSize: '11px', fontWeight: 700, color: '#16a34a', display: 'block' }}>Bs. {p.monto_pago || 150}</span>
                             <button
                               type="button"
-                              onClick={() => setModalImage({ url: p.comprobante_url!, title: `Comprobante de Pago - ${p.nombres} ${p.apellidos}` })}
+                              onClick={() => setModalImage({ url: p.comprobante_url!, title: `Comprobante - ${p.nombres} ${p.apellidos}` })}
                               style={{ background: 'none', border: 'none', padding: 0, color: '#2563eb', fontSize: '11px', cursor: 'pointer', textDecoration: 'underline' }}
                             >
                               Ver recibo
@@ -611,14 +539,7 @@ export default function GestionParticipantes() {
                         type="button"
                         onClick={() => handleDeleteParticipante(p.ci, `${p.nombres} ${p.apellidos}`)}
                         title="Eliminar participante"
-                        style={{
-                          background: '#fee2e2',
-                          color: '#dc2626',
-                          border: 'none',
-                          borderRadius: '6px',
-                          padding: '6px',
-                          cursor: 'pointer'
-                        }}
+                        style={{ background: '#fee2e2', color: '#dc2626', border: 'none', borderRadius: '6px', padding: '6px', cursor: 'pointer' }}
                       >
                         <Trash2 size={15} />
                       </button>
@@ -654,59 +575,27 @@ export default function GestionParticipantes() {
             maxHeight: '90vh',
             display: 'flex',
             flexDirection: 'column',
-            overflow: 'hidden',
-            boxShadow: '0 20px 40px rgba(0,0,0,0.5)'
+            overflow: 'hidden'
           }}>
-            <div style={{
-              padding: '16px 20px',
-              borderBottom: '1px solid #e2e8f0',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              background: '#0f172a',
-              color: '#ffffff'
-            }}>
+            <div style={{ padding: '16px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#0f172a', color: '#ffffff' }}>
               <span style={{ fontWeight: 700, fontSize: '14px' }}>{modalImage.title}</span>
               <button
                 type="button"
                 onClick={() => setModalImage(null)}
-                style={{ background: 'none', border: 'none', color: '#ffffff', cursor: 'pointer', padding: '4px' }}
+                style={{ background: 'none', border: 'none', color: '#ffffff', cursor: 'pointer' }}
               >
                 <X size={20} />
               </button>
             </div>
-            <div style={{
-              padding: '16px',
-              background: '#1e293b',
-              flex: 1,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              overflow: 'auto'
-            }}>
-              <img
-                src={modalImage.url}
-                alt="Vista previa"
-                style={{ maxWidth: '100%', maxHeight: '70vh', objectFit: 'contain', borderRadius: '8px' }}
-              />
+            <div style={{ padding: '16px', background: '#1e293b', flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'auto' }}>
+              <img src={modalImage.url} alt="Vista previa" style={{ maxWidth: '100%', maxHeight: '70vh', objectFit: 'contain', borderRadius: '8px' }} />
             </div>
             <div style={{ padding: '12px 20px', display: 'flex', justifyContent: 'flex-end', gap: '8px', background: '#f8fafc' }}>
               <a
                 href={modalImage.url}
                 target="_blank"
                 rel="noreferrer"
-                style={{
-                  padding: '8px 16px',
-                  background: '#2563eb',
-                  color: '#fff',
-                  borderRadius: '8px',
-                  fontSize: '12px',
-                  fontWeight: 600,
-                  textDecoration: 'none',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '6px'
-                }}
+                style={{ padding: '8px 16px', background: '#2563eb', color: '#fff', borderRadius: '8px', fontSize: '12px', fontWeight: 600, textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
               >
                 <ExternalLink size={14} /> Abrir Original
               </a>
@@ -737,14 +626,7 @@ export default function GestionParticipantes() {
           zIndex: 9999,
           padding: '20px'
         }}>
-          <div style={{
-            background: '#ffffff',
-            borderRadius: '16px',
-            maxWidth: '500px',
-            width: '100%',
-            overflow: 'hidden',
-            boxShadow: '0 20px 40px rgba(0,0,0,0.2)'
-          }}>
+          <div style={{ background: '#ffffff', borderRadius: '16px', maxWidth: '500px', width: '100%', overflow: 'hidden' }}>
             <div style={{ padding: '16px 20px', borderBottom: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: '#0f172a' }}>Registrar Nuevo Participante</h3>
               <button
@@ -757,6 +639,23 @@ export default function GestionParticipantes() {
             </div>
 
             <form onSubmit={handleAddParticipante} style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+              {cursos.length > 0 && (
+                <div>
+                  <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#334155', marginBottom: '4px' }}>
+                    Curso *
+                  </label>
+                  <select
+                    value={newCursoId}
+                    onChange={(e) => setNewCursoId(e.target.value)}
+                    style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '13px', boxSizing: 'border-box', background: '#fff' }}
+                  >
+                    {cursos.map(c => (
+                      <option key={c.id} value={c.id}>{c.nombre}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
               <div>
                 <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#334155', marginBottom: '4px' }}>
                   Cédula de Identidad (CI) *

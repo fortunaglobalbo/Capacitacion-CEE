@@ -1,9 +1,22 @@
+export interface CursoCapacitacion {
+  id: string; // Slug o código identificador del curso (ej: 'operador-pc')
+  nombre: string;
+  descripcion?: string;
+  costo?: number;
+  whatsapp_url?: string; // Enlace al grupo de WhatsApp del curso
+  activo?: boolean;
+  created_at?: string;
+  updated_at?: string;
+}
+
 export interface Participante {
   id?: string;
   ci: string;
   nombres: string;
   apellidos: string;
   telefono?: string;
+  curso_id?: string;
+  curso?: CursoCapacitacion;
   carnet_anverso_url?: string;
   carnet_reverso_url?: string;
   carnet_escaneado_url?: string;
@@ -20,6 +33,7 @@ export interface ParticipanteFormData {
   nombres: string;
   apellidos: string;
   telefono: string;
+  curso_id: string;
   carnet_anverso_file?: File | null;
   carnet_reverso_file?: File | null;
   carnet_escaneado_file?: File | null;

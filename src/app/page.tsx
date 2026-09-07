@@ -5,21 +5,19 @@ import Image from 'next/image';
 import Link from 'next/link';
 import {
   Users,
-  Sparkles,
+  BookOpen,
   QrCode,
   ExternalLink,
   Copy,
-  Share2,
-  FileCheck,
-  Shield,
-  HelpCircle,
-  Award
+  MessageCircle,
+  Sparkles
 } from 'lucide-react';
 import Swal from 'sweetalert2';
 import GestionParticipantes from '@/components/participantes/GestionParticipantes';
+import GestionCursos from '@/components/cursos/GestionCursos';
 
 export default function HomePage() {
-  const [activeTab, setActiveTab] = useState<'participantes' | 'informacion'>('participantes');
+  const [activeTab, setActiveTab] = useState<'participantes' | 'cursos' | 'informacion'>('participantes');
 
   const handleCopyPublicLink = () => {
     const url = `${window.location.origin}/inscripciones`;
@@ -67,8 +65,8 @@ export default function HomePage() {
               background: '#ffffff',
               borderRadius: '50%',
               padding: '3px',
-              width: '56px',
-              height: '56px',
+              width: '54px',
+              height: '54px',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -78,8 +76,8 @@ export default function HomePage() {
               <Image
                 src="/logo-cee.png"
                 alt="Logo CEE Martha Mendoza"
-                width={50}
-                height={50}
+                width={48}
+                height={48}
                 style={{ objectFit: 'contain' }}
                 priority
               />
@@ -106,13 +104,13 @@ export default function HomePage() {
 
           {/* Navegación y Botones de Acción */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
-            {/* Pestañas */}
+            {/* Pestañas Principales */}
             <div style={{ display: 'flex', background: 'rgba(255,255,255,0.1)', padding: '4px', borderRadius: '10px' }}>
               <button
                 type="button"
                 onClick={() => setActiveTab('participantes')}
                 style={{
-                  padding: '8px 16px',
+                  padding: '8px 14px',
                   borderRadius: '8px',
                   border: 'none',
                   cursor: 'pointer',
@@ -128,11 +126,33 @@ export default function HomePage() {
               >
                 <Users size={16} /> Participantes
               </button>
+
+              <button
+                type="button"
+                onClick={() => setActiveTab('cursos')}
+                style={{
+                  padding: '8px 14px',
+                  borderRadius: '8px',
+                  border: 'none',
+                  cursor: 'pointer',
+                  fontWeight: 700,
+                  fontSize: '13px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  transition: 'all 0.2s',
+                  background: activeTab === 'cursos' ? '#3b82f6' : 'transparent',
+                  color: '#ffffff'
+                }}
+              >
+                <BookOpen size={16} /> Cursos y WhatsApp
+              </button>
+
               <button
                 type="button"
                 onClick={() => setActiveTab('informacion')}
                 style={{
-                  padding: '8px 16px',
+                  padding: '8px 14px',
                   borderRadius: '8px',
                   border: 'none',
                   cursor: 'pointer',
@@ -174,7 +194,7 @@ export default function HomePage() {
               <button
                 type="button"
                 onClick={handleCopyPublicLink}
-                title="Copiar link de inscripción"
+                title="Copiar enlace general de inscripción"
                 style={{
                   padding: '8px 12px',
                   borderRadius: '8px',
@@ -196,25 +216,32 @@ export default function HomePage() {
 
       {/* CONTENIDO PRINCIPAL */}
       <main style={{ maxWidth: '1280px', margin: '0 auto', padding: '24px 20px' }}>
+        {/* PESTAÑA 1: PARTICIPANTES */}
         {activeTab === 'participantes' && (
           <section>
-            <div style={{ marginBottom: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
-              <div>
-                <h2 style={{ fontSize: '20px', fontWeight: 800, margin: 0, color: '#0f172a' }}>
-                  Gestión de Participantes
-                </h2>
-                <p style={{ margin: '2px 0 0 0', fontSize: '13px', color: '#64748b' }}>
-                  Listado oficial de inscritos, verificación de carnets escaneados y comprobantes de pago.
-                </p>
-              </div>
+            <div style={{ marginBottom: '16px' }}>
+              <h2 style={{ fontSize: '20px', fontWeight: 800, margin: 0, color: '#0f172a' }}>
+                Gestión de Participantes
+              </h2>
+              <p style={{ margin: '2px 0 0 0', fontSize: '13px', color: '#64748b' }}>
+                Listado oficial de inscritos, verificación de carnets escaneados y comprobantes de pago.
+              </p>
             </div>
 
             <GestionParticipantes />
           </section>
         )}
 
+        {/* PESTAÑA 2: CURSOS Y WHATSAPP */}
+        {activeTab === 'cursos' && (
+          <section>
+            <GestionCursos />
+          </section>
+        )}
+
+        {/* PESTAÑA 3: DATOS DE PAGO / QR */}
         {activeTab === 'informacion' && (
-          <section style={{ maxWidth: '780px', margin: '0 auto' }}>
+          <section style={{ maxWidth: '760px', margin: '0 auto' }}>
             <div style={{
               background: '#ffffff',
               borderRadius: '20px',
@@ -224,8 +251,8 @@ export default function HomePage() {
             }}>
               <div style={{ textAlign: 'center', marginBottom: '24px' }}>
                 <div style={{
-                  width: '90px',
-                  height: '90px',
+                  width: '84px',
+                  height: '84px',
                   borderRadius: '50%',
                   background: '#f8fafc',
                   border: '1px solid #e2e8f0',
@@ -237,16 +264,16 @@ export default function HomePage() {
                   <Image
                     src="/logo-cee.png"
                     alt="Logo CEA Martha Mendoza"
-                    width={80}
-                    height={80}
+                    width={74}
+                    height={74}
                     style={{ objectFit: 'contain' }}
                   />
                 </div>
                 <h2 style={{ fontSize: '22px', fontWeight: 800, margin: '0 0 6px 0', color: '#0f172a' }}>
-                  Datos Oficiales del Curso de Capacitación
+                  Datos Oficiales de Pago por QR
                 </h2>
                 <p style={{ fontSize: '14px', color: '#64748b', margin: 0 }}>
-                  Centro de Educación Alternativa "Martha Mendoza" - Sucre, Bolivia
+                  Banco BISA • Cuenta Institucional para Matrículas
                 </p>
               </div>
 
@@ -267,8 +294,8 @@ export default function HomePage() {
                   padding: '12px',
                   borderRadius: '12px',
                   boxShadow: '0 6px 16px rgba(0,0,0,0.08)',
-                  width: '220px',
-                  height: '220px',
+                  width: '210px',
+                  height: '210px',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center'
@@ -298,7 +325,7 @@ export default function HomePage() {
                     <strong style={{ color: '#0f172a' }}>CURSOS DE FORMACIÓN CONTINUA</strong>
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: '6px' }}>
-                    <span style={{ color: '#16a34a', fontWeight: 700 }}>Monto de Matrícula:</span>
+                    <span style={{ color: '#16a34a', fontWeight: 700 }}>Monto Base Matrícula:</span>
                     <strong style={{ color: '#16a34a', fontSize: '15px' }}>BOB 150.00</strong>
                   </div>
                 </div>
@@ -313,7 +340,7 @@ export default function HomePage() {
                     display: 'inline-flex',
                     alignItems: 'center',
                     gap: '8px',
-                    padding: '12px 28px',
+                    padding: '12px 26px',
                     background: '#2563eb',
                     color: '#ffffff',
                     borderRadius: '10px',
