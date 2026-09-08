@@ -401,7 +401,7 @@ function InscripcionesPublicContent() {
             }}>
               C.E.A. Martha Mendoza • Sucre - Bolivia
             </span>
-            <h1 style={{ margin: 0, fontSize: '24px', fontWeight: 800, letterSpacing: '-0.5px' }}>
+            <h1 style={{ margin: 0, fontSize: '24px', fontWeight: 800, letterSpacing: '-0.5px', color: '#f1f5f9' }}>
               Curso de Capacitación
             </h1>
             <p style={{ margin: '2px 0 0 0', color: '#cbd5e1', fontSize: '13px' }}>
@@ -596,7 +596,7 @@ function InscripcionesPublicContent() {
               {/* Selector de Curso si hay varios y no vino fijado */}
               {cursos.length > 0 && (
                 <div style={{ marginBottom: '16px' }}>
-                  <label style={{ display: 'block', fontSize: '13px', fontWeight: 700, color: '#1e293b', marginBottom: '6px' }}>
+                  <label style={{ display: 'block', fontSize: '13px', fontWeight: 700, color: '#475569', marginBottom: '6px' }}>
                     Seleccione el Curso de Capacitación *
                   </label>
                   <select

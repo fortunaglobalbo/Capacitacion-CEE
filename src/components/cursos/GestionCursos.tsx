@@ -209,7 +209,7 @@ export default function GestionCursos() {
         boxShadow: '0 2px 10px rgba(0,0,0,0.03)'
       }}>
         <div>
-          <h2 style={{ fontSize: '18px', fontWeight: 800, margin: 0, color: '#0f172a' }}>
+          <h2 style={{ fontSize: '18px', fontWeight: 800, margin: 0, color: '#475569' }}>
             Catálogo de Cursos de Capacitación
           </h2>
           <p style={{ margin: '2px 0 0 0', fontSize: '13px', color: '#64748b' }}>

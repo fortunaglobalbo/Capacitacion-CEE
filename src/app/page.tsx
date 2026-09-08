@@ -96,7 +96,7 @@ export default function HomePage() {
                   C.E.A. MARTHA MENDOZA • SUCRE
                 </span>
               </div>
-              <h1 style={{ margin: '2px 0 0 0', fontSize: '22px', fontWeight: 800, letterSpacing: '-0.5px' }}>
+              <h1 style={{ margin: '2px 0 0 0', fontSize: '22px', fontWeight: 800, letterSpacing: '-0.5px', color: '#f1f5f9' }}>
                 Curso de Capacitación
               </h1>
             </div>
