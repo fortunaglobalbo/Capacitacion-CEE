@@ -18,7 +18,10 @@ import {
   Trash2,
   ExternalLink,
   Layers,
-  Info
+  Info,
+  RefreshCw,
+  RotateCcw,
+  Edit3
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase/client';
 import { uploadAndSaveAfiche, saveAficheLocallySafe, getAficheLocallySafe } from '@/lib/storage/afichesStorage';
@@ -210,12 +213,20 @@ export default function PromptIAModal({ curso, onClose, onAficheSaved }: PromptI
   // Tab activo: 'prompt' | 'plantilla_qr' | 'afiche'
   const [activeTab, setActiveTab] = useState<'prompt' | 'plantilla_qr' | 'afiche'>('prompt');
 
-  // Datos editables para el prompt
+  // Datos editables para el prompt (con persistencia automática por curso)
   const [nombreCurso, setNombreCurso] = useState(() => {
+    if (typeof window !== 'undefined' && curso.id) {
+      const saved = localStorage.getItem(`prompt_nombre_${curso.id}`);
+      if (saved) return saved;
+    }
     return curso.nombre || curso.ciclo_nombre || 'TRABAJO EN ALTURA Y ESPACIOS CONFINADOS EN ELECTRICIDAD';
   });
 
   const [aprenderas, setAprenderas] = useState(() => {
+    if (typeof window !== 'undefined' && curso.id) {
+      const saved = localStorage.getItem(`temario_curso_${curso.id}`) || localStorage.getItem(`prompt_aprenderas_${curso.id}`);
+      if (saved) return saved;
+    }
     if (curso.temario) return curso.temario;
     if (curso.tema1 || curso.tema2) {
       const temas = [curso.tema1, curso.tema2, curso.tema3, curso.tema4].filter(Boolean);
@@ -227,8 +238,38 @@ export default function PromptIAModal({ curso, onClose, onAficheSaved }: PromptI
     return 'Prevención de caídas a distinto nivel, uso de arnés dieléctrico, medición de atmósferas con multigasómetro, llenado de Permisos de Trabajo (PTS) y técnicas de rescate.';
   });
 
-  const [costo, setCosto] = useState<number>(curso.costo || 150);
-  const [modalidad, setModalidad] = useState<string>('Teórico - Práctico');
+  const [costo, setCosto] = useState<number>(() => {
+    if (typeof window !== 'undefined' && curso.id) {
+      const saved = localStorage.getItem(`prompt_costo_${curso.id}`);
+      if (saved) return Number(saved) || curso.costo || 150;
+    }
+    return curso.costo || 150;
+  });
+
+  const [modalidad, setModalidad] = useState<string>(() => {
+    if (typeof window !== 'undefined' && curso.id) {
+      const saved = localStorage.getItem(`prompt_modalidad_${curso.id}`);
+      if (saved) return saved;
+    }
+    return 'Teórico - Práctico';
+  });
+
+  // Prompt personalizado directamente por el usuario
+  const [customPromptText, setCustomPromptText] = useState<string>(() => {
+    if (typeof window !== 'undefined' && curso.id) {
+      return localStorage.getItem(`prompt_custom_text_${curso.id}`) || '';
+    }
+    return '';
+  });
+
+  const [hasCustomPromptEdit, setHasCustomPromptEdit] = useState<boolean>(() => {
+    if (typeof window !== 'undefined' && curso.id) {
+      return !!localStorage.getItem(`prompt_custom_text_${curso.id}`);
+    }
+    return false;
+  });
+
+  const [saveStatus, setSaveStatus] = useState<'saved' | 'saving'>('saved');
 
   // Estados de las 4 Plantillas Oficiales (Persistentes globalmente en localStorage para todos los cursos)
   const [plantillas, setPlantillas] = useState<PlantillaSlot[]>(() => {
@@ -361,14 +402,59 @@ export default function PromptIAModal({ curso, onClose, onAficheSaved }: PromptI
     return () => { active = false; };
   }, []);
 
-  // Generar el texto exacto del prompt
-  const getPromptText = () => {
-    return `Actúa como un experto en diseño y marketing educativo. Tu objetivo es crear afiches publicitarios para cursos de capacitación, asegurando que se incluya **exactamente** la siguiente información obligatoria:
+  // AUTO-GUARDADO AUTOMÁTICO DE CUALQUIER CAMBIO EN EL PROMPT Y EN LOS DATOS
+  useEffect(() => {
+    if (typeof window === 'undefined' || !curso.id) return;
 
-### Información Obligatoria (No omitir ni modificar):
-1. **Título Principal:** "CURSOS DE CAPACITACIÓN".
-2. **Título del Curso:** ${nombreCurso}
-3. **Sección "Aprenderás":** ${aprenderas}
+    setSaveStatus('saving');
+    const timer = setTimeout(async () => {
+      try {
+        localStorage.setItem(`prompt_nombre_${curso.id}`, nombreCurso);
+        localStorage.setItem(`temario_curso_${curso.id}`, aprenderas);
+        localStorage.setItem(`prompt_aprenderas_${curso.id}`, aprenderas);
+        localStorage.setItem(`prompt_costo_${curso.id}`, String(costo));
+        localStorage.setItem(`prompt_modalidad_${curso.id}`, modalidad);
+
+        if (hasCustomPromptEdit && customPromptText) {
+          localStorage.setItem(`prompt_custom_text_${curso.id}`, customPromptText);
+        } else {
+          localStorage.removeItem(`prompt_custom_text_${curso.id}`);
+        }
+
+        // Sincronizar silenciosamente temario en Supabase
+        try {
+          await supabase
+            .from('cursos')
+            .update({
+              temario: aprenderas,
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', curso.id);
+        } catch {
+          // Fallback silencioso si no migró columna temario
+        }
+
+        setSaveStatus('saved');
+      } catch (err) {
+        console.warn('Error en auto-guardado:', err);
+        setSaveStatus('saved');
+      }
+    }, 450);
+
+    return () => clearTimeout(timer);
+  }, [nombreCurso, aprenderas, costo, modalidad, customPromptText, hasCustomPromptEdit, curso.id]);
+
+  // Generar el texto oficial del prompt con base estricta en la plantilla de arriba
+  const buildDefaultPromptText = () => {
+    return `Actúa como un experto en diseño y marketing publicitario educativo. Tu objetivo es crear afiches publicitarios para cursos de capacitación.
+
+⚠️ REGLA PRINCIPAL Y OBLIGATORIA DE DISEÑO (BASE EN LA PLANTILLA DE ARRIBA):
+Debes basarte estrictamente en la PLANTILLA DE REFERENCIA proporcionada arriba (la imagen del afiche modelo adjunta). Mantén con total fidelidad el mismo estilo gráfico, la composición visual, los marcos, la paleta de colores institucional, la tipografía corporativa, los logotipos y la distribución espacial de los elementos de dicha plantilla, pero actualizando y reemplazando todo el contenido con ESTA NUEVA INFORMACIÓN:
+
+### Información Obligatoria de este Curso (No omitir ni modificar):
+1. **Título Principal:** "CURSOS DE CAPACITACIÓN"
+2. **Título del Curso (Nuevo):** ${nombreCurso}
+3. **Sección "Aprenderás" (Nuevo contenido detallado):** ${aprenderas}
 4. **Inversión:** "Inversión: Bs. ${costo}"
 5. **Modalidad:** "${modalidad}"
 6. **Código QR Oficial de Inscripción:** Ubicado en la esquina inferior izquierda del afiche (sobre un recuadro blanco cuadrado de alto contraste). Se debe incluir **obligatoriamente el Código QR oficial provisto sin sufrir ninguna modificación**, respetando estrictamente su matriz original, orientación, proporción de aspecto cuadrada 1:1, contraste nítido y módulos de escaneo para que sea 100% escaneable desde cualquier smartphone.
@@ -379,29 +465,58 @@ export default function PromptIAModal({ curso, onClose, onAficheSaved }: PromptI
    ✅ Procesos de Licitación en SICOES (Cumplimiento de personal clave).
    ✅ Trámites de Ascenso y Registro SYSO ante el Ministerio de Trabajo, Empleo y Previsión Social (MTEPS).
 
-### Proceso de Generación de Imagen:
-Usa la herramienta de generación de imágenes para crear un afiche con estas especificaciones:
-- **Elemento Central**: Un **personaje hiperrealista** (un instructor profesional o un estudiante con apariencia de experto) que transmita confianza y éxito.
-- **Estilo**: Fotografía publicitaria de alta gama, limpia y corporativa.
+### Proceso de Generación de Imagen basándote en la Plantilla de Referencia:
+Usa la herramienta de generación de imágenes tomando la plantilla de arriba como guía estética estricta:
+- **Referencia Visual Directa**: Toma la imagen de la plantilla oficial adjunta arriba como base obligatoria. Conserva sus fondos, márgenes, proporciones, estilo y sobriedad corporativa.
+- **Elemento Central**: Un **personaje hiperrealista** (un instructor profesional o un especialista con indumentaria acorde a la temática del curso) que transmita liderazgo, confianza y éxito.
+- **Estilo**: Fotografía publicitaria de alta gama, limpia, moderna y corporativa idéntica a la plantilla de referencia.
 - **Formato**: Vertical (4:5).
-- **Colores**: Azul Marino, Amarillo, Blanco y Gris.
+- **Colores**: Mantener los colores de la plantilla seleccionada arriba (Azul Marino, Amarillo, Blanco y Gris).
 - **Preservación del Código QR Oficial (Estricto)**: El Código QR oficial adjunto debe insertarse en la esquina inferior izquierda tal cual es, **SIN sufrir modificaciones**, sin inclinaciones en perspectiva 3D, sin curvaturas, sin filtros ni desenfoques que rompan los patrones de lectura de las esquinas del QR. Debe mantenerse plano, cuadrado, limpio y de máxima resolución.
-- **Integración**: Coloca el logo de C.E.A. Martha Mendoza arriba a la derecha. El Código QR oficial en la esquina inferior izquierda, y el Banner de Certificación abajo a la derecha. El texto obligatorio y el código QR deben ser nítidos y legibles, integrados armoniosamente en el diseño publicitario.
+- **Integración Armónica**: Coloca el logo de C.E.A. Martha Mendoza arriba a la derecha. El Código QR oficial en la esquina inferior izquierda, y el Banner de Certificación abajo a la derecha. Todo el texto de la nueva información debe ser nítido, de alta legibilidad e integrado armónicamente siguiendo la plantilla de arriba.
 
-### Instrucciones:
-1. Charla con el usuario para obtener el nombre del curso y los puntos clave de "Aprenderás".
-2. Genera un copy publicitario para redes sociales con emojis.
+### Instrucciones para la IA:
+1. Toma la imagen de la plantilla oficial adjunta arriba como base estructural y visual obligatoria.
+2. Reemplaza los textos anteriores con esta nueva información (${nombreCurso} y ${aprenderas}).
 3. Inserta el Código QR oficial respetando intacto su formato, nitidez y funcionalidad de escaneo sin ninguna modificación.
-4. Crea la imagen hiperrealista final integrando todos los elementos mencionados.
+4. Genera un copy publicitario atractivo para WhatsApp y redes sociales con emojis.
+5. Produce el afiche publicitario final de alta definición listo para impresión y difusión digital.
 
-EJEMPLO:
-CURSO 1 : ${nombreCurso}
-
-Aprenderás: ${aprenderas}
+EJEMPLO DE LA NUEVA INFORMACIÓN APLICADA:
+CURSO: ${nombreCurso}
+APRENDERÁS: ${aprenderas}
+INVERSIÓN: Bs. ${costo}
+MODALIDAD: ${modalidad}
 
 ---
 📱 CÓDIGO QR OFICIAL: Inserta la imagen adjunta del QR en la esquina inferior izquierda sin ninguna modificación de formato o perspectiva.
 🔗 Enlace oficial codificado en el QR: ${enlaceInscripcion}`;
+  };
+
+  // Obtener el texto del prompt actual (personalizado o generado)
+  const getPromptText = () => {
+    if (hasCustomPromptEdit && customPromptText) {
+      return customPromptText;
+    }
+    return buildDefaultPromptText();
+  };
+
+  // Restablecer el prompt a la plantilla automática
+  const handleResetPromptToDefault = () => {
+    setHasCustomPromptEdit(false);
+    setCustomPromptText('');
+    if (typeof window !== 'undefined' && curso.id) {
+      localStorage.removeItem(`prompt_custom_text_${curso.id}`);
+    }
+    Swal.fire({
+      icon: 'info',
+      title: 'Prompt Sincronizado',
+      text: 'El prompt se ha restablecido a la plantilla oficial con los datos actuales del curso.',
+      toast: true,
+      position: 'top-end',
+      showConfirmButton: false,
+      timer: 2200
+    });
   };
 
   // Helper para mostrar feedback copiado
@@ -1173,9 +1288,20 @@ Aprenderás: ${aprenderas}
                   borderRadius: '14px',
                   border: '1px solid #e2e8f0'
                 }}>
-                  <h3 style={{ margin: '0 0 12px 0', fontSize: '14px', fontWeight: 800, color: '#1e293b', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <Info size={16} color="#2563eb" /> Datos del Curso para el Prompt
-                  </h3>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px', flexWrap: 'wrap', gap: '8px' }}>
+                    <h3 style={{ margin: 0, fontSize: '14px', fontWeight: 800, color: '#1e293b', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <Info size={16} color="#2563eb" /> Datos del Curso para el Prompt
+                    </h3>
+                    {saveStatus === 'saving' ? (
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', color: '#d97706', background: '#fef3c7', padding: '3px 9px', borderRadius: '999px', fontSize: '11px', fontWeight: 700 }}>
+                        <RefreshCw size={11} className="animate-spin" /> Guardando cambios...
+                      </span>
+                    ) : (
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', color: '#15803d', background: '#dcfce7', padding: '3px 9px', borderRadius: '999px', fontSize: '11px', fontWeight: 700 }}>
+                        <CheckCircle2 size={12} color="#16a34a" /> Guardado automático activo
+                      </span>
+                    )}
+                  </div>
 
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                     <div>
@@ -1452,45 +1578,105 @@ Aprenderás: ${aprenderas}
                 </div>
               </div>
 
-              {/* Columna Derecha: Vista Previa del Prompt Completo */}
+              {/* Columna Derecha: Editor y Vista Previa del Prompt Completo */}
               <div style={{ display: 'flex', flexDirection: 'column' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                  <label style={{ fontSize: '13px', fontWeight: 800, color: '#334155' }}>
-                    Formato del Prompt Generado (Listo para IA):
-                  </label>
-                  <button
-                    type="button"
-                    onClick={handleCopyPromptOnly}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '4px',
-                      background: 'none',
-                      border: 'none',
-                      color: '#2563eb',
-                      fontWeight: 700,
-                      fontSize: '12px',
-                      cursor: 'pointer'
-                    }}
-                  >
-                    <Copy size={14} /> Copiar Prompt
-                  </button>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px', flexWrap: 'wrap', gap: '8px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <label style={{ fontSize: '13px', fontWeight: 800, color: '#334155', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <Edit3 size={15} color="#2563eb" /> Prompt Oficial para IA (Editable):
+                    </label>
+                    {hasCustomPromptEdit && (
+                      <span style={{ fontSize: '11px', background: '#eff6ff', color: '#2563eb', padding: '2px 8px', borderRadius: '6px', fontWeight: 700 }}>
+                        Editado
+                      </span>
+                    )}
+                  </div>
+
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    {hasCustomPromptEdit && (
+                      <button
+                        type="button"
+                        onClick={handleResetPromptToDefault}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '4px',
+                          background: '#f1f5f9',
+                          border: '1px solid #cbd5e1',
+                          color: '#475569',
+                          padding: '4px 8px',
+                          borderRadius: '6px',
+                          fontWeight: 700,
+                          fontSize: '11px',
+                          cursor: 'pointer'
+                        }}
+                        title="Restablecer el texto a la plantilla automática con los datos del curso"
+                      >
+                        <RotateCcw size={12} /> Restablecer automático
+                      </button>
+                    )}
+
+                    <button
+                      type="button"
+                      onClick={handleCopyPromptOnly}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '4px',
+                        background: '#eff6ff',
+                        border: '1px solid #bfdbfe',
+                        color: '#1d4ed8',
+                        padding: '4px 10px',
+                        borderRadius: '6px',
+                        fontWeight: 700,
+                        fontSize: '12px',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      <Copy size={14} /> Copiar Prompt
+                    </button>
+                  </div>
                 </div>
 
-                <div style={{
-                  background: '#0f172a',
-                  color: '#e2e8f0',
-                  padding: '16px',
-                  borderRadius: '12px',
-                  fontSize: '12px',
-                  lineHeight: '1.6',
-                  fontFamily: 'monospace',
-                  whiteSpace: 'pre-wrap',
-                  overflowY: 'auto',
-                  maxHeight: '460px',
-                  border: '1px solid #334155'
-                }}>
-                  {getPromptText()}
+                <div style={{ position: 'relative' }}>
+                  <textarea
+                    value={getPromptText()}
+                    onChange={(e) => {
+                      setCustomPromptText(e.target.value);
+                      setHasCustomPromptEdit(true);
+                    }}
+                    placeholder="Escribe o edita el prompt aquí. Cualquier cambio se guardará automáticamente..."
+                    style={{
+                      width: '100%',
+                      height: '460px',
+                      background: '#0f172a',
+                      color: '#e2e8f0',
+                      padding: '16px',
+                      borderRadius: '12px',
+                      fontSize: '12px',
+                      lineHeight: '1.6',
+                      fontFamily: 'Consolas, Monaco, "Courier New", monospace',
+                      whiteSpace: 'pre-wrap',
+                      boxSizing: 'border-box',
+                      resize: 'vertical',
+                      outline: 'none',
+                      border: hasCustomPromptEdit ? '1.5px solid #3b82f6' : '1px solid #334155',
+                      boxShadow: hasCustomPromptEdit ? '0 0 0 3px rgba(59, 130, 246, 0.15)' : 'none'
+                    }}
+                  />
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    marginTop: '6px',
+                    fontSize: '11px',
+                    color: '#64748b'
+                  }}>
+                    <span>💡 Puedes editar este texto directamente o cambiar los datos a la izquierda.</span>
+                    <span style={{ color: saveStatus === 'saving' ? '#d97706' : '#15803d', fontWeight: 700 }}>
+                      {saveStatus === 'saving' ? '💾 Guardando...' : '✅ Cambios guardados automáticamente'}
+                    </span>
+                  </div>
                 </div>
               </div>
 
