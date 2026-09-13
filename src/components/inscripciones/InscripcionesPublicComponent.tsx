@@ -503,23 +503,17 @@ function InscripcionesPublicContent() {
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
           <div style={{
-            background: '#ffffff',
-            borderRadius: '50%',
-            padding: '3px',
-            width: '70px',
-            height: '70px',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            boxShadow: '0 4px 10px rgba(0,0,0,0.2)',
             flexShrink: 0
           }}>
             <Image
               src="/logo-cee.png"
               alt="Logo Martha Mendoza"
-              width={64}
-              height={64}
-              style={{ objectFit: 'contain' }}
+              width={68}
+              height={68}
+              style={{ objectFit: 'contain', filter: 'drop-shadow(0 4px 12px rgba(0,0,0,0.35))' }}
               priority
             />
           </div>

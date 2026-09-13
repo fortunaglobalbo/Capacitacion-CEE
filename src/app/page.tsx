@@ -62,23 +62,17 @@ export default function HomePage() {
           {/* Logo y Título */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
             <div style={{
-              background: '#ffffff',
-              borderRadius: '50%',
-              padding: '3px',
-              width: '54px',
-              height: '54px',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              boxShadow: '0 2px 8px rgba(0,0,0,0.2)',
               flexShrink: 0
             }}>
               <Image
                 src="/logo-cee.png"
                 alt="Logo CEE Martha Mendoza"
-                width={48}
-                height={48}
-                style={{ objectFit: 'contain' }}
+                width={56}
+                height={56}
+                style={{ objectFit: 'contain', filter: 'drop-shadow(0 4px 10px rgba(0,0,0,0.35))' }}
                 priority
               />
             </div>
@@ -251,11 +245,6 @@ export default function HomePage() {
             }}>
               <div style={{ textAlign: 'center', marginBottom: '24px' }}>
                 <div style={{
-                  width: '84px',
-                  height: '84px',
-                  borderRadius: '50%',
-                  background: '#f8fafc',
-                  border: '1px solid #e2e8f0',
                   margin: '0 auto 12px auto',
                   display: 'flex',
                   alignItems: 'center',
@@ -264,9 +253,9 @@ export default function HomePage() {
                   <Image
                     src="/logo-cee.png"
                     alt="Logo CEA Martha Mendoza"
-                    width={74}
-                    height={74}
-                    style={{ objectFit: 'contain' }}
+                    width={80}
+                    height={80}
+                    style={{ objectFit: 'contain', filter: 'drop-shadow(0 2px 8px rgba(0,0,0,0.12))' }}
                   />
                 </div>
                 <h2 style={{ fontSize: '22px', fontWeight: 800, margin: '0 0 6px 0', color: '#0f172a' }}>
