@@ -5,6 +5,8 @@ export interface CursoCapacitacion {
   costo?: number;
   whatsapp_url?: string; // Enlace al grupo de WhatsApp del curso
   activo?: boolean;
+  afiche_url?: string;
+  temario?: string;
   created_at?: string;
   updated_at?: string;
 }

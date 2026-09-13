@@ -13,9 +13,10 @@ import {
   Edit3, Trash2, Users, Wrench, Globe, FileText, BookOpen,
   ClipboardEdit, ToggleLeft, Link2, MapPin, ExternalLink,
   Phone, Eye, CheckCircle2, Copy, MessageCircle,
-  Calendar, Clock, Save, User
+  Calendar, Clock, Save, User, Sparkles
 } from 'lucide-react';
 import InscripcionOnlineModal from '@/components/cursos/InscripcionOnlineModal';
+import PromptIAModal from '@/components/cursos/PromptIAModal';
 
 const getInitialFechaInicio = (c: Curso | null): string => {
   if (!c) return '';
@@ -94,6 +95,7 @@ export default function NotaCard({
   const [noteColor, setNoteColor] = useState(curso.grupo_color || '#2f80ed');
   const [prev, setPrev] = useState(curso.prev || '');
   const [showInscripcionModal, setShowInscripcionModal] = useState(false);
+  const [showPromptModal, setShowPromptModal] = useState(false);
   const [resolvedMapSrc, setResolvedMapSrc] = useState('');
 
   // Estados locales para la edición directa del curso
@@ -1430,6 +1432,31 @@ export default function NotaCard({
               {/* Grid 2x2 de Acciones Secundarias */}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
                 
+                {/* Botón PROMPT IA */}
+                <button
+                  type="button"
+                  style={{
+                    gridColumn: '1 / -1',
+                    padding: '10px 14px',
+                    fontSize: '0.88rem',
+                    fontWeight: 800,
+                    borderRadius: '8px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '6px',
+                    background: 'linear-gradient(135deg, #0d3b66 0%, #1e3a8a 100%)',
+                    color: '#ffffff',
+                    border: 'none',
+                    cursor: 'pointer',
+                    boxShadow: '0 2px 8px rgba(13, 59, 102, 0.25)'
+                  }}
+                  onClick={() => setShowPromptModal(true)}
+                  title="Abrir generador oficial de afiche con IA, código QR y plantilla"
+                >
+                  <Sparkles size={16} color="#fbbf24" /> PROMPT IA (Afiche & QR)
+                </button>
+
                 {/* Inscripción Online */}
                 <button
                   type="button"
@@ -1529,6 +1556,24 @@ export default function NotaCard({
         <InscripcionOnlineModal
           curso={curso}
           onClose={() => setShowInscripcionModal(false)}
+        />
+      )}
+
+      {showPromptModal && (
+        <PromptIAModal
+          curso={{
+            id: curso.id,
+            nombre: curso.ciclo_nombre || `Curso ${curso.id}`,
+            costo: curso.costo || 150,
+            tema1: curso.tema1,
+            tema2: curso.tema2,
+            tema3: curso.tema3,
+            tema4: curso.tema4,
+            whatsapp_url: curso.link_inscripcion_externo,
+            afiche_url: curso.afiche_url
+          }}
+          onClose={() => setShowPromptModal(false)}
+          onAficheSaved={(url) => onUpdate({ afiche_url: url })}
         />
       )}
     </div>

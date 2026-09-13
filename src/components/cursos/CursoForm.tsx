@@ -3,8 +3,9 @@
 import { useState, useEffect } from 'react';
 import { Curso, CursoFormData, Tecnico, Facilitador, CicloFormativo } from '@/types';
 import { GROUP_COLORS } from '@/lib/utils/colors';
-import { Save, X, BookOpen } from 'lucide-react';
+import { Save, X, BookOpen, Sparkles } from 'lucide-react';
 import { distritosData } from '@/lib/utils/distritos';
+import PromptIAModal from '@/components/cursos/PromptIAModal';
 
 interface CursoFormProps {
   curso: Curso | null;
@@ -91,6 +92,7 @@ export default function CursoForm({
 
   const [areaFormativa, setAreaFormativa] = useState('');
   const [isSuggestedId, setIsSuggestedId] = useState(false);
+  const [showPromptModal, setShowPromptModal] = useState(false);
 
   useEffect(() => {
     let suggestedId = '';
@@ -167,10 +169,33 @@ export default function CursoForm({
 
   return (
     <div className="curso-form">
-      <h3 className="curso-form-title">
-        <BookOpen size={18} style={{ color: 'var(--primary-500)' }} />
-        {isEdit ? `Modificar Curso (ID: ${curso.id})` : 'Registrar Nuevo Curso'}
-      </h3>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
+        <h3 className="curso-form-title" style={{ margin: 0 }}>
+          <BookOpen size={18} style={{ color: 'var(--primary-500)' }} />
+          {isEdit ? `Modificar Curso (ID: ${curso.id})` : 'Registrar Nuevo Curso'}
+        </h3>
+        <button
+          type="button"
+          onClick={() => setShowPromptModal(true)}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px',
+            background: 'linear-gradient(135deg, #0d3b66 0%, #1e40af 100%)',
+            color: '#ffffff',
+            border: 'none',
+            borderRadius: '8px',
+            padding: '7px 12px',
+            fontSize: '12px',
+            fontWeight: 800,
+            cursor: 'pointer',
+            boxShadow: '0 2px 8px rgba(13, 59, 102, 0.25)'
+          }}
+          title="Abrir generador oficial de afiche con IA, código QR y plantilla"
+        >
+          <Sparkles size={14} color="#fbbf24" /> PROMPT IA
+        </button>
+      </div>
 
       <div className="form-field">
         <label>
@@ -423,6 +448,24 @@ export default function CursoForm({
           <Save size={14} /> {isEdit ? 'Actualizar curso' : 'Crear curso'}
         </button>
       </div>
+      {showPromptModal && (
+        <PromptIAModal
+          curso={{
+            id: form.id || 'nuevo-curso',
+            nombre: filteredCiclos.find(c => c.id === form.ciclo_id)?.nombre || form.id || 'Curso de Capacitación',
+            costo: form.costo,
+            whatsapp_url: form.link_inscripcion_externo,
+            tema1: filteredCiclos.find(c => c.id === form.ciclo_id)?.tema1,
+            tema2: filteredCiclos.find(c => c.id === form.ciclo_id)?.tema2,
+            tema3: filteredCiclos.find(c => c.id === form.ciclo_id)?.tema3,
+            tema4: filteredCiclos.find(c => c.id === form.ciclo_id)?.tema4
+          }}
+          onClose={() => setShowPromptModal(false)}
+          onAficheSaved={(url) => {
+            setForm(prev => ({ ...prev, link_inscripcion_externo: prev.link_inscripcion_externo }));
+          }}
+        />
+      )}
     </div>
   );
 }

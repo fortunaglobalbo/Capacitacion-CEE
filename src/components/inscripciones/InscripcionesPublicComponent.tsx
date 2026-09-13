@@ -26,7 +26,9 @@ import {
   ExternalLink,
   Sparkles,
   Check,
-  BadgeAlert
+  BadgeAlert,
+  Eye,
+  X
 } from 'lucide-react';
 import { Participante, CursoCapacitacion } from '@/types';
 
@@ -50,6 +52,7 @@ function InscripcionesPublicContent() {
   const [selectedCursoId, setSelectedCursoId] = useState<string>(urlCursoId);
   const [selectedCurso, setSelectedCurso] = useState<CursoCapacitacion | null>(null);
   const [loadingCursos, setLoadingCursos] = useState(true);
+  const [showAficheModal, setShowAficheModal] = useState(false);
 
   // Paso actual del Wizard: 1 = Datos, 2 = Carnet, 3 = Pago QR
   const [currentStep, setCurrentStep] = useState<1 | 2 | 3 | 4>(1);
@@ -484,7 +487,34 @@ function InscripcionesPublicContent() {
                 </div>
               </div>
 
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                {(() => {
+                  const aficheUrl = selectedCurso.afiche_url || (typeof window !== 'undefined' ? localStorage.getItem(`afiche_curso_${selectedCurso.id}`) : '');
+                  if (!aficheUrl) return null;
+                  return (
+                    <button
+                      type="button"
+                      onClick={() => setShowAficheModal(true)}
+                      style={{
+                        padding: '6px 12px',
+                        background: 'linear-gradient(135deg, #0d3b66 0%, #1e40af 100%)',
+                        color: '#ffffff',
+                        border: 'none',
+                        borderRadius: '8px',
+                        fontSize: '12px',
+                        fontWeight: 700,
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '5px',
+                        boxShadow: '0 2px 6px rgba(13, 59, 102, 0.25)'
+                      }}
+                    >
+                      <Eye size={13} color="#fbbf24" /> Ver Afiche Oficial
+                    </button>
+                  );
+                })()}
+
                 <span style={{ background: '#dcfce7', color: '#15803d', padding: '4px 10px', borderRadius: '8px', fontSize: '13px', fontWeight: 800 }}>
                   Matrícula: Bs. {selectedCurso.costo || 150}
                 </span>
@@ -1471,6 +1501,68 @@ function InscripcionesPublicContent() {
                 )}
               </>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* MODAL VISUALIZADOR DE AFICHE OFICIAL */}
+      {showAficheModal && selectedCurso && (
+        <div
+          onClick={() => setShowAficheModal(false)}
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'rgba(15, 23, 42, 0.85)',
+            backdropFilter: 'blur(6px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 99999,
+            padding: '16px'
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: '#0a192f',
+              borderRadius: '16px',
+              padding: '16px',
+              maxWidth: '650px',
+              width: '100%',
+              maxHeight: '90vh',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5)',
+              position: 'relative'
+            }}
+          >
+            <div style={{ width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', color: '#ffffff' }}>
+              <div>
+                <h3 style={{ margin: 0, fontSize: '15px', fontWeight: 800, color: '#f8fafc' }}>
+                  Afiche Oficial del Curso
+                </h3>
+                <span style={{ fontSize: '12px', color: '#93c5fd' }}>{selectedCurso.nombre}</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowAficheModal(false)}
+                style={{ background: 'rgba(255,255,255,0.15)', border: 'none', color: '#ffffff', borderRadius: '50%', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div style={{ borderRadius: '10px', overflow: 'hidden', maxHeight: '72vh', width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#000' }}>
+              <img
+                src={selectedCurso.afiche_url || (typeof window !== 'undefined' ? localStorage.getItem(`afiche_curso_${selectedCurso.id}`) : '') || ''}
+                alt={`Afiche de ${selectedCurso.nombre}`}
+                style={{ maxHeight: '72vh', maxWidth: '100%', objectFit: 'contain' }}
+              />
+            </div>
           </div>
         </div>
       )}
