@@ -68,7 +68,9 @@ export default function PromptIAModal({ curso, onClose, onAficheSaved }: PromptI
 
   // Estados de QR y Plantilla
   const [qrDataUrl, setQrDataUrl] = useState<string>('');
+  const [plantillaUrl, setPlantillaUrl] = useState<string>('/plantilla_afiche.jpg');
   const [plantillaBase64, setPlantillaBase64] = useState<string>('');
+  const [isUpdatingPlantilla, setIsUpdatingPlantilla] = useState<boolean>(false);
   const [enlaceInscripcion, setEnlaceInscripcion] = useState<string>('');
 
   // Estados de carga de afiche
@@ -86,6 +88,7 @@ export default function PromptIAModal({ curso, onClose, onAficheSaved }: PromptI
   const [copiedType, setCopiedType] = useState<string | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const plantillaFileInputRef = useRef<HTMLInputElement>(null);
 
   // Inicializar URL pública y QR
   useEffect(() => {
@@ -111,7 +114,7 @@ export default function PromptIAModal({ curso, onClose, onAficheSaved }: PromptI
       // Cargar plantilla oficial y convertir a base64 para copiado inteligente
       const img = new Image();
       img.crossOrigin = 'anonymous';
-      img.src = '/plantilla_afiche.jpg';
+      img.src = plantillaUrl;
       img.onload = () => {
         const canvas = document.createElement('canvas');
         canvas.width = img.naturalWidth || 800;
@@ -128,7 +131,7 @@ export default function PromptIAModal({ curso, onClose, onAficheSaved }: PromptI
         }
       };
     }
-  }, [curso.id]);
+  }, [curso.id, plantillaUrl]);
 
   // Generar el texto exacto del prompt
   const getPromptText = () => {
@@ -247,7 +250,7 @@ Aprenderás: ${aprenderas}
   // 3. Copiar Imagen de Plantilla como PNG
   const handleCopyPlantillaImage = async () => {
     try {
-      const response = await fetch('/plantilla_afiche.jpg');
+      const response = await fetch(plantillaUrl);
       const blob = await response.blob();
       // Convertir a PNG para compatibilidad con ClipboardItem
       const img = new Image();
@@ -298,7 +301,7 @@ Aprenderás: ${aprenderas}
   const handleCopyBothImages = async () => {
     try {
       // 1. Cargar imagen de la plantilla
-      const plantillaResp = await fetch('/plantilla_afiche.jpg');
+      const plantillaResp = await fetch(plantillaUrl);
       const plantillaBlob = await plantillaResp.blob();
       const imgPlantilla = new Image();
       imgPlantilla.src = URL.createObjectURL(plantillaBlob);
@@ -387,7 +390,7 @@ Aprenderás: ${aprenderas}
         const htmlContent = `
           <div>
             <h3>Plantilla de Referencia Visual:</h3>
-            <p><img src="${plantillaBase64 || '/plantilla_afiche.jpg'}" alt="Plantilla" style="max-width: 450px;" /></p>
+            <p><img src="${plantillaBase64 || plantillaUrl}" alt="Plantilla" style="max-width: 450px;" /></p>
             <h3>Código QR Oficial (Sin Modificaciones):</h3>
             <p><img src="${qrDataUrl}" alt="Código QR" style="max-width: 300px;" /></p>
             <p><strong>Enlace directo:</strong> <a href="${enlaceInscripcion}">${enlaceInscripcion}</a></p>
@@ -406,7 +409,7 @@ Aprenderás: ${aprenderas}
                 'text/plain': textBlob
               })
             ]);
-            showCopiedFeedback('both_images', '¡Ambas imágenes (Plantilla + QR) copiadas! Pégalas directamente en Gemini o tu editor con Ctrl+V.');
+            showCopiedFeedback('both_images', '¡Ambas imágenes (Plantilla + QR) copiadas! Pégalas directamente en Gemini con Ctrl+V.');
             return;
           } catch {
             await navigator.clipboard.write([
@@ -437,9 +440,51 @@ Aprenderás: ${aprenderas}
 
   const handleDownloadPlantilla = () => {
     const a = document.createElement('a');
-    a.href = '/plantilla_afiche.jpg';
+    a.href = plantillaUrl;
     a.download = 'plantilla_afiche_referencia.jpg';
     a.click();
+  };
+
+  // Actualizar Plantilla Oficial de Referencia
+  const handlePlantillaFileInputChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    await handleUpdatePlantilla(file);
+    e.target.value = '';
+  };
+
+  const handleUpdatePlantilla = async (file: File) => {
+    try {
+      setIsUpdatingPlantilla(true);
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('isPlantilla', 'true');
+
+      const res = await fetch('/api/afiche/upload', {
+        method: 'POST',
+        body: formData,
+      });
+
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.message || 'Error al actualizar plantilla');
+      }
+
+      const newUrl = `${data.url || '/plantilla_afiche.jpg'}?t=${Date.now()}`;
+      setPlantillaUrl(newUrl);
+
+      Swal.fire({
+        icon: 'success',
+        title: '¡Plantilla Oficial Actualizada!',
+        text: 'La nueva plantilla oficial de afiche se ha guardado y sincronizado exitosamente.',
+        confirmButtonColor: '#2563eb'
+      });
+    } catch (err: any) {
+      console.error('Error al actualizar plantilla oficial:', err);
+      Swal.fire('Error', err.message || 'No se pudo actualizar la plantilla.', 'error');
+    } finally {
+      setIsUpdatingPlantilla(false);
+    }
   };
 
   // Manejo de Arrastrar y Soltar para Afiche
@@ -732,9 +777,9 @@ Aprenderás: ${aprenderas}
             </button>
           </div>
 
-          {/* BOTONES SUPERIORES: ACCIONES RÁPIDAS Y ENLACES */}
+          {/* BOTONES SUPERIORES: ACCIONES ENUMERADAS EN ORDEN */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-            {/* Copiar Ambas Imágenes */}
+            {/* 1. Plantilla + QR */}
             <button
               type="button"
               onClick={handleCopyBothImages}
@@ -753,16 +798,16 @@ Aprenderás: ${aprenderas}
                 boxShadow: '0 3px 10px rgba(124, 58, 237, 0.3)',
                 transition: 'all 0.2s'
               }}
-              title="Copia ambas imágenes juntas (Plantilla + QR) en alta resolución para pegar en Gemini con Ctrl+V"
+              title="1. Copia la Plantilla de Referencia + Código QR juntos para pegar en Gemini con Ctrl+V"
             >
               {copiedType === 'both_images' ? <Check size={15} /> : <ImageIcon size={15} />}
-              {copiedType === 'both_images' ? '¡AMBAS COPIADAS!' : 'Copiar Plantilla + QR (Ambas)'}
+              {copiedType === 'both_images' ? '1. ¡Plantilla + QR Copiados!' : '1. Plantilla + QR'}
             </button>
 
-            {/* Copiar Todo */}
+            {/* 2. Copiar solo prompt de texto */}
             <button
               type="button"
-              onClick={handleCopyAll}
+              onClick={handleCopyPromptOnly}
               style={{
                 display: 'flex',
                 alignItems: 'center',
@@ -773,18 +818,18 @@ Aprenderás: ${aprenderas}
                 fontWeight: 800,
                 cursor: 'pointer',
                 border: 'none',
-                background: copiedType === 'all' ? '#16a34a' : 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)',
+                background: copiedType === 'prompt' ? '#16a34a' : 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)',
                 color: '#ffffff',
-                boxShadow: '0 3px 10px rgba(37, 99, 235, 0.25)',
+                boxShadow: '0 3px 10px rgba(2, 132, 199, 0.25)',
                 transition: 'all 0.2s'
               }}
-              title="Copia el Prompt con formato + Plantilla + QR todo en uno"
+              title="2. Copia solo el texto completo del Prompt para IA"
             >
-              {copiedType === 'all' ? <Check size={15} /> : <Copy size={15} />}
-              {copiedType === 'all' ? '¡TODO COPIADO!' : 'Copiar Todo'}
+              {copiedType === 'prompt' ? <Check size={15} /> : <Copy size={15} />}
+              {copiedType === 'prompt' ? '2. ¡Prompt Copiado!' : '2. Copiar solo prompt de texto'}
             </button>
 
-            {/* Enlace directo a Gemini */}
+            {/* 3. Gemini AI */}
             <a
               href="https://gemini.google.com/app"
               target="_blank"
@@ -798,16 +843,16 @@ Aprenderás: ${aprenderas}
                 fontSize: '12px',
                 fontWeight: 800,
                 textDecoration: 'none',
-                background: 'linear-gradient(135deg, #1e40af 0%, #4338ca 100%)',
+                background: 'linear-gradient(135deg, #1e40af 0%, #312e81 100%)',
                 color: '#ffffff',
                 boxShadow: '0 3px 10px rgba(30, 64, 175, 0.25)'
               }}
-              title="Abrir Google Gemini para generar el afiche con IA"
+              title="3. Abrir Google Gemini para generar el afiche con IA"
             >
-              <Sparkles size={14} color="#fbbf24" /> Gemini AI
+              <Sparkles size={14} color="#fbbf24" /> 3. Gemini AI
             </a>
 
-            {/* Enlace directo a Google Docs Imágenes */}
+            {/* 4. Editar en PICS */}
             <a
               href="https://docs.google.com/images/u/0/"
               target="_blank"
@@ -815,20 +860,19 @@ Aprenderás: ${aprenderas}
               style={{
                 display: 'flex',
                 alignItems: 'center',
-                gap: '5px',
-                padding: '8px 12px',
+                gap: '6px',
+                padding: '8px 13px',
                 borderRadius: '10px',
                 fontSize: '12px',
-                fontWeight: 700,
+                fontWeight: 800,
                 textDecoration: 'none',
-                background: '#ffffff',
-                color: '#334155',
-                border: '1px solid #cbd5e1',
-                boxShadow: '0 2px 6px rgba(0,0,0,0.04)'
+                background: 'linear-gradient(135deg, #ea580c 0%, #c2410c 100%)',
+                color: '#ffffff',
+                boxShadow: '0 3px 10px rgba(234, 88, 12, 0.25)'
               }}
-              title="Abrir Google Docs para editar y retocar imágenes"
+              title="4. Abrir Google Docs Imágenes para retocar y editar afiches"
             >
-              <ExternalLink size={13} color="#2563eb" /> Editar en Docs
+              <ExternalLink size={14} /> 4. Editar en PICS
             </a>
           </div>
         </div>
@@ -1278,54 +1322,91 @@ Aprenderás: ${aprenderas}
                     background: '#000000'
                   }}>
                     <img
-                      src="/plantilla_afiche.jpg"
+                      src={plantillaUrl}
                       alt="Plantilla Afiche Referencia"
                       style={{ maxHeight: '340px', width: 'auto', display: 'block', objectFit: 'contain' }}
                     />
                   </div>
 
-                  <div style={{ display: 'flex', gap: '10px', width: '100%', maxWidth: '360px' }}>
-                    <button
-                      type="button"
-                      onClick={handleCopyPlantillaImage}
-                      style={{
-                        flex: 1,
-                        padding: '9px 12px',
-                        borderRadius: '8px',
-                        background: copiedType === 'plantilla' ? '#15803d' : '#2563eb',
-                        color: '#ffffff',
-                        border: 'none',
-                        fontWeight: 700,
-                        fontSize: '12px',
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: '6px'
-                      }}
-                    >
-                      {copiedType === 'plantilla' ? <Check size={14} /> : <Copy size={14} />}
-                      Copiar Imagen
-                    </button>
+                  {/* Input oculto para cambiar plantilla */}
+                  <input
+                    ref={plantillaFileInputRef}
+                    type="file"
+                    accept="image/*"
+                    onChange={handlePlantillaFileInputChange}
+                    style={{ display: 'none' }}
+                  />
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', width: '100%', maxWidth: '360px' }}>
+                    <div style={{ display: 'flex', gap: '10px', width: '100%' }}>
+                      <button
+                        type="button"
+                        onClick={handleCopyPlantillaImage}
+                        style={{
+                          flex: 1,
+                          padding: '9px 12px',
+                          borderRadius: '8px',
+                          background: copiedType === 'plantilla' ? '#15803d' : '#2563eb',
+                          color: '#ffffff',
+                          border: 'none',
+                          fontWeight: 700,
+                          fontSize: '12px',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '6px'
+                        }}
+                      >
+                        {copiedType === 'plantilla' ? <Check size={14} /> : <Copy size={14} />}
+                        Copiar Imagen
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={handleDownloadPlantilla}
+                        style={{
+                          padding: '9px 14px',
+                          borderRadius: '8px',
+                          background: '#ffffff',
+                          color: '#334155',
+                          border: '1px solid #cbd5e1',
+                          fontWeight: 600,
+                          fontSize: '12px',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '6px'
+                        }}
+                      >
+                        <Download size={14} /> Descargar
+                      </button>
+                    </div>
 
                     <button
                       type="button"
-                      onClick={handleDownloadPlantilla}
+                      disabled={isUpdatingPlantilla}
+                      onClick={() => plantillaFileInputRef.current?.click()}
                       style={{
+                        width: '100%',
                         padding: '9px 14px',
+                        background: '#eff6ff',
+                        color: '#1d4ed8',
+                        border: '1.5px dashed #3b82f6',
                         borderRadius: '8px',
-                        background: '#ffffff',
-                        color: '#334155',
-                        border: '1px solid #cbd5e1',
-                        fontWeight: 600,
+                        fontWeight: 700,
                         fontSize: '12px',
-                        cursor: 'pointer',
+                        cursor: isUpdatingPlantilla ? 'not-allowed' : 'pointer',
                         display: 'flex',
                         alignItems: 'center',
-                        gap: '6px'
+                        justifyContent: 'center',
+                        gap: '6px',
+                        transition: 'all 0.2s'
                       }}
+                      title="Sube una nueva imagen para cambiar la plantilla oficial de afiche"
                     >
-                      <Download size={14} /> Descargar
+                      <UploadCloud size={15} />
+                      {isUpdatingPlantilla ? 'Actualizando plantilla...' : '🔄 Cambiar Plantilla Oficial'}
                     </button>
                   </div>
                 </div>
@@ -1654,101 +1735,24 @@ Aprenderás: ${aprenderas}
             <span>Los afiches y QR quedan vinculados al curso <strong>{curso.nombre || curso.id}</strong>.</span>
           </div>
 
-          <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
-            <a
-              href="https://gemini.google.com/app"
-              target="_blank"
-              rel="noreferrer"
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px',
-                padding: '9px 14px',
-                background: '#1e3a8a',
-                color: '#ffffff',
-                borderRadius: '8px',
-                fontSize: '12px',
-                fontWeight: 700,
-                textDecoration: 'none'
-              }}
-            >
-              <Sparkles size={13} color="#fbbf24" /> Gemini AI
-            </a>
-
-            <a
-              href="https://docs.google.com/images/u/0/"
-              target="_blank"
-              rel="noreferrer"
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px',
-                padding: '9px 14px',
-                background: '#ffffff',
-                color: '#334155',
-                border: '1px solid #cbd5e1',
-                borderRadius: '8px',
-                fontSize: '12px',
-                fontWeight: 600,
-                textDecoration: 'none'
-              }}
-            >
-              <ExternalLink size={13} /> Google Docs Imágenes
-            </a>
-
-            <button
-              type="button"
-              onClick={handleCopyBothImages}
-              style={{
-                padding: '9px 16px',
-                background: 'linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%)',
-                color: '#ffffff',
-                border: 'none',
-                borderRadius: '8px',
-                fontSize: '12px',
-                fontWeight: 800,
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px'
-              }}
-            >
-              <ImageIcon size={14} /> Copiar Plantilla + QR
-            </button>
-
-            <button
-              type="button"
-              onClick={handleCopyAll}
-              style={{
-                padding: '9px 16px',
-                background: '#0d3b66',
-                color: '#ffffff',
-                border: 'none',
-                borderRadius: '8px',
-                fontSize: '12px',
-                fontWeight: 700,
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px'
-              }}
-            >
-              <Copy size={14} /> Copiar Todo
-            </button>
-
+          <div>
             <button
               type="button"
               onClick={onClose}
               style={{
-                padding: '9px 16px',
-                background: '#e2e8f0',
-                color: '#334155',
+                padding: '9px 24px',
+                background: '#0f172a',
+                color: '#ffffff',
                 border: 'none',
                 borderRadius: '8px',
-                fontSize: '12px',
-                fontWeight: 600,
-                cursor: 'pointer'
+                fontSize: '13px',
+                fontWeight: 700,
+                cursor: 'pointer',
+                boxShadow: '0 2px 6px rgba(15, 23, 42, 0.15)',
+                transition: 'all 0.2s'
               }}
+              onMouseOver={(e) => (e.currentTarget.style.background = '#1e293b')}
+              onMouseOut={(e) => (e.currentTarget.style.background = '#0f172a')}
             >
               Cerrar
             </button>

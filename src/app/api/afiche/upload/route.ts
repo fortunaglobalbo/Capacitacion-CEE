@@ -10,10 +10,17 @@ export async function POST(request: Request) {
     let fileBuffer: Buffer | null = null;
     let fileExtension = 'jpg';
 
+    let isPlantilla = false;
+
     if (contentType.includes('multipart/form-data')) {
       const formData = await request.formData();
       const file = formData.get('file') as File | null;
       const formCursoId = formData.get('cursoId') as string | null;
+      const formIsPlantilla = formData.get('isPlantilla') as string | null;
+
+      if (formIsPlantilla === 'true' || formCursoId === 'plantilla') {
+        isPlantilla = true;
+      }
 
       if (formCursoId) {
         cursoId = formCursoId.trim().toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-_]/g, '');
@@ -38,6 +45,9 @@ export async function POST(request: Request) {
       if (body.cursoId) {
         cursoId = String(body.cursoId).trim().toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-_]/g, '');
       }
+      if (body.isPlantilla === true || body.isPlantilla === 'true' || cursoId === 'plantilla') {
+        isPlantilla = true;
+      }
 
       const base64Data = body.image || body.base64;
       if (!base64Data) {
@@ -57,13 +67,25 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, message: 'Error al procesar el archivo' }, { status: 400 });
     }
 
+    const timestamp = Date.now();
+
+    if (isPlantilla) {
+      const plantillaPath = path.join(process.cwd(), 'public', 'plantilla_afiche.jpg');
+      fs.writeFileSync(plantillaPath, fileBuffer);
+      return NextResponse.json({
+        success: true,
+        url: `/plantilla_afiche.jpg?v=${timestamp}`,
+        fileName: 'plantilla_afiche.jpg',
+        isPlantilla: true
+      });
+    }
+
     // Asegurar directorio public/afiches
     const publicDir = path.join(process.cwd(), 'public', 'afiches');
     if (!fs.existsSync(publicDir)) {
       fs.mkdirSync(publicDir, { recursive: true });
     }
 
-    const timestamp = Date.now();
     const fileName = `afiche-${cursoId}-${timestamp}.${fileExtension}`;
     const filePath = path.join(publicDir, fileName);
 
