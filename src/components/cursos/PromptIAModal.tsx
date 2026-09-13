@@ -294,6 +294,138 @@ Aprenderás: ${aprenderas}
     }
   };
 
+  // 5. Copiar AMBAS imágenes (Plantilla de Referencia + Código QR Oficial)
+  const handleCopyBothImages = async () => {
+    try {
+      // 1. Cargar imagen de la plantilla
+      const plantillaResp = await fetch('/plantilla_afiche.jpg');
+      const plantillaBlob = await plantillaResp.blob();
+      const imgPlantilla = new Image();
+      imgPlantilla.src = URL.createObjectURL(plantillaBlob);
+      await new Promise((res, rej) => {
+        imgPlantilla.onload = res;
+        imgPlantilla.onerror = rej;
+      });
+
+      // 2. Cargar imagen del QR
+      let qrSource = qrDataUrl;
+      if (!qrSource) {
+        qrSource = await QRCode.toDataURL(enlaceInscripcion, { width: 500, margin: 2 });
+      }
+      const imgQr = new Image();
+      imgQr.src = qrSource;
+      await new Promise((res, rej) => {
+        imgQr.onload = res;
+        imgQr.onerror = rej;
+      });
+
+      // 3. Crear canvas compuesto de alta resolución (ambas imágenes nítidas)
+      const pWidth = imgPlantilla.naturalWidth || 800;
+      const pHeight = imgPlantilla.naturalHeight || 1000;
+      const sidePanelWidth = Math.max(Math.round(pWidth * 0.62), 480);
+      const totalWidth = pWidth + sidePanelWidth + 30;
+      const totalHeight = pHeight;
+
+      const canvas = document.createElement('canvas');
+      canvas.width = totalWidth;
+      canvas.height = totalHeight;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) throw new Error('No se pudo inicializar canvas');
+
+      // Fondo corporativo
+      ctx.fillStyle = '#0a192f';
+      ctx.fillRect(0, 0, totalWidth, totalHeight);
+
+      // Dibujar plantilla de afiche a la izquierda
+      ctx.drawImage(imgPlantilla, 0, 0, pWidth, pHeight);
+
+      // Panel derecho para el QR Oficial
+      const qrPanelX = pWidth + 20;
+      const qrPanelY = 50;
+
+      // Título en panel
+      ctx.fillStyle = '#fbbf24';
+      ctx.font = 'bold 28px system-ui, -apple-system, sans-serif';
+      ctx.fillText('CÓDIGO QR OFICIAL', qrPanelX + 20, qrPanelY + 40);
+
+      ctx.fillStyle = '#93c5fd';
+      ctx.font = '16px system-ui, -apple-system, sans-serif';
+      ctx.fillText('Sin modificaciones • 100% Escaneable', qrPanelX + 20, qrPanelY + 75);
+
+      // Recuadro blanco para el QR
+      const boxSize = sidePanelWidth - 40;
+      const qrBoxX = qrPanelX + 20;
+      const qrBoxY = qrPanelY + 105;
+
+      ctx.fillStyle = '#ffffff';
+      if (typeof ctx.roundRect === 'function') {
+        ctx.beginPath();
+        ctx.roundRect(qrBoxX, qrBoxY, boxSize, boxSize, 16);
+        ctx.fill();
+      } else {
+        ctx.fillRect(qrBoxX, qrBoxY, boxSize, boxSize);
+      }
+
+      // Dibujar QR centrado con margen dentro del recuadro
+      const padding = 24;
+      ctx.drawImage(imgQr, qrBoxX + padding, qrBoxY + padding, boxSize - (padding * 2), boxSize - (padding * 2));
+
+      // Indicaciones inferiores
+      ctx.fillStyle = '#f8fafc';
+      ctx.font = 'bold 16px system-ui, -apple-system, sans-serif';
+      ctx.fillText('🔴 Insertar intacto en esquina inferior izq.', qrPanelX + 20, qrBoxY + boxSize + 45);
+
+      ctx.fillStyle = '#94a3b8';
+      ctx.font = '13px monospace';
+      const shortUrl = enlaceInscripcion.length > 42 ? enlaceInscripcion.substring(0, 40) + '...' : enlaceInscripcion;
+      ctx.fillText(shortUrl, qrPanelX + 20, qrBoxY + boxSize + 75);
+
+      // 4. Copiar al portapapeles
+      canvas.toBlob(async (blob) => {
+        if (!blob) throw new Error('Error al generar imagen combinada');
+
+        const htmlContent = `
+          <div>
+            <h3>Plantilla de Referencia Visual:</h3>
+            <p><img src="${plantillaBase64 || '/plantilla_afiche.jpg'}" alt="Plantilla" style="max-width: 450px;" /></p>
+            <h3>Código QR Oficial (Sin Modificaciones):</h3>
+            <p><img src="${qrDataUrl}" alt="Código QR" style="max-width: 300px;" /></p>
+            <p><strong>Enlace directo:</strong> <a href="${enlaceInscripcion}">${enlaceInscripcion}</a></p>
+          </div>
+        `;
+
+        if (navigator.clipboard && typeof window.ClipboardItem !== 'undefined') {
+          const htmlBlob = new Blob([htmlContent], { type: 'text/html' });
+          const textBlob = new Blob([`PLANTILLA Y CÓDIGO QR OFICIAL\nEnlace: ${enlaceInscripcion}`], { type: 'text/plain' });
+
+          try {
+            await navigator.clipboard.write([
+              new ClipboardItem({
+                'image/png': blob,
+                'text/html': htmlBlob,
+                'text/plain': textBlob
+              })
+            ]);
+            showCopiedFeedback('both_images', '¡Ambas imágenes (Plantilla + QR) copiadas! Pégalas directamente en Gemini o tu editor con Ctrl+V.');
+            return;
+          } catch {
+            await navigator.clipboard.write([
+              new ClipboardItem({ 'image/png': blob })
+            ]);
+            showCopiedFeedback('both_images', '¡Ambas imágenes (Plantilla + QR) copiadas al portapapeles!');
+            return;
+          }
+        }
+
+        showCopiedFeedback('both_images', 'Imágenes preparadas.');
+      }, 'image/png');
+
+    } catch (err: any) {
+      console.error('Error al copiar ambas imágenes:', err);
+      Swal.fire('Error', 'No se pudieron procesar ambas imágenes automáticamente. Puedes copiarlas individualmente con los botones dedicados.', 'error');
+    }
+  };
+
   // Descargas
   const handleDownloadQr = () => {
     if (!qrDataUrl) return;
@@ -600,30 +732,105 @@ Aprenderás: ${aprenderas}
             </button>
           </div>
 
-          {/* BOTÓN SUPERIOR: COPIAR TODO */}
-          <button
-            type="button"
-            onClick={handleCopyAll}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              padding: '9px 18px',
-              borderRadius: '10px',
-              fontSize: '13px',
-              fontWeight: 800,
-              cursor: 'pointer',
-              border: 'none',
-              background: copiedType === 'all' ? '#16a34a' : 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)',
-              color: '#ffffff',
-              boxShadow: '0 4px 14px rgba(37, 99, 235, 0.35)',
-              transition: 'all 0.2s'
-            }}
-            title="Copia el Prompt con formato + Plantilla + QR todo en uno para pegar en documentos, chats o editores"
-          >
-            {copiedType === 'all' ? <Check size={16} /> : <Copy size={16} />}
-            {copiedType === 'all' ? '¡TODO COPIADO!' : 'Copiar Todo (Prompt + QR + Plantilla)'}
-          </button>
+          {/* BOTONES SUPERIORES: ACCIONES RÁPIDAS Y ENLACES */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+            {/* Copiar Ambas Imágenes */}
+            <button
+              type="button"
+              onClick={handleCopyBothImages}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '8px 14px',
+                borderRadius: '10px',
+                fontSize: '12px',
+                fontWeight: 800,
+                cursor: 'pointer',
+                border: 'none',
+                background: copiedType === 'both_images' ? '#16a34a' : 'linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%)',
+                color: '#ffffff',
+                boxShadow: '0 3px 10px rgba(124, 58, 237, 0.3)',
+                transition: 'all 0.2s'
+              }}
+              title="Copia ambas imágenes juntas (Plantilla + QR) en alta resolución para pegar en Gemini con Ctrl+V"
+            >
+              {copiedType === 'both_images' ? <Check size={15} /> : <ImageIcon size={15} />}
+              {copiedType === 'both_images' ? '¡AMBAS COPIADAS!' : 'Copiar Plantilla + QR (Ambas)'}
+            </button>
+
+            {/* Copiar Todo */}
+            <button
+              type="button"
+              onClick={handleCopyAll}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '8px 14px',
+                borderRadius: '10px',
+                fontSize: '12px',
+                fontWeight: 800,
+                cursor: 'pointer',
+                border: 'none',
+                background: copiedType === 'all' ? '#16a34a' : 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)',
+                color: '#ffffff',
+                boxShadow: '0 3px 10px rgba(37, 99, 235, 0.25)',
+                transition: 'all 0.2s'
+              }}
+              title="Copia el Prompt con formato + Plantilla + QR todo en uno"
+            >
+              {copiedType === 'all' ? <Check size={15} /> : <Copy size={15} />}
+              {copiedType === 'all' ? '¡TODO COPIADO!' : 'Copiar Todo'}
+            </button>
+
+            {/* Enlace directo a Gemini */}
+            <a
+              href="https://gemini.google.com/app"
+              target="_blank"
+              rel="noreferrer"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '8px 13px',
+                borderRadius: '10px',
+                fontSize: '12px',
+                fontWeight: 800,
+                textDecoration: 'none',
+                background: 'linear-gradient(135deg, #1e40af 0%, #4338ca 100%)',
+                color: '#ffffff',
+                boxShadow: '0 3px 10px rgba(30, 64, 175, 0.25)'
+              }}
+              title="Abrir Google Gemini para generar el afiche con IA"
+            >
+              <Sparkles size={14} color="#fbbf24" /> Gemini AI
+            </a>
+
+            {/* Enlace directo a Google Docs Imágenes */}
+            <a
+              href="https://docs.google.com/images/u/0/"
+              target="_blank"
+              rel="noreferrer"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '5px',
+                padding: '8px 12px',
+                borderRadius: '10px',
+                fontSize: '12px',
+                fontWeight: 700,
+                textDecoration: 'none',
+                background: '#ffffff',
+                color: '#334155',
+                border: '1px solid #cbd5e1',
+                boxShadow: '0 2px 6px rgba(0,0,0,0.04)'
+              }}
+              title="Abrir Google Docs para editar y retocar imágenes"
+            >
+              <ExternalLink size={13} color="#2563eb" /> Editar en Docs
+            </a>
+          </div>
         </div>
 
         {/* CONTENIDO DEL MODAL SEGÚN PESTAÑA */}
@@ -769,6 +976,31 @@ Aprenderás: ${aprenderas}
 
                 {/* Acciones de Copiado de esta vista */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  {/* Botón Destacado: Copiar Ambas Imágenes */}
+                  <button
+                    type="button"
+                    onClick={handleCopyBothImages}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '8px',
+                      padding: '11px',
+                      borderRadius: '10px',
+                      background: copiedType === 'both_images' ? '#15803d' : 'linear-gradient(135deg, #7c3aed 0%, #5b21b6 100%)',
+                      color: '#ffffff',
+                      fontWeight: 800,
+                      fontSize: '13px',
+                      border: 'none',
+                      cursor: 'pointer',
+                      boxShadow: '0 4px 12px rgba(124, 58, 237, 0.35)'
+                    }}
+                    title="Copia juntas la Plantilla de Referencia y el Código QR oficial para pegarlas en Gemini"
+                  >
+                    {copiedType === 'both_images' ? <Check size={17} /> : <ImageIcon size={17} />}
+                    {copiedType === 'both_images' ? '¡Ambas Imágenes Copiadas!' : '🖼️📱 Copiar Plantilla + QR (Ambas)'}
+                  </button>
+
                   <button
                     type="button"
                     onClick={handleCopyPromptOnly}
@@ -791,26 +1023,109 @@ Aprenderás: ${aprenderas}
                     Copiar Solo Prompt de Texto
                   </button>
 
-                  <button
-                    type="button"
-                    onClick={handleCopyPlantillaImage}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: '8px',
-                      padding: '9px',
-                      borderRadius: '8px',
-                      background: '#f1f5f9',
-                      color: '#334155',
-                      fontWeight: 600,
-                      fontSize: '12px',
-                      border: '1px solid #cbd5e1',
-                      cursor: 'pointer'
-                    }}
-                  >
-                    <ImageIcon size={15} color="#2563eb" /> Copiar Imagen Plantilla de Referencia
-                  </button>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                    <button
+                      type="button"
+                      onClick={handleCopyPlantillaImage}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '6px',
+                        padding: '8px 10px',
+                        borderRadius: '8px',
+                        background: '#f1f5f9',
+                        color: '#334155',
+                        fontWeight: 600,
+                        fontSize: '11px',
+                        border: '1px solid #cbd5e1',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      <ImageIcon size={13} color="#2563eb" /> Solo Plantilla
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={handleCopyQrImage}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '6px',
+                        padding: '8px 10px',
+                        borderRadius: '8px',
+                        background: '#f1f5f9',
+                        color: '#334155',
+                        fontWeight: 600,
+                        fontSize: '11px',
+                        border: '1px solid #cbd5e1',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      <QrCode size={13} color="#16a34a" /> Solo Código QR
+                    </button>
+                  </div>
+
+                  {/* CAJA DE HERRAMIENTAS DIRECTAS (GEMINI + DOCS) */}
+                  <div style={{
+                    background: '#f8fafc',
+                    borderRadius: '12px',
+                    padding: '12px',
+                    border: '1px solid #e2e8f0',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '8px',
+                    marginTop: '4px'
+                  }}>
+                    <span style={{ fontSize: '11px', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.4px' }}>
+                      🚀 Abrir Herramientas de Creación:
+                    </span>
+
+                    <a
+                      href="https://gemini.google.com/app"
+                      target="_blank"
+                      rel="noreferrer"
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '7px',
+                        padding: '9px 12px',
+                        borderRadius: '8px',
+                        background: 'linear-gradient(135deg, #1e3a8a 0%, #312e81 100%)',
+                        color: '#ffffff',
+                        fontWeight: 800,
+                        fontSize: '12px',
+                        textDecoration: 'none',
+                        boxShadow: '0 2px 8px rgba(30, 58, 138, 0.25)'
+                      }}
+                    >
+                      <Sparkles size={14} color="#fbbf24" /> Generar en Gemini AI (Abrir)
+                    </a>
+
+                    <a
+                      href="https://docs.google.com/images/u/0/"
+                      target="_blank"
+                      rel="noreferrer"
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '7px',
+                        padding: '9px 12px',
+                        borderRadius: '8px',
+                        background: '#ffffff',
+                        color: '#1e293b',
+                        fontWeight: 700,
+                        fontSize: '12px',
+                        border: '1px solid #cbd5e1',
+                        textDecoration: 'none'
+                      }}
+                    >
+                      <ExternalLink size={14} color="#2563eb" /> Editar Imágenes en Google Docs (Abrir)
+                    </a>
+                  </div>
                 </div>
               </div>
 
@@ -863,196 +1178,264 @@ Aprenderás: ${aprenderas}
           {/* PESTAÑA 2: PLANTILLA & CÓDIGO QR */}
           {/* ======================================================== */}
           {activeTab === 'plantilla_qr' && (
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
-              
-              {/* Tarjeta: Plantilla Oficial de Referencia */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
+              {/* Barra de acción rápida para copiar ambas imágenes */}
               <div style={{
-                background: '#f8fafc',
-                borderRadius: '16px',
-                padding: '20px',
-                border: '1px solid #e2e8f0',
+                background: 'linear-gradient(135deg, #f5f3ff 0%, #ede9fe 100%)',
+                borderRadius: '14px',
+                border: '1px solid #ddd6fe',
+                padding: '14px 20px',
                 display: 'flex',
-                flexDirection: 'column',
                 alignItems: 'center',
-                textAlign: 'center'
+                justifyContent: 'space-between',
+                flexWrap: 'wrap',
+                gap: '12px'
               }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
-                  <ImageIcon size={20} color="#2563eb" />
-                  <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 800, color: '#0f172a' }}>
-                    Plantilla Oficial de Referencia
-                  </h3>
-                </div>
-                <p style={{ fontSize: '12px', color: '#64748b', margin: '0 0 16px 0', maxWidth: '380px' }}>
-                  Esta imagen sirve como guía visual exacta de colores (azul, amarillo, blanco), tipografía, logo y estructura corporativa.
-                </p>
-
-                <div style={{
-                  borderRadius: '12px',
-                  overflow: 'hidden',
-                  border: '2px solid #cbd5e1',
-                  boxShadow: '0 8px 20px rgba(0,0,0,0.1)',
-                  maxHeight: '340px',
-                  marginBottom: '16px',
-                  background: '#000000'
-                }}>
-                  <img
-                    src="/plantilla_afiche.jpg"
-                    alt="Plantilla Afiche Referencia"
-                    style={{ maxHeight: '340px', width: 'auto', display: 'block', objectFit: 'contain' }}
-                  />
+                <div>
+                  <h4 style={{ margin: 0, fontSize: '14px', fontWeight: 800, color: '#5b21b6' }}>
+                    ¿Vas a generar el afiche en Gemini o ChatGPT?
+                  </h4>
+                  <p style={{ margin: '2px 0 0 0', fontSize: '12px', color: '#6d28d9' }}>
+                    Copia la Plantilla de Referencia + el Código QR juntos en alta resolución para pegarlos con Ctrl+V.
+                  </p>
                 </div>
 
-                <div style={{ display: 'flex', gap: '10px', width: '100%', maxWidth: '360px' }}>
+                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                   <button
                     type="button"
-                    onClick={handleCopyPlantillaImage}
+                    onClick={handleCopyBothImages}
                     style={{
-                      flex: 1,
-                      padding: '9px 12px',
-                      borderRadius: '8px',
-                      background: copiedType === 'plantilla' ? '#15803d' : '#2563eb',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '7px',
+                      padding: '9px 16px',
+                      background: copiedType === 'both_images' ? '#15803d' : 'linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%)',
                       color: '#ffffff',
                       border: 'none',
-                      fontWeight: 700,
+                      borderRadius: '8px',
                       fontSize: '12px',
+                      fontWeight: 800,
                       cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: '6px'
+                      boxShadow: '0 2px 8px rgba(124, 58, 237, 0.3)'
                     }}
                   >
-                    {copiedType === 'plantilla' ? <Check size={14} /> : <Copy size={14} />}
-                    Copiar Imagen
+                    {copiedType === 'both_images' ? <Check size={15} /> : <ImageIcon size={15} />}
+                    {copiedType === 'both_images' ? '¡Ambas Imágenes Copiadas!' : '🖼️📱 Copiar Plantilla + QR (Ambas Imágenes)'}
                   </button>
 
-                  <button
-                    type="button"
-                    onClick={handleDownloadPlantilla}
+                  <a
+                    href="https://gemini.google.com/app"
+                    target="_blank"
+                    rel="noreferrer"
                     style={{
-                      padding: '9px 14px',
-                      borderRadius: '8px',
-                      background: '#ffffff',
-                      color: '#334155',
-                      border: '1px solid #cbd5e1',
-                      fontWeight: 600,
-                      fontSize: '12px',
-                      cursor: 'pointer',
                       display: 'flex',
                       alignItems: 'center',
-                      gap: '6px'
+                      gap: '6px',
+                      padding: '9px 14px',
+                      background: '#1e3a8a',
+                      color: '#ffffff',
+                      borderRadius: '8px',
+                      fontSize: '12px',
+                      fontWeight: 700,
+                      textDecoration: 'none'
                     }}
                   >
-                    <Download size={14} /> Descargar
-                  </button>
+                    <Sparkles size={13} color="#fbbf24" /> Abrir Gemini AI
+                  </a>
                 </div>
               </div>
 
-              {/* Tarjeta: Código QR Dinámico del Curso */}
-              <div style={{
-                background: '#f8fafc',
-                borderRadius: '16px',
-                padding: '20px',
-                border: '1px solid #e2e8f0',
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                textAlign: 'center'
-              }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
-                  <QrCode size={20} color="#16a34a" />
-                  <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 800, color: '#0f172a' }}>
-                    Código QR de Inscripción
-                  </h3>
-                </div>
-                <p style={{ fontSize: '12px', color: '#64748b', margin: '0 0 16px 0', maxWidth: '380px' }}>
-                  Generado automáticamente para el enlace público de este curso. Colócalo en la esquina inferior izquierda del afiche.
-                </p>
-
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
+                
+                {/* Tarjeta: Plantilla Oficial de Referencia */}
                 <div style={{
-                  background: '#ffffff',
-                  padding: '16px',
+                  background: '#f8fafc',
                   borderRadius: '16px',
-                  border: '2px solid #cbd5e1',
-                  boxShadow: '0 8px 20px rgba(0,0,0,0.06)',
-                  marginBottom: '16px'
-                }}>
-                  {qrDataUrl ? (
-                    <img
-                      src={qrDataUrl}
-                      alt="Código QR de Inscripción"
-                      style={{ width: '220px', height: '220px', display: 'block' }}
-                    />
-                  ) : (
-                    <div style={{ width: '220px', height: '220px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#94a3b8' }}>
-                      Generando QR...
-                    </div>
-                  )}
-                </div>
-
-                <div style={{
-                  background: '#ffffff',
+                  padding: '20px',
                   border: '1px solid #e2e8f0',
-                  borderRadius: '8px',
-                  padding: '6px 12px',
-                  fontSize: '11px',
-                  color: '#2563eb',
-                  maxWidth: '340px',
-                  wordBreak: 'break-all',
-                  marginBottom: '14px',
                   display: 'flex',
+                  flexDirection: 'column',
                   alignItems: 'center',
-                  gap: '6px'
+                  textAlign: 'center'
                 }}>
-                  <ExternalLink size={12} /> {enlaceInscripcion}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
+                    <ImageIcon size={20} color="#2563eb" />
+                    <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 800, color: '#0f172a' }}>
+                      Plantilla Oficial de Referencia
+                    </h3>
+                  </div>
+                  <p style={{ fontSize: '12px', color: '#64748b', margin: '0 0 16px 0', maxWidth: '380px' }}>
+                    Esta imagen sirve como guía visual exacta de colores (azul, amarillo, blanco), tipografía, logo y estructura corporativa.
+                  </p>
+
+                  <div style={{
+                    borderRadius: '12px',
+                    overflow: 'hidden',
+                    border: '2px solid #cbd5e1',
+                    boxShadow: '0 8px 20px rgba(0,0,0,0.1)',
+                    maxHeight: '340px',
+                    marginBottom: '16px',
+                    background: '#000000'
+                  }}>
+                    <img
+                      src="/plantilla_afiche.jpg"
+                      alt="Plantilla Afiche Referencia"
+                      style={{ maxHeight: '340px', width: 'auto', display: 'block', objectFit: 'contain' }}
+                    />
+                  </div>
+
+                  <div style={{ display: 'flex', gap: '10px', width: '100%', maxWidth: '360px' }}>
+                    <button
+                      type="button"
+                      onClick={handleCopyPlantillaImage}
+                      style={{
+                        flex: 1,
+                        padding: '9px 12px',
+                        borderRadius: '8px',
+                        background: copiedType === 'plantilla' ? '#15803d' : '#2563eb',
+                        color: '#ffffff',
+                        border: 'none',
+                        fontWeight: 700,
+                        fontSize: '12px',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '6px'
+                      }}
+                    >
+                      {copiedType === 'plantilla' ? <Check size={14} /> : <Copy size={14} />}
+                      Copiar Imagen
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={handleDownloadPlantilla}
+                      style={{
+                        padding: '9px 14px',
+                        borderRadius: '8px',
+                        background: '#ffffff',
+                        color: '#334155',
+                        border: '1px solid #cbd5e1',
+                        fontWeight: 600,
+                        fontSize: '12px',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px'
+                      }}
+                    >
+                      <Download size={14} /> Descargar
+                    </button>
+                  </div>
                 </div>
 
-                <div style={{ display: 'flex', gap: '10px', width: '100%', maxWidth: '360px' }}>
-                  <button
-                    type="button"
-                    onClick={handleCopyQrImage}
-                    style={{
-                      flex: 1,
-                      padding: '9px 12px',
-                      borderRadius: '8px',
-                      background: copiedType === 'qr' ? '#15803d' : '#16a34a',
-                      color: '#ffffff',
-                      border: 'none',
-                      fontWeight: 700,
-                      fontSize: '12px',
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: '6px'
-                    }}
-                  >
-                    {copiedType === 'qr' ? <Check size={14} /> : <Copy size={14} />}
-                    Copiar QR
-                  </button>
+                {/* Tarjeta: Código QR Dinámico del Curso */}
+                <div style={{
+                  background: '#f8fafc',
+                  borderRadius: '16px',
+                  padding: '20px',
+                  border: '1px solid #e2e8f0',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  textAlign: 'center'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
+                    <QrCode size={20} color="#16a34a" />
+                    <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 800, color: '#0f172a' }}>
+                      Código QR de Inscripción
+                    </h3>
+                  </div>
+                  <p style={{ fontSize: '12px', color: '#64748b', margin: '0 0 16px 0', maxWidth: '380px' }}>
+                    Generado automáticamente para el enlace público de este curso. Colócalo en la esquina inferior izquierda del afiche.
+                  </p>
 
-                  <button
-                    type="button"
-                    onClick={handleDownloadQr}
-                    style={{
-                      padding: '9px 14px',
-                      borderRadius: '8px',
-                      background: '#ffffff',
-                      color: '#334155',
-                      border: '1px solid #cbd5e1',
-                      fontWeight: 600,
-                      fontSize: '12px',
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '6px'
-                    }}
-                  >
-                    <Download size={14} /> Descargar
-                  </button>
+                  <div style={{
+                    background: '#ffffff',
+                    padding: '16px',
+                    borderRadius: '16px',
+                    border: '2px solid #cbd5e1',
+                    boxShadow: '0 8px 20px rgba(0,0,0,0.06)',
+                    marginBottom: '16px'
+                  }}>
+                    {qrDataUrl ? (
+                      <img
+                        src={qrDataUrl}
+                        alt="Código QR de Inscripción"
+                        style={{ width: '220px', height: '220px', display: 'block' }}
+                      />
+                    ) : (
+                      <div style={{ width: '220px', height: '220px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#94a3b8' }}>
+                        Generando QR...
+                      </div>
+                    )}
+                  </div>
+
+                  <div style={{
+                    background: '#ffffff',
+                    border: '1px solid #e2e8f0',
+                    borderRadius: '8px',
+                    padding: '6px 12px',
+                    fontSize: '11px',
+                    color: '#2563eb',
+                    maxWidth: '340px',
+                    wordBreak: 'break-all',
+                    marginBottom: '14px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px'
+                  }}>
+                    <ExternalLink size={12} /> {enlaceInscripcion}
+                  </div>
+
+                  <div style={{ display: 'flex', gap: '10px', width: '100%', maxWidth: '360px' }}>
+                    <button
+                      type="button"
+                      onClick={handleCopyQrImage}
+                      style={{
+                        flex: 1,
+                        padding: '9px 12px',
+                        borderRadius: '8px',
+                        background: copiedType === 'qr' ? '#15803d' : '#16a34a',
+                        color: '#ffffff',
+                        border: 'none',
+                        fontWeight: 700,
+                        fontSize: '12px',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '6px'
+                      }}
+                    >
+                      {copiedType === 'qr' ? <Check size={14} /> : <Copy size={14} />}
+                      Copiar QR
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={handleDownloadQr}
+                      style={{
+                        padding: '9px 14px',
+                        borderRadius: '8px',
+                        background: '#ffffff',
+                        color: '#334155',
+                        border: '1px solid #cbd5e1',
+                        fontWeight: 600,
+                        fontSize: '12px',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px'
+                      }}
+                    >
+                      <Download size={14} /> Descargar
+                    </button>
+                  </div>
                 </div>
+
               </div>
-
             </div>
           )}
 
@@ -1271,17 +1654,78 @@ Aprenderás: ${aprenderas}
             <span>Los afiches y QR quedan vinculados al curso <strong>{curso.nombre || curso.id}</strong>.</span>
           </div>
 
-          <div style={{ display: 'flex', gap: '10px' }}>
+          <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+            <a
+              href="https://gemini.google.com/app"
+              target="_blank"
+              rel="noreferrer"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '9px 14px',
+                background: '#1e3a8a',
+                color: '#ffffff',
+                borderRadius: '8px',
+                fontSize: '12px',
+                fontWeight: 700,
+                textDecoration: 'none'
+              }}
+            >
+              <Sparkles size={13} color="#fbbf24" /> Gemini AI
+            </a>
+
+            <a
+              href="https://docs.google.com/images/u/0/"
+              target="_blank"
+              rel="noreferrer"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '9px 14px',
+                background: '#ffffff',
+                color: '#334155',
+                border: '1px solid #cbd5e1',
+                borderRadius: '8px',
+                fontSize: '12px',
+                fontWeight: 600,
+                textDecoration: 'none'
+              }}
+            >
+              <ExternalLink size={13} /> Google Docs Imágenes
+            </a>
+
+            <button
+              type="button"
+              onClick={handleCopyBothImages}
+              style={{
+                padding: '9px 16px',
+                background: 'linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%)',
+                color: '#ffffff',
+                border: 'none',
+                borderRadius: '8px',
+                fontSize: '12px',
+                fontWeight: 800,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px'
+              }}
+            >
+              <ImageIcon size={14} /> Copiar Plantilla + QR
+            </button>
+
             <button
               type="button"
               onClick={handleCopyAll}
               style={{
-                padding: '9px 18px',
+                padding: '9px 16px',
                 background: '#0d3b66',
                 color: '#ffffff',
                 border: 'none',
                 borderRadius: '8px',
-                fontSize: '13px',
+                fontSize: '12px',
                 fontWeight: 700,
                 cursor: 'pointer',
                 display: 'flex',
@@ -1296,12 +1740,12 @@ Aprenderás: ${aprenderas}
               type="button"
               onClick={onClose}
               style={{
-                padding: '9px 18px',
+                padding: '9px 16px',
                 background: '#e2e8f0',
                 color: '#334155',
                 border: 'none',
                 borderRadius: '8px',
-                fontSize: '13px',
+                fontSize: '12px',
                 fontWeight: 600,
                 cursor: 'pointer'
               }}
