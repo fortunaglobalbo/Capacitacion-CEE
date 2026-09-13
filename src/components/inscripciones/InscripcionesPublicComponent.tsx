@@ -58,35 +58,73 @@ function InscripcionesPublicContent() {
   const [modalAficheInfo, setModalAficheInfo] = useState<{ url: string; nombre: string } | null>(null);
   const [afichesByCursoId, setAfichesByCursoId] = useState<{ [cursoId: string]: string }>({});
 
-  // Cargar afiches de todos los cursos desde Supabase, localStorage e IndexedDB
+  // Cargar afiches de todos los cursos desde Supabase Storage, localStorage e IndexedDB (compatible con cualquier celular)
   useEffect(() => {
     if (cursos.length === 0) return;
-    const initialMap: { [id: string]: string } = {};
-    cursos.forEach(c => {
-      let url = c.afiche_url || '';
-      if (!url && typeof window !== 'undefined') {
-        try {
-          url = localStorage.getItem(`afiche_curso_${c.id}`) || '';
-        } catch {}
-      }
-      if (url) initialMap[c.id] = url;
-    });
-    setAfichesByCursoId(initialMap);
 
-    // Hidratar desde IndexedDB en segundo plano
-    cursos.forEach(async (c) => {
-      if (!initialMap[c.id]) {
-        const idbUrl = await getAficheLocallySafe(c.id, c.afiche_url);
-        if (idbUrl) {
-          setAfichesByCursoId(prev => ({ ...prev, [c.id]: idbUrl }));
+    let isMounted = true;
+
+    const loadAfiches = async () => {
+      // 1. Inicializar con la URL pública estándar de Supabase Storage para cada curso
+      const map: { [id: string]: string } = {};
+      cursos.forEach(c => {
+        const cleanId = c.id.trim();
+        map[c.id] = `https://qcsbxjovrhxrafbxaiqd.supabase.co/storage/v1/object/public/comprobantes/afiches/afiche_${cleanId}.jpg`;
+      });
+
+      // 2. Comprobar archivos en Supabase Storage (para resolver nombres con timestamp o nombres específicos)
+      try {
+        const { data: storageFiles } = await supabase.storage.from('comprobantes').list('afiches');
+        if (storageFiles && storageFiles.length > 0) {
+          cursos.forEach(c => {
+            const cleanId = c.id.trim();
+            const matching = storageFiles.filter(f =>
+              f.name === `afiche_${cleanId}.jpg` ||
+              f.name.startsWith(`afiche_${cleanId}_`) ||
+              f.name.includes(`_${cleanId}_`)
+            );
+            if (matching.length > 0) {
+              const latest = matching.sort((a, b) => {
+                const timeA = a.created_at || a.updated_at || a.name;
+                const timeB = b.created_at || b.updated_at || b.name;
+                return timeB.localeCompare(timeA);
+              })[0];
+              const { data: publicData } = supabase.storage.from('comprobantes').getPublicUrl(`afiches/${latest.name}`);
+              if (publicData?.publicUrl) {
+                map[c.id] = publicData.publicUrl;
+              }
+            }
+          });
+        }
+      } catch (err) {
+        console.warn('Error resolviendo afiches de Supabase Storage:', err);
+      }
+
+      // 3. Fallback a IndexedDB / LocalStorage si existe algo local
+      for (const c of cursos) {
+        if (!map[c.id] || map[c.id].trim() === '') {
+          const localUrl = await getAficheLocallySafe(c.id, c.afiche_url);
+          if (localUrl) map[c.id] = localUrl;
         }
       }
-    });
+
+      if (isMounted) {
+        setAfichesByCursoId(map);
+      }
+    };
+
+    loadAfiches();
+
+    return () => {
+      isMounted = false;
+    };
   }, [cursos]);
 
   const getAficheForCurso = (c: CursoCapacitacion | null): string => {
     if (!c) return '/plantilla_afiche.jpg';
-    return afichesByCursoId[c.id] || c.afiche_url || '/plantilla_afiche.jpg';
+    const cleanId = c.id.trim();
+    return afichesByCursoId[c.id] ||
+      `https://qcsbxjovrhxrafbxaiqd.supabase.co/storage/v1/object/public/comprobantes/afiches/afiche_${cleanId}.jpg`;
   };
 
   const hasCustomAfiche = (c: CursoCapacitacion | null): boolean => {
@@ -105,22 +143,17 @@ function InscripcionesPublicContent() {
       setActiveAficheUrl('');
       return;
     }
-    let localUrl = afichesByCursoId[selectedCurso.id] || selectedCurso.afiche_url || '';
-    if (!localUrl && typeof window !== 'undefined') {
-      try {
-        localUrl = localStorage.getItem(`afiche_curso_${selectedCurso.id}`) || '';
-      } catch {}
-    }
+    const cleanId = selectedCurso.id.trim();
+    const publicStorageUrl = `https://qcsbxjovrhxrafbxaiqd.supabase.co/storage/v1/object/public/comprobantes/afiches/afiche_${cleanId}.jpg`;
+    let localUrl = afichesByCursoId[selectedCurso.id] || selectedCurso.afiche_url || publicStorageUrl;
     setActiveAficheUrl(localUrl);
 
-    if (!localUrl) {
-      getAficheLocallySafe(selectedCurso.id, selectedCurso.afiche_url).then((url) => {
-        if (url) {
-          setActiveAficheUrl(url);
-          setAfichesByCursoId(prev => ({ ...prev, [selectedCurso.id]: url }));
-        }
-      });
-    }
+    getAficheLocallySafe(selectedCurso.id, selectedCurso.afiche_url).then((url) => {
+      if (url) {
+        setActiveAficheUrl(url);
+        setAfichesByCursoId(prev => ({ ...prev, [selectedCurso.id]: url }));
+      }
+    });
   }, [selectedCurso, afichesByCursoId]);
 
   // Paso actual del Wizard:
@@ -840,6 +873,9 @@ function InscripcionesPublicContent() {
                       <img
                         src={getAficheForCurso(selectedCurso)}
                         alt={`Afiche Oficial - ${selectedCurso.nombre}`}
+                        onError={() => {
+                          setAfichesByCursoId(prev => ({ ...prev, [selectedCurso.id]: '' }));
+                        }}
                         style={{
                           width: '100%',
                           height: '100%',

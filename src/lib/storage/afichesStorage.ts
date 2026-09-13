@@ -91,24 +91,58 @@ export async function saveAficheLocallySafe(cursoId: string, urlOrBase64: string
 }
 
 /**
- * Obtiene el afiche combinando Supabase, localStorage e IndexedDB
+ * Genera la URL pública directa desde Supabase Storage para un curso (accesible en celulares y cualquier red)
+ */
+export function getAfichePublicUrl(cursoId: string): string {
+  if (!cursoId) return '';
+  const cleanId = cursoId.trim();
+  const { data } = supabase.storage.from('comprobantes').getPublicUrl(`afiches/afiche_${cleanId}.jpg`);
+  return data?.publicUrl || '';
+}
+
+/**
+ * Obtiene el afiche combinando Supabase Storage (para celulares y cualquier dispositivo),
+ * localStorage e IndexedDB.
  */
 export async function getAficheLocallySafe(cursoId: string, fallbackUrl?: string | null): Promise<string> {
   if (fallbackUrl && !fallbackUrl.startsWith('data:') && fallbackUrl.length < 500) {
     return fallbackUrl;
   }
 
-  if (typeof window !== 'undefined' && cursoId) {
+  const cleanId = cursoId ? cursoId.trim() : '';
+
+  // 1. Primero intentar en Supabase Storage (accesible desde cualquier celular)
+  if (cleanId) {
     try {
-      const stored = localStorage.getItem(`afiche_curso_${cursoId}`);
+      const { data: listData } = await supabase.storage.from('comprobantes').list('afiches');
+      if (listData && listData.length > 0) {
+        const match = listData.find(f =>
+          f.name === `afiche_${cleanId}.jpg` ||
+          f.name.startsWith(`afiche_${cleanId}_`) ||
+          f.name.includes(`_${cleanId}_`)
+        );
+        if (match) {
+          const { data } = supabase.storage.from('comprobantes').getPublicUrl(`afiches/${match.name}`);
+          if (data?.publicUrl) return data.publicUrl;
+        }
+      }
+    } catch (storageErr) {
+      console.warn('Verificación en Supabase Storage:', storageErr);
+    }
+  }
+
+  // 2. Fallback a IndexedDB / LocalStorage del navegador
+  if (typeof window !== 'undefined' && cleanId) {
+    try {
+      const stored = localStorage.getItem(`afiche_curso_${cleanId}`);
       if (stored) return stored;
     } catch {}
 
-    const idbStored = await getAficheFromIDB(cursoId);
+    const idbStored = await getAficheFromIDB(cleanId);
     if (idbStored) return idbStored;
   }
 
-  return fallbackUrl || '';
+  return fallbackUrl || (cleanId ? getAfichePublicUrl(cleanId) : '');
 }
 
 /**
@@ -199,6 +233,7 @@ export async function uploadAndSaveAfiche(cursoId: string, rawFile: File): Promi
   try {
     const fileName = `afiche_${cleanId}_${Date.now()}.jpg`;
     const filePath = `afiches/${fileName}`;
+    const fixedPath = `afiches/afiche_${cleanId}.jpg`;
 
     const { data, error } = await supabase.storage
       .from('comprobantes')
@@ -207,15 +242,23 @@ export async function uploadAndSaveAfiche(cursoId: string, rawFile: File): Promi
         upsert: true
       });
 
+    // Subir también con nombre fijo para acceso directo universal desde cualquier celular
+    await supabase.storage
+      .from('comprobantes')
+      .upload(fixedPath, compressedFile, {
+        cacheControl: '3600',
+        upsert: true
+      });
+
     if (!error && data) {
-      const { data: publicUrlData } = supabase.storage.from('comprobantes').getPublicUrl(filePath);
+      const { data: publicUrlData } = supabase.storage.from('comprobantes').getPublicUrl(fixedPath);
       if (publicUrlData?.publicUrl) {
         finalUrl = publicUrlData.publicUrl;
         uploadedToStorage = true;
       }
     }
   } catch (storageErr) {
-    console.warn('Supabase Storage intento 1 omitido:', storageErr);
+    console.warn('Supabase Storage intento omitido:', storageErr);
   }
 
   // 3. Si no se pudo en Supabase Storage, probar la API Next.js `/api/afiche/upload`
