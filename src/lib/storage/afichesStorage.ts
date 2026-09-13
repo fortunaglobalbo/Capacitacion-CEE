@@ -300,3 +300,45 @@ export async function uploadAndSaveAfiche(cursoId: string, rawFile: File): Promi
 
   return finalUrl;
 }
+
+/**
+ * Guarda metadatos dinámicos del curso (como Modalidad: MOOC) en Supabase Storage
+ * para que se sincronicen y respeten en cualquier dispositivo y celular.
+ */
+export async function saveCursoMetadata(cursoId: string, metaData: { modalidad?: string; costo?: number }): Promise<void> {
+  try {
+    const cleanId = cursoId.trim();
+    let currentMeta: Record<string, any> = {};
+    try {
+      const res = await fetch(`https://qcsbxjovrhxrafbxaiqd.supabase.co/storage/v1/object/public/comprobantes/cursos_metadata.json?v=${Date.now()}`);
+      if (res.ok) {
+        currentMeta = await res.json();
+      }
+    } catch {}
+
+    currentMeta[cleanId] = {
+      ...currentMeta[cleanId],
+      ...metaData,
+      updated_at: new Date().toISOString()
+    };
+
+    const blob = new Blob([JSON.stringify(currentMeta, null, 2)], { type: 'application/json' });
+    await supabase.storage.from('comprobantes').upload('cursos_metadata.json', blob, { upsert: true });
+  } catch (e) {
+    console.warn('Error al guardar metadata de cursos:', e);
+  }
+}
+
+/**
+ * Carga metadatos dinámicos de los cursos desde Supabase Storage
+ */
+export async function loadCursosMetadata(): Promise<Record<string, { modalidad?: string; costo?: number }>> {
+  try {
+    const res = await fetch(`https://qcsbxjovrhxrafbxaiqd.supabase.co/storage/v1/object/public/comprobantes/cursos_metadata.json?v=${Date.now()}`);
+    if (res.ok) {
+      return await res.json();
+    }
+  } catch {}
+  return {};
+}
+

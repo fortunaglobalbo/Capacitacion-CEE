@@ -31,7 +31,7 @@ import {
   X
 } from 'lucide-react';
 import { Participante, CursoCapacitacion } from '@/types';
-import { getAficheLocallySafe } from '@/lib/storage/afichesStorage';
+import { getAficheLocallySafe, loadCursosMetadata } from '@/lib/storage/afichesStorage';
 
 export function InscripcionesPublicComponent() {
   return (
@@ -57,6 +57,29 @@ function InscripcionesPublicContent() {
   const [activeAficheUrl, setActiveAficheUrl] = useState<string>('');
   const [modalAficheInfo, setModalAficheInfo] = useState<{ url: string; nombre: string } | null>(null);
   const [afichesByCursoId, setAfichesByCursoId] = useState<{ [cursoId: string]: string }>({});
+  const [cursosMeta, setCursosMeta] = useState<Record<string, { modalidad?: string; costo?: number }>>({});
+
+  // Cargar metadatos sincronizados (ej. Modalidad: MOOC)
+  useEffect(() => {
+    loadCursosMetadata().then(meta => {
+      if (meta) {
+        setCursosMeta(meta);
+      }
+    });
+  }, []);
+
+  const getModalidadForCurso = (c: CursoCapacitacion | null | undefined): string => {
+    if (!c) return 'MOOC';
+    const cleanId = c.id?.trim() || '';
+    if (cursosMeta[cleanId]?.modalidad) return cursosMeta[cleanId].modalidad!;
+    if (cursosMeta[c.id]?.modalidad) return cursosMeta[c.id].modalidad!;
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem(`prompt_modalidad_${c.id}`) || localStorage.getItem(`prompt_modalidad_${cleanId}`);
+      if (saved) return saved;
+    }
+    if ((c as any).modalidad) return (c as any).modalidad;
+    return 'MOOC';
+  };
 
   // Cargar afiches de todos los cursos desde Supabase Storage, localStorage e IndexedDB (compatible con cualquier celular)
   useEffect(() => {
@@ -812,7 +835,7 @@ function InscripcionesPublicContent() {
                                 {c.nombre}
                               </strong>
                               <span style={{ fontSize: '11px', color: '#64748b' }}>
-                                Modalidad {(c as any).modalidad || 'Teórico - Práctico'}
+                                Modalidad {getModalidadForCurso(c)}
                               </span>
                             </div>
                           </div>
@@ -945,7 +968,7 @@ function InscripcionesPublicContent() {
                             Inversión: Bs. {selectedCurso.costo || 150}
                           </span>
                           <span style={{ background: 'rgba(255,255,255,0.12)', color: '#e2e8f0', padding: '4px 10px', borderRadius: '6px', fontSize: '12px', fontWeight: 700 }}>
-                            {(selectedCurso as any).modalidad || 'Teórico - Práctico'}
+                            Modalidad {getModalidadForCurso(selectedCurso)}
                           </span>
                         </div>
 
@@ -980,44 +1003,8 @@ function InscripcionesPublicContent() {
                     </div>
                   )}
 
-                  {/* Datos del Curso y Botón de Inscripción */}
+                  {/* Botón Asistido de Inscripción */}
                   <div style={{ width: '100%', textAlign: 'center', marginTop: '16px' }}>
-                    <h2 style={{
-                      fontSize: '20px',
-                      fontWeight: 900,
-                      color: '#0f172a',
-                      margin: '0 0 8px 0',
-                      lineHeight: '1.3'
-                    }}>
-                      {selectedCurso.nombre}
-                    </h2>
-
-                    <div style={{
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: '8px',
-                      background: '#ecfdf5',
-                      border: '1px solid #a7f3d0',
-                      padding: '6px 14px',
-                      borderRadius: '999px',
-                      marginBottom: '16px',
-                      flexWrap: 'wrap'
-                    }}>
-                      <span style={{ fontSize: '13px', fontWeight: 800, color: '#047857' }}>
-                        Inversión: Bs. {selectedCurso.costo || 150}
-                      </span>
-                      <span style={{ color: '#94a3b8' }}>•</span>
-                      <span style={{ fontSize: '12px', fontWeight: 700, color: '#065f46' }}>
-                        {(selectedCurso as any).modalidad || 'Teórico - Práctico'}
-                      </span>
-                      <span style={{ color: '#94a3b8' }}>•</span>
-                      <span style={{ fontSize: '12px', fontWeight: 700, color: '#065f46' }}>
-                        Resolución Ministerial
-                      </span>
-                    </div>
-
-                    {/* Botón Asistido de Inscripción */}
                     <button
                       type="button"
                       onClick={handleProceedFromStep1}

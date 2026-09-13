@@ -24,7 +24,7 @@ import {
   Edit3
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase/client';
-import { uploadAndSaveAfiche, saveAficheLocallySafe, getAficheLocallySafe } from '@/lib/storage/afichesStorage';
+import { uploadAndSaveAfiche, saveAficheLocallySafe, getAficheLocallySafe, saveCursoMetadata, loadCursosMetadata } from '@/lib/storage/afichesStorage';
 
 export interface PromptIAModalProps {
   curso: {
@@ -251,8 +251,20 @@ export default function PromptIAModal({ curso, onClose, onAficheSaved }: PromptI
       const saved = localStorage.getItem(`prompt_modalidad_${curso.id}`);
       if (saved) return saved;
     }
-    return 'Teórico - Práctico';
+    return (curso as any).modalidad || 'MOOC';
   });
+
+  // Sincronizar modalidad y metadatos remotos desde Supabase Storage
+  useEffect(() => {
+    if (!curso.id) return;
+    loadCursosMetadata().then(meta => {
+      const cleanId = curso.id.trim();
+      const m = meta[cleanId] || meta[curso.id];
+      if (m?.modalidad) {
+        setModalidad(m.modalidad);
+      }
+    });
+  }, [curso.id]);
 
   // Prompt personalizado directamente por el usuario
   const [customPromptText, setCustomPromptText] = useState<string>(() => {
@@ -414,6 +426,9 @@ export default function PromptIAModal({ curso, onClose, onAficheSaved }: PromptI
         localStorage.setItem(`prompt_aprenderas_${curso.id}`, aprenderas);
         localStorage.setItem(`prompt_costo_${curso.id}`, String(costo));
         localStorage.setItem(`prompt_modalidad_${curso.id}`, modalidad);
+
+        // Guardar metadata en Supabase Storage para sincronizar con celulares y web pública
+        saveCursoMetadata(curso.id, { modalidad, costo });
 
         if (hasCustomPromptEdit && customPromptText) {
           localStorage.setItem(`prompt_custom_text_${curso.id}`, customPromptText);
