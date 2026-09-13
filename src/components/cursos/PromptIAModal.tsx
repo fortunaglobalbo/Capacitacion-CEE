@@ -50,6 +50,130 @@ export interface PlantillaSlot {
   defaultUrl: string;
 }
 
+// IndexedDB para almacenamiento ilimitado de imágenes de plantillas
+const IDB_NAME = 'cee_plantillas_db';
+const IDB_STORE = 'plantillas';
+
+function openPlantillasDB(): Promise<IDBDatabase> {
+  return new Promise((resolve, reject) => {
+    if (typeof window === 'undefined' || !window.indexedDB) {
+      return reject(new Error('IndexedDB no soportado'));
+    }
+    const request = indexedDB.open(IDB_NAME, 1);
+    request.onupgradeneeded = () => {
+      const db = request.result;
+      if (!db.objectStoreNames.contains(IDB_STORE)) {
+        db.createObjectStore(IDB_STORE);
+      }
+    };
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+  });
+}
+
+async function savePlantillaToIDB(key: string, dataUrl: string): Promise<void> {
+  try {
+    const db = await openPlantillasDB();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(IDB_STORE, 'readwrite');
+      const store = tx.objectStore(IDB_STORE);
+      store.put(dataUrl, key);
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+    });
+  } catch (e) {
+    console.warn('Advertencia IndexedDB save:', e);
+  }
+}
+
+async function getPlantillaFromIDB(key: string): Promise<string | null> {
+  try {
+    const db = await openPlantillasDB();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(IDB_STORE, 'readonly');
+      const store = tx.objectStore(IDB_STORE);
+      const req = store.get(key);
+      req.onsuccess = () => resolve(req.result || null);
+      req.onerror = () => reject(req.error);
+    });
+  } catch {
+    return null;
+  }
+}
+
+async function removePlantillaFromIDB(key: string): Promise<void> {
+  try {
+    const db = await openPlantillasDB();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(IDB_STORE, 'readwrite');
+      const store = tx.objectStore(IDB_STORE);
+      store.delete(key);
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+    });
+  } catch {
+    // ignore
+  }
+}
+
+/**
+ * Comprime y escala cualquier imagen (JPG, PNG, WEBP, fotos pesadas de celular)
+ * a una resolución óptima para afiches (~1400px máx) produciendo un JPEG de ~150-250KB.
+ * Esto evita errores de límite de memoria y de cuota de localStorage.
+ */
+function compressImageForTemplate(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error('No se pudo leer el archivo seleccionado.'));
+    reader.onload = (event) => {
+      const result = event.target?.result;
+      if (!result || typeof result !== 'string') {
+        return reject(new Error('El archivo no contiene datos legibles.'));
+      }
+
+      const img = new Image();
+      img.onerror = () => reject(new Error('El formato del archivo no es compatible con el visor de imágenes.'));
+      img.onload = () => {
+        try {
+          const maxDimension = 1400;
+          let width = img.naturalWidth || img.width || 800;
+          let height = img.naturalHeight || img.height || 1000;
+
+          if (width > maxDimension || height > maxDimension) {
+            if (width > height) {
+              height = Math.round((height * maxDimension) / width);
+              width = maxDimension;
+            } else {
+              width = Math.round((width * maxDimension) / height);
+              height = maxDimension;
+            }
+          }
+
+          const canvas = document.createElement('canvas');
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          if (!ctx) {
+            return resolve(result);
+          }
+
+          ctx.fillStyle = '#ffffff';
+          ctx.fillRect(0, 0, width, height);
+          ctx.drawImage(img, 0, 0, width, height);
+
+          const compressed = canvas.toDataURL('image/jpeg', 0.85);
+          resolve(compressed);
+        } catch (canvasErr) {
+          console.warn('Compresión canvas en fallback:', canvasErr);
+          resolve(result);
+        }
+      };
+      img.src = result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
 const DEFAULT_PLANTILLAS: PlantillaSlot[] = [
   {
     id: 1,
@@ -202,6 +326,26 @@ export default function PromptIAModal({ curso, onClose, onAficheSaved }: PromptI
       };
     }
   }, [curso.id, plantillaUrl]);
+
+  // Cargar plantillas desde IndexedDB si faltasen en localStorage
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      const updated = await Promise.all(
+        plantillas.map(async (p) => {
+          if (!p.url) {
+            const idbVal = await getPlantillaFromIDB(`plantilla_oficial_slot_${p.id}`);
+            if (idbVal) return { ...p, url: idbVal };
+          }
+          return p;
+        })
+      );
+      if (active) {
+        setPlantillas(updated);
+      }
+    })();
+    return () => { active = false; };
+  }, []);
 
   // Generar el texto exacto del prompt
   const getPromptText = () => {
@@ -560,24 +704,35 @@ Aprenderás: ${aprenderas}
     try {
       setIsUpdatingPlantilla(true);
 
-      // Leer localmente como base64 data URL (100% inmune a EROFS en servidores/Vercel)
-      const reader = new FileReader();
-      const base64Url: string = await new Promise((resolve, reject) => {
-        reader.onload = () => resolve(reader.result as string);
-        reader.onerror = reject;
-        reader.readAsDataURL(file);
-      });
-
-      // Guardar en localStorage para persistencia permanente en todos los cursos
-      if (typeof window !== 'undefined') {
-        localStorage.setItem(`plantilla_oficial_slot_${slotId}`, base64Url);
-        localStorage.setItem('plantilla_oficial_activa_slot', String(slotId));
+      // 1. Validar que sea un archivo de imagen
+      if (file.type && !file.type.startsWith('image/')) {
+        throw new Error('El archivo seleccionado no es una imagen válida.');
       }
 
+      // 2. Comprimir y optimizar la imagen con canvas (inmune a cuota de localStorage)
+      const base64Url = await compressImageForTemplate(file);
+
+      // 3. Guardar en IndexedDB (sin límite de 5MB)
+      await savePlantillaToIDB(`plantilla_oficial_slot_${slotId}`, base64Url);
+
+      // 4. Guardar en localStorage de forma segura con protección anti-cuota
+      if (typeof window !== 'undefined') {
+        try {
+          localStorage.setItem(`plantilla_oficial_slot_${slotId}`, base64Url);
+          localStorage.setItem('plantilla_oficial_activa_slot', String(slotId));
+        } catch (storageErr) {
+          console.warn('LocalStorage lleno, se usará IndexedDB para esta plantilla:', storageErr);
+          try {
+            localStorage.setItem('plantilla_oficial_activa_slot', String(slotId));
+          } catch {}
+        }
+      }
+
+      // 5. Actualizar estado reactivo
       setPlantillas(prev => prev.map(p => p.id === slotId ? { ...p, url: base64Url } : p));
       setActiveSlotId(slotId);
 
-      // Intentar sincronizar en backend de forma segura y opcional
+      // 6. Intentar sincronizar en backend de forma segura y opcional
       try {
         const formData = new FormData();
         formData.append('file', file);
@@ -591,22 +746,26 @@ Aprenderás: ${aprenderas}
       Swal.fire({
         icon: 'success',
         title: `¡Plantilla ${slotId} Guardada!`,
-        text: `La imagen se guardó exitosamente y se configuró como la Plantilla Oficial Activa para todos los cursos.`,
+        text: `La imagen se procesó exitosamente y se configuró como la Plantilla Oficial Activa para todos los cursos.`,
         confirmButtonColor: '#2563eb'
       });
     } catch (err: any) {
       console.error('Error al actualizar plantilla:', err);
-      Swal.fire('Error', 'No se pudo procesar la imagen.', 'error');
+      Swal.fire('Error', err?.message || 'No se pudo procesar la imagen.', 'error');
     } finally {
       setIsUpdatingPlantilla(false);
     }
   };
 
-  const handleResetSlot = (slotId: number, e: React.MouseEvent) => {
+  const handleResetSlot = async (slotId: number, e: React.MouseEvent) => {
     e.stopPropagation();
     if (typeof window !== 'undefined') {
-      localStorage.removeItem(`plantilla_oficial_slot_${slotId}`);
+      try {
+        localStorage.removeItem(`plantilla_oficial_slot_${slotId}`);
+      } catch {}
     }
+    await removePlantillaFromIDB(`plantilla_oficial_slot_${slotId}`);
+
     setPlantillas(prev => prev.map(p => p.id === slotId ? { ...p, url: p.defaultUrl } : p));
     Swal.fire({
       icon: 'info',

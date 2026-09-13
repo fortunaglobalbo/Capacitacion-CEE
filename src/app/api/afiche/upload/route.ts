@@ -18,6 +18,8 @@ export async function POST(request: Request) {
       const formCursoId = formData.get('cursoId') as string | null;
       const formIsPlantilla = formData.get('isPlantilla') as string | null;
 
+      const formSlotId = (formData.get('slotId') as string) || '1';
+
       if (formIsPlantilla === 'true' || formCursoId === 'plantilla') {
         isPlantilla = true;
       }
@@ -72,13 +74,14 @@ export async function POST(request: Request) {
     const base64FallbackUrl = `data:${mimeType};base64,${fileBuffer.toString('base64')}`;
 
     if (isPlantilla) {
+      const templateFileName = cursoId === 'plantilla' ? 'plantilla_afiche.jpg' : 'plantilla_afiche.jpg';
       try {
-        const plantillaPath = path.join(process.cwd(), 'public', 'plantilla_afiche.jpg');
+        const plantillaPath = path.join(process.cwd(), 'public', templateFileName);
         fs.writeFileSync(plantillaPath, fileBuffer);
         return NextResponse.json({
           success: true,
-          url: `/plantilla_afiche.jpg?v=${timestamp}`,
-          fileName: 'plantilla_afiche.jpg',
+          url: `/${templateFileName}?v=${timestamp}`,
+          fileName: templateFileName,
           isPlantilla: true
         });
       } catch (fsErr: any) {
@@ -86,7 +89,7 @@ export async function POST(request: Request) {
         return NextResponse.json({
           success: true,
           url: base64FallbackUrl,
-          fileName: 'plantilla_afiche.jpg',
+          fileName: templateFileName,
           isPlantilla: true
         });
       }
