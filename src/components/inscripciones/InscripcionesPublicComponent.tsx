@@ -31,6 +31,7 @@ import {
   X
 } from 'lucide-react';
 import { Participante, CursoCapacitacion } from '@/types';
+import { getAficheLocallySafe } from '@/lib/storage/afichesStorage';
 
 export function InscripcionesPublicComponent() {
   return (
@@ -44,7 +45,7 @@ function InscripcionesPublicContent() {
   const searchParams = useSearchParams();
   const urlCursoId = searchParams.get('curso') || '';
 
-  // Tab activo: Formulario o Consulta
+  // Tabs: 'formulario' | 'consulta'
   const [activeTab, setActiveTab] = useState<'formulario' | 'consulta'>('formulario');
 
   // Cursos disponibles
@@ -53,6 +54,27 @@ function InscripcionesPublicContent() {
   const [selectedCurso, setSelectedCurso] = useState<CursoCapacitacion | null>(null);
   const [loadingCursos, setLoadingCursos] = useState(true);
   const [showAficheModal, setShowAficheModal] = useState(false);
+  const [activeAficheUrl, setActiveAficheUrl] = useState<string>('');
+
+  useEffect(() => {
+    if (!selectedCurso) {
+      setActiveAficheUrl('');
+      return;
+    }
+    let localUrl = selectedCurso.afiche_url || '';
+    if (!localUrl && typeof window !== 'undefined') {
+      try {
+        localUrl = localStorage.getItem(`afiche_curso_${selectedCurso.id}`) || '';
+      } catch {}
+    }
+    setActiveAficheUrl(localUrl);
+
+    if (!localUrl) {
+      getAficheLocallySafe(selectedCurso.id, selectedCurso.afiche_url).then((url) => {
+        if (url) setActiveAficheUrl(url);
+      });
+    }
+  }, [selectedCurso]);
 
   // Paso actual del Wizard: 1 = Datos, 2 = Carnet, 3 = Pago QR
   const [currentStep, setCurrentStep] = useState<1 | 2 | 3 | 4>(1);
@@ -488,32 +510,28 @@ function InscripcionesPublicContent() {
               </div>
 
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
-                {(() => {
-                  const aficheUrl = selectedCurso.afiche_url || (typeof window !== 'undefined' ? localStorage.getItem(`afiche_curso_${selectedCurso.id}`) : '');
-                  if (!aficheUrl) return null;
-                  return (
-                    <button
-                      type="button"
-                      onClick={() => setShowAficheModal(true)}
-                      style={{
-                        padding: '6px 12px',
-                        background: 'linear-gradient(135deg, #0d3b66 0%, #1e40af 100%)',
-                        color: '#ffffff',
-                        border: 'none',
-                        borderRadius: '8px',
-                        fontSize: '12px',
-                        fontWeight: 700,
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '5px',
-                        boxShadow: '0 2px 6px rgba(13, 59, 102, 0.25)'
-                      }}
-                    >
-                      <Eye size={13} color="#fbbf24" /> Ver Afiche Oficial
-                    </button>
-                  );
-                })()}
+                {activeAficheUrl && (
+                  <button
+                    type="button"
+                    onClick={() => setShowAficheModal(true)}
+                    style={{
+                      padding: '6px 12px',
+                      background: 'linear-gradient(135deg, #0d3b66 0%, #1e40af 100%)',
+                      color: '#ffffff',
+                      border: 'none',
+                      borderRadius: '8px',
+                      fontSize: '12px',
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      boxShadow: '0 2px 8px rgba(13,59,102,0.25)'
+                    }}
+                  >
+                    <Eye size={14} /> Ver Afiche del Curso
+                  </button>
+                )}
 
                 <span style={{ background: '#dcfce7', color: '#15803d', padding: '4px 10px', borderRadius: '8px', fontSize: '13px', fontWeight: 800 }}>
                   Matrícula: Bs. {selectedCurso.costo || 150}
@@ -1558,7 +1576,7 @@ function InscripcionesPublicContent() {
 
             <div style={{ borderRadius: '10px', overflow: 'hidden', maxHeight: '72vh', width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#000' }}>
               <img
-                src={selectedCurso.afiche_url || (typeof window !== 'undefined' ? localStorage.getItem(`afiche_curso_${selectedCurso.id}`) : '') || ''}
+                src={activeAficheUrl || ''}
                 alt={`Afiche de ${selectedCurso.nombre}`}
                 style={{ maxHeight: '72vh', maxWidth: '100%', objectFit: 'contain' }}
               />

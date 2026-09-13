@@ -26,6 +26,7 @@ import {
 } from 'lucide-react';
 import { CursoCapacitacion } from '@/types';
 import PromptIAModal from '@/components/cursos/PromptIAModal';
+import { uploadAndSaveAfiche, saveAficheLocallySafe, getAficheLocallySafe } from '@/lib/storage/afichesStorage';
 
 export default function GestionCursos() {
   const [cursos, setCursos] = useState<CursoCapacitacion[]>([]);
@@ -71,13 +72,26 @@ export default function GestionCursos() {
         const mapAfiches: { [id: string]: string } = {};
         if (typeof window !== 'undefined') {
           cursosList.forEach(c => {
-            const stored = localStorage.getItem(`afiche_curso_${c.id}`);
+            let stored = '';
+            try {
+              stored = localStorage.getItem(`afiche_curso_${c.id}`) || '';
+            } catch {}
             if (c.afiche_url || stored) {
               mapAfiches[c.id] = c.afiche_url || stored || '';
             }
           });
         }
         setAficheUrls(mapAfiches);
+
+        // Hidratar desde IndexedDB para aquellos cursos sin afiche en memoria
+        cursosList.forEach(async (c) => {
+          if (!mapAfiches[c.id]) {
+            const idbUrl = await getAficheLocallySafe(c.id, c.afiche_url);
+            if (idbUrl) {
+              setAficheUrls(prev => ({ ...prev, [c.id]: idbUrl }));
+            }
+          }
+        });
       }
 
       // Cargar conteo de participantes por curso
@@ -167,23 +181,9 @@ export default function GestionCursos() {
 
       // Si subió un archivo nuevo de afiche
       if (formAficheFile) {
-        const formData = new FormData();
-        formData.append('file', formAficheFile);
-        formData.append('cursoId', cleanId);
-
-        const res = await fetch('/api/afiche/upload', {
-          method: 'POST',
-          body: formData
-        });
-
-        const resData = await res.json();
-        if (res.ok && resData.success) {
-          finalAficheUrl = resData.url;
-        }
-      }
-
-      if (finalAficheUrl && typeof window !== 'undefined') {
-        localStorage.setItem(`afiche_curso_${cleanId}`, finalAficheUrl);
+        finalAficheUrl = await uploadAndSaveAfiche(cleanId, formAficheFile);
+      } else if (finalAficheUrl) {
+        await saveAficheLocallySafe(cleanId, finalAficheUrl);
       }
 
       const payload: any = {
@@ -285,32 +285,8 @@ export default function GestionCursos() {
   // Subir afiche rápido desde la tarjeta
   const handleQuickUploadAfiche = async (cursoItem: CursoCapacitacion, file: File) => {
     try {
-      const formData = new FormData();
-      formData.append('file', file);
-      formData.append('cursoId', cursoItem.id);
-
-      const res = await fetch('/api/afiche/upload', {
-        method: 'POST',
-        body: formData
-      });
-
-      const resData = await res.json();
-      if (!res.ok || !resData.success) {
-        throw new Error(resData.message || 'Error al guardar el afiche');
-      }
-
-      const newUrl = resData.url;
-      localStorage.setItem(`afiche_curso_${cursoItem.id}`, newUrl);
+      const newUrl = await uploadAndSaveAfiche(cursoItem.id, file);
       setAficheUrls(prev => ({ ...prev, [cursoItem.id]: newUrl }));
-
-      try {
-        await supabase
-          .from('cursos')
-          .update({ afiche_url: newUrl, updated_at: new Date().toISOString() })
-          .eq('id', cursoItem.id);
-      } catch (e) {
-        // Fallback silencioso
-      }
 
       Swal.fire({
         icon: 'success',

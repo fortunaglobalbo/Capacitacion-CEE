@@ -21,6 +21,7 @@ import {
   Info
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase/client';
+import { uploadAndSaveAfiche, saveAficheLocallySafe, getAficheLocallySafe } from '@/lib/storage/afichesStorage';
 
 export interface PromptIAModalProps {
   curso: {
@@ -267,10 +268,23 @@ export default function PromptIAModal({ curso, onClose, onAficheSaved }: PromptI
   const [currentAficheUrl, setCurrentAficheUrl] = useState<string>(() => {
     if (curso.afiche_url) return curso.afiche_url;
     if (typeof window !== 'undefined') {
-      return localStorage.getItem(`afiche_curso_${curso.id}`) || '';
+      try {
+        return localStorage.getItem(`afiche_curso_${curso.id}`) || '';
+      } catch {
+        return '';
+      }
     }
     return '';
   });
+
+  useEffect(() => {
+    if (!currentAficheUrl && curso.id) {
+      getAficheLocallySafe(curso.id, curso.afiche_url).then((url) => {
+        if (url) setCurrentAficheUrl(url);
+      });
+    }
+  }, [curso.id, curso.afiche_url, currentAficheUrl]);
+
   const [dragActive, setDragActive] = useState(false);
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
   const [previewLocalUrl, setPreviewLocalUrl] = useState<string>('');
@@ -826,43 +840,18 @@ Aprenderás: ${aprenderas}
       let finalUrl = currentAficheUrl;
 
       if (uploadedFile) {
-        // Enviar a la API local de Next.js
-        const formData = new FormData();
-        formData.append('file', uploadedFile);
-        formData.append('cursoId', curso.id || 'general');
-
-        const res = await fetch('/api/afiche/upload', {
-          method: 'POST',
-          body: formData
-        });
-
-        const resData = await res.json();
-        if (!res.ok || !resData.success) {
-          throw new Error(resData.message || 'Error al guardar imagen en servidor');
-        }
-
-        finalUrl = resData.url;
+        // Comprime automáticamente, sube a Supabase Storage/API y guarda en IndexedDB + local con protección de cuota
+        finalUrl = await uploadAndSaveAfiche(curso.id || 'general', uploadedFile);
+      } else if (finalUrl && curso.id) {
+        await saveAficheLocallySafe(curso.id, finalUrl);
       }
 
-      // Guardar en localStorage para respaldo instantáneo
+      // Guardar temario de forma segura sin exceder cuotas
       if (typeof window !== 'undefined' && curso.id) {
-        localStorage.setItem(`afiche_curso_${curso.id}`, finalUrl);
-        // También actualizar temario si se editó
-        localStorage.setItem(`temario_curso_${curso.id}`, aprenderas);
-      }
-
-      // Intentar actualizar Supabase (con fallback silencioso si las columnas no existen aún)
-      if (curso.id) {
         try {
-          await supabase
-            .from('cursos')
-            .update({
-              afiche_url: finalUrl,
-              updated_at: new Date().toISOString()
-            })
-            .eq('id', curso.id);
-        } catch (dbErr) {
-          console.warn('Nota: columna afiche_url en Supabase pendiente de migración SQL, guardado en servidor y local:', dbErr);
+          localStorage.setItem(`temario_curso_${curso.id}`, aprenderas);
+        } catch {
+          // Ignorar silenciosamente si temario llena la cuota
         }
       }
 
