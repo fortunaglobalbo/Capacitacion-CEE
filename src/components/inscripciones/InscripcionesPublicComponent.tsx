@@ -89,6 +89,12 @@ function InscripcionesPublicContent() {
     return afichesByCursoId[c.id] || c.afiche_url || '/plantilla_afiche.jpg';
   };
 
+  const hasCustomAfiche = (c: CursoCapacitacion | null): boolean => {
+    if (!c) return false;
+    const url = afichesByCursoId[c.id] || c.afiche_url;
+    return Boolean(url && url.trim() !== '' && url !== '/plantilla_afiche.jpg');
+  };
+
   const openAfichePreview = (url: string, nombre: string) => {
     setModalAficheInfo({ url, nombre });
     setShowAficheModal(true);
@@ -708,41 +714,93 @@ function InscripcionesPublicContent() {
               alignItems: 'center',
               gap: '16px'
             }}>
-              {/* Selector de Curso si hay más de 1 curso activo */}
+              {/* Selector de Curso Limpio e Interactivo (Sin texto cortado) */}
               {cursos.length > 1 && (
                 <div style={{
                   width: '100%',
                   background: '#ffffff',
-                  padding: '12px 16px',
-                  borderRadius: '14px',
-                  border: '1.5px solid #cbd5e1',
-                  boxShadow: '0 2px 8px rgba(0,0,0,0.04)'
+                  padding: '16px',
+                  borderRadius: '16px',
+                  border: '1.5px solid #e2e8f0',
+                  boxShadow: '0 2px 10px rgba(0,0,0,0.04)'
                 }}>
-                  <label style={{ display: 'block', fontSize: '13px', fontWeight: 800, color: '#1e293b', marginBottom: '6px' }}>
-                    Seleccione el Curso de Capacitación:
-                  </label>
-                  <select
-                    value={selectedCursoId}
-                    onChange={(e) => handleSelectCurso(e.target.value)}
-                    style={{
-                      width: '100%',
-                      padding: '10px 14px',
-                      borderRadius: '10px',
-                      border: '1.5px solid #3b82f6',
-                      background: '#f8fafc',
-                      fontSize: '14px',
-                      fontWeight: 700,
-                      color: '#0f172a',
-                      outline: 'none',
-                      cursor: 'pointer'
-                    }}
-                  >
-                    {cursos.map(c => (
-                      <option key={c.id} value={c.id}>
-                        {c.nombre} — (Inversión: Bs. {c.costo || 150})
-                      </option>
-                    ))}
-                  </select>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
+                    <span style={{ fontSize: '13px', fontWeight: 800, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <BookOpen size={16} color="#2563eb" /> Seleccione el Curso:
+                    </span>
+                    <span style={{ fontSize: '11px', fontWeight: 700, color: '#64748b' }}>
+                      {cursos.length} cursos activos
+                    </span>
+                  </div>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    {cursos.map(c => {
+                      const isSelected = c.id === selectedCursoId;
+                      return (
+                        <button
+                          key={c.id}
+                          type="button"
+                          onClick={() => handleSelectCurso(c.id)}
+                          style={{
+                            width: '100%',
+                            textAlign: 'left',
+                            padding: '12px 14px',
+                            borderRadius: '12px',
+                            border: isSelected ? '2px solid #2563eb' : '1px solid #e2e8f0',
+                            background: isSelected ? '#eff6ff' : '#f8fafc',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            gap: '12px',
+                            transition: 'all 0.15s ease',
+                            boxShadow: isSelected ? '0 4px 12px rgba(37,99,235,0.12)' : 'none'
+                          }}
+                        >
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0, flex: 1 }}>
+                            <div style={{
+                              width: '20px',
+                              height: '20px',
+                              borderRadius: '50%',
+                              border: isSelected ? '6px solid #2563eb' : '2px solid #cbd5e1',
+                              background: '#ffffff',
+                              flexShrink: 0,
+                              boxSizing: 'border-box'
+                            }} />
+                            <div style={{ minWidth: 0 }}>
+                              <strong style={{
+                                display: 'block',
+                                fontSize: '13px',
+                                fontWeight: 800,
+                                color: isSelected ? '#1d4ed8' : '#1e293b',
+                                lineHeight: '1.3',
+                                wordBreak: 'break-word'
+                              }}>
+                                {c.nombre}
+                              </strong>
+                              <span style={{ fontSize: '11px', color: '#64748b' }}>
+                                Modalidad {(c as any).modalidad || 'Teórico - Práctico'}
+                              </span>
+                            </div>
+                          </div>
+
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
+                            <span style={{
+                              fontSize: '12px',
+                              fontWeight: 800,
+                              color: isSelected ? '#15803d' : '#334155',
+                              background: isSelected ? '#dcfce7' : '#ffffff',
+                              padding: '4px 8px',
+                              borderRadius: '8px',
+                              border: '1px solid ' + (isSelected ? '#86efac' : '#e2e8f0')
+                            }}>
+                              Bs. {c.costo || 150}
+                            </span>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
               )}
 
@@ -761,34 +819,130 @@ function InscripcionesPublicContent() {
                   padding: '16px'
                 }}>
                   {/* Contenedor del Afiche en Ratio 4:5 estricto */}
-                  <div
-                    onClick={() => openAfichePreview(getAficheForCurso(selectedCurso), selectedCurso.nombre)}
-                    style={{
-                      width: '100%',
-                      aspectRatio: '4 / 5',
-                      borderRadius: '14px',
-                      overflow: 'hidden',
-                      position: 'relative',
-                      background: '#090d16',
-                      cursor: 'pointer',
-                      boxShadow: '0 8px 24px rgba(0,0,0,0.2)',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center'
-                    }}
-                    title="Clic para ver en pantalla completa"
-                  >
-                    <img
-                      src={getAficheForCurso(selectedCurso)}
-                      alt={`Afiche Oficial - ${selectedCurso.nombre}`}
+                  {hasCustomAfiche(selectedCurso) ? (
+                    <div
+                      onClick={() => openAfichePreview(getAficheForCurso(selectedCurso), selectedCurso.nombre)}
                       style={{
                         width: '100%',
-                        height: '100%',
-                        objectFit: 'contain',
-                        display: 'block'
+                        aspectRatio: '4 / 5',
+                        borderRadius: '14px',
+                        overflow: 'hidden',
+                        position: 'relative',
+                        background: '#090d16',
+                        cursor: 'pointer',
+                        boxShadow: '0 8px 24px rgba(0,0,0,0.2)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center'
                       }}
-                    />
-                  </div>
+                      title="Clic para ver en pantalla completa"
+                    >
+                      <img
+                        src={getAficheForCurso(selectedCurso)}
+                        alt={`Afiche Oficial - ${selectedCurso.nombre}`}
+                        style={{
+                          width: '100%',
+                          height: '100%',
+                          objectFit: 'contain',
+                          display: 'block'
+                        }}
+                      />
+                    </div>
+                  ) : (
+                    /* Tarjeta Institucional 4:5 del Curso (cuando no se ha subido afiche personalizado) */
+                    <div
+                      style={{
+                        width: '100%',
+                        aspectRatio: '4 / 5',
+                        borderRadius: '14px',
+                        overflow: 'hidden',
+                        position: 'relative',
+                        background: 'linear-gradient(150deg, #091a36 0%, #0d2850 50%, #061224 100%)',
+                        color: '#ffffff',
+                        padding: '22px 18px',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        justifyContent: 'space-between',
+                        boxShadow: '0 8px 24px rgba(0,0,0,0.25)',
+                        border: '1.5px solid #1e3a5f',
+                        boxSizing: 'border-box'
+                      }}
+                    >
+                      {/* Cabecera institucional */}
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid rgba(255,255,255,0.12)', paddingBottom: '10px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <Image src="/logo-cee.png" alt="Logo" width={32} height={32} style={{ objectFit: 'contain' }} />
+                          <div>
+                            <span style={{ fontSize: '9px', color: '#93c5fd', fontWeight: 800, letterSpacing: '0.5px', textTransform: 'uppercase' }}>
+                              C.E.A. Martha Mendoza
+                            </span>
+                            <span style={{ fontSize: '11px', fontWeight: 900, color: '#f8fafc', display: 'block' }}>
+                              CURSOS DE CAPACITACIÓN
+                            </span>
+                          </div>
+                        </div>
+
+                        <span style={{
+                          background: 'rgba(34, 197, 94, 0.2)',
+                          color: '#86efac',
+                          border: '1px solid rgba(34, 197, 94, 0.4)',
+                          fontSize: '10px',
+                          fontWeight: 800,
+                          padding: '2px 8px',
+                          borderRadius: '20px'
+                        }}>
+                          INSCRIPCIONES HABILITADAS
+                        </span>
+                      </div>
+
+                      {/* Título y datos del curso */}
+                      <div style={{ padding: '8px 0' }}>
+                        <span style={{ fontSize: '11px', color: '#fbbf24', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.5px', display: 'block', marginBottom: '6px' }}>
+                          Programa Académico:
+                        </span>
+                        <h3 style={{ fontSize: '19px', fontWeight: 900, color: '#ffffff', margin: '0 0 12px 0', lineHeight: '1.3' }}>
+                          {selectedCurso.nombre}
+                        </h3>
+
+                        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '12px' }}>
+                          <span style={{ background: '#16a34a', color: '#ffffff', padding: '4px 10px', borderRadius: '6px', fontSize: '12px', fontWeight: 800 }}>
+                            Inversión: Bs. {selectedCurso.costo || 150}
+                          </span>
+                          <span style={{ background: 'rgba(255,255,255,0.12)', color: '#e2e8f0', padding: '4px 10px', borderRadius: '6px', fontSize: '12px', fontWeight: 700 }}>
+                            {(selectedCurso as any).modalidad || 'Teórico - Práctico'}
+                          </span>
+                        </div>
+
+                        {/* Temario resumido si existe */}
+                        {(selectedCurso.temario || selectedCurso.descripcion) && (
+                          <div style={{ background: 'rgba(255,255,255,0.06)', borderRadius: '10px', padding: '10px 12px', border: '1px solid rgba(255,255,255,0.1)' }}>
+                            <span style={{ fontSize: '10px', fontWeight: 800, color: '#93c5fd', textTransform: 'uppercase', display: 'block', marginBottom: '4px' }}>
+                              ¿Qué aprenderás?
+                            </span>
+                            <p style={{ margin: 0, fontSize: '11px', color: '#cbd5e1', lineHeight: '1.4' }}>
+                              {selectedCurso.temario || selectedCurso.descripcion}
+                            </p>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Pie de certificación oficial */}
+                      <div style={{
+                        background: 'rgba(0, 0, 0, 0.45)',
+                        borderRadius: '10px',
+                        padding: '10px 12px',
+                        border: '1px solid rgba(255,255,255,0.1)',
+                        fontSize: '10px',
+                        color: '#cbd5e1',
+                        lineHeight: '1.4'
+                      }}>
+                        <strong style={{ color: '#ef4444', display: 'block', marginBottom: '2px', fontSize: '11px' }}>
+                          🔴 CADA CERTIFICADO CUENTA CON RESOLUCIÓN MINISTERIAL
+                        </strong>
+                        <span>📄 Fotocopia Legalizada válida para Compulsas de Mérito, SICOES y Ascensos MTEPS.</span>
+                      </div>
+                    </div>
+                  )}
 
                   {/* Datos del Curso y Botón de Inscripción */}
                   <div style={{ width: '100%', textAlign: 'center', marginTop: '16px' }}>
