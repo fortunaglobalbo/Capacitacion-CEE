@@ -140,7 +140,8 @@ export default function PromptIAModal({ curso, onClose, onAficheSaved }: PromptI
 3. **Sección "Aprenderás":** ${aprenderas}
 4. **Inversión:** "Inversión: Bs. ${costo}"
 5. **Modalidad:** "${modalidad}"
-6. **Banner de Certificación (Abajo):**
+6. **Código QR Oficial de Inscripción:** Ubicado en la esquina inferior izquierda del afiche (sobre un recuadro blanco cuadrado de alto contraste). Se debe incluir **obligatoriamente el Código QR oficial provisto sin sufrir ninguna modificación**, respetando estrictamente su matriz original, orientación, proporción de aspecto cuadrada 1:1, contraste nítido y módulos de escaneo para que sea 100% escaneable desde cualquier smartphone.
+7. **Banner de Certificación (Abajo a la derecha):**
 🔴 CADA CERTIFICADO CUENTA CON RESOLUCIÓN MINISTERIAL
    📄 INCLUYE FOTOCOPIA LEGALIZADA lista y apta para:
    ✅ Compulsas de Mérito (Puntaje garantizado en convocatorias).
@@ -153,12 +154,14 @@ Usa la herramienta de generación de imágenes para crear un afiche con estas es
 - **Estilo**: Fotografía publicitaria de alta gama, limpia y corporativa.
 - **Formato**: Vertical (4:5).
 - **Colores**: Azul Marino, Amarillo, Blanco y Gris.
-- **Integración**: Coloca el logo de C.E.A. Martha Mendoza arriba a la derecha. El texto obligatorio debe ser nítido y legible, integrado armoniosamente en el diseño.
+- **Preservación del Código QR Oficial (Estricto)**: El Código QR oficial adjunto debe insertarse en la esquina inferior izquierda tal cual es, **SIN sufrir modificaciones**, sin inclinaciones en perspectiva 3D, sin curvaturas, sin filtros ni desenfoques que rompan los patrones de lectura de las esquinas del QR. Debe mantenerse plano, cuadrado, limpio y de máxima resolución.
+- **Integración**: Coloca el logo de C.E.A. Martha Mendoza arriba a la derecha. El Código QR oficial en la esquina inferior izquierda, y el Banner de Certificación abajo a la derecha. El texto obligatorio y el código QR deben ser nítidos y legibles, integrados armoniosamente en el diseño publicitario.
 
 ### Instrucciones:
 1. Charla con el usuario para obtener el nombre del curso y los puntos clave de "Aprenderás".
 2. Genera un copy publicitario para redes sociales con emojis.
-3. Crea la imagen hiperrealista final integrando todos los elementos mencionados.
+3. Inserta el Código QR oficial respetando intacto su formato, nitidez y funcionalidad de escaneo sin ninguna modificación.
+4. Crea la imagen hiperrealista final integrando todos los elementos mencionados.
 
 EJEMPLO:
 CURSO 1 : ${nombreCurso}
@@ -166,8 +169,8 @@ CURSO 1 : ${nombreCurso}
 Aprenderás: ${aprenderas}
 
 ---
-🔗 ENLACE OFICIAL DE INSCRIPCIÓN (Para el Código QR):
-${enlaceInscripcion}`;
+📱 CÓDIGO QR OFICIAL: Inserta la imagen adjunta del QR en la esquina inferior izquierda sin ninguna modificación de formato o perspectiva.
+🔗 Enlace oficial codificado en el QR: ${enlaceInscripcion}`;
   };
 
   // Helper para mostrar feedback copiado
@@ -745,6 +748,23 @@ ${enlaceInscripcion}`;
                   • Fotocopia Legalizada para Compulsas de Mérito<br />
                   • Procesos de Licitación en SICOES (Personal clave)<br />
                   • Trámites de Ascenso y Registro SYSO (MTEPS)
+                </div>
+
+                {/* Requisito de Preservación de QR Oficial */}
+                <div style={{
+                  background: '#f0fdf4',
+                  padding: '12px 14px',
+                  borderRadius: '12px',
+                  border: '1px solid #bbf7d0',
+                  fontSize: '11px',
+                  color: '#166534',
+                  lineHeight: '1.45'
+                }}>
+                  <strong style={{ display: 'flex', alignItems: 'center', gap: '5px', marginBottom: '4px', fontSize: '12px' }}>
+                    <QrCode size={14} color="#16a34a" /> Código QR Oficial Obligatorio:
+                  </strong>
+                  • Ubicado en la esquina inferior izquierda.<br />
+                  • <strong>Sin modificaciones</strong>: se preserva plano, cuadrado y nítido para garantizar su lectura en cualquier celular.
                 </div>
 
                 {/* Acciones de Copiado de esta vista */}
