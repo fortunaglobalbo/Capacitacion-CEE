@@ -458,7 +458,7 @@ Debes basarte estrictamente en la PLANTILLA DE REFERENCIA proporcionada arriba (
 4. **Inversión:** "Inversión: Bs. ${costo}"
 5. **Modalidad:** "${modalidad}"
 6. **Código QR Oficial de Inscripción:** Ubicado en la esquina inferior izquierda del afiche (sobre un recuadro blanco cuadrado de alto contraste). Se debe incluir **obligatoriamente el Código QR oficial provisto sin sufrir ninguna modificación**, respetando estrictamente su matriz original, orientación, proporción de aspecto cuadrada 1:1, contraste nítido y módulos de escaneo para que sea 100% escaneable desde cualquier smartphone.
-7. **Banner de Certificación (Abajo a la derecha):**
+7. **Certificación (Abajo a la derecha):**
 🔴 CADA CERTIFICADO CUENTA CON RESOLUCIÓN MINISTERIAL
    📄 INCLUYE FOTOCOPIA LEGALIZADA lista y apta para:
    ✅ Compulsas de Mérito (Puntaje garantizado en convocatorias).
@@ -473,7 +473,7 @@ Usa la herramienta de generación de imágenes tomando la plantilla de arriba co
 - **Formato**: Vertical (4:5).
 - **Colores**: Mantener los colores de la plantilla seleccionada arriba (Azul Marino, Amarillo, Blanco y Gris).
 - **Preservación del Código QR Oficial (Estricto)**: El Código QR oficial adjunto debe insertarse en la esquina inferior izquierda tal cual es, **SIN sufrir modificaciones**, sin inclinaciones en perspectiva 3D, sin curvaturas, sin filtros ni desenfoques que rompan los patrones de lectura de las esquinas del QR. Debe mantenerse plano, cuadrado, limpio y de máxima resolución.
-- **Integración Armónica**: Coloca el logo de C.E.A. Martha Mendoza arriba a la derecha. El Código QR oficial en la esquina inferior izquierda, y el Banner de Certificación abajo a la derecha. Todo el texto de la nueva información debe ser nítido, de alta legibilidad e integrado armónicamente siguiendo la plantilla de arriba.
+- **Integración Armónica**: Coloca el logo de C.E.A. Martha Mendoza arriba a la derecha. El Código QR oficial en la esquina inferior izquierda, y la Certificación abajo a la derecha. Todo el texto de la nueva información debe ser nítido, de alta legibilidad e integrado armónicamente siguiendo la plantilla de arriba.
 
 ### Instrucciones para la IA:
 1. Toma la imagen de la plantilla oficial adjunta arriba como base estructural y visual obligatoria.
@@ -1387,7 +1387,7 @@ MODALIDAD: ${modalidad}
                   </div>
                 </div>
 
-                {/* Resumen del Banner de Certificación */}
+                {/* Resumen de Certificación */}
                 <div style={{
                   background: '#fef2f2',
                   padding: '14px',
@@ -1398,7 +1398,7 @@ MODALIDAD: ${modalidad}
                   lineHeight: '1.45'
                 }}>
                   <strong style={{ display: 'block', marginBottom: '4px', fontSize: '12px' }}>
-                    🔴 Banner de Certificación Obligatorio:
+                    🔴 Certificación (Abajo a la derecha):
                   </strong>
                   • Resolución Ministerial garantizada<br />
                   • Fotocopia Legalizada para Compulsas de Mérito<br />
