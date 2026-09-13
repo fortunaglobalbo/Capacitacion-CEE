@@ -697,367 +697,161 @@ function InscripcionesPublicContent() {
             </div>
           )}
 
-          {/* PASO 1: VER AFICHE Y SELECCIONAR CURSO DE INTERÉS */}
+          {/* PASO 1: AFICHE OFICIAL EN FORMATO 4:5 */}
           {currentStep === 1 && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '22px' }}>
-              {/* Encabezado Asistido de Paso 1 */}
-              <div style={{
-                background: 'linear-gradient(135deg, #0d3b66 0%, #1e40af 100%)',
-                borderRadius: '16px',
-                padding: '20px 24px',
-                color: '#ffffff',
-                boxShadow: '0 4px 16px rgba(13, 59, 102, 0.25)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                flexWrap: 'wrap',
-                gap: '12px'
-              }}>
-                <div>
-                  <span style={{
-                    background: 'rgba(255, 255, 255, 0.2)',
-                    padding: '3px 10px',
-                    borderRadius: '20px',
-                    fontSize: '11px',
-                    fontWeight: 800,
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.5px'
-                  }}>
-                    PASO 1 DE 4 • ASISTENTE DE INSCRIPCIÓN
-                  </span>
-                  <h2 style={{ margin: '6px 0 2px 0', fontSize: '20px', fontWeight: 800 }}>
-                    Revisa el Afiche Oficial y Confirma tu Curso
-                  </h2>
-                  <p style={{ margin: 0, fontSize: '13px', color: '#bfdbfe' }}>
-                    Observa el afiche del curso de tu interés, verifica los temas de aprendizaje y comienza tu registro paso a paso.
-                  </p>
-                </div>
-
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <span style={{ fontSize: '12px', background: 'rgba(255,255,255,0.15)', padding: '6px 12px', borderRadius: '10px', fontWeight: 700 }}>
-                    {cursos.length} curso{cursos.length !== 1 ? 's' : ''} disponible{cursos.length !== 1 ? 's' : ''}
-                  </span>
-                </div>
-              </div>
-
-              {/* TARJETA DESTACADA DEL CURSO SELECCIONADO */}
-              {selectedCurso && (
+            <div style={{
+              maxWidth: '480px',
+              margin: '0 auto',
+              width: '100%',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              gap: '16px'
+            }}>
+              {/* Selector de Curso si hay más de 1 curso activo */}
+              {cursos.length > 1 && (
                 <div style={{
+                  width: '100%',
                   background: '#ffffff',
-                  borderRadius: '18px',
-                  border: '1.5px solid #bfdbfe',
-                  boxShadow: '0 10px 30px -5px rgba(37, 99, 235, 0.12)',
-                  overflow: 'hidden',
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
-                  gap: '0px'
+                  padding: '12px 16px',
+                  borderRadius: '14px',
+                  border: '1.5px solid #cbd5e1',
+                  boxShadow: '0 2px 8px rgba(0,0,0,0.04)'
                 }}>
-                  {/* Visualizador del Afiche con Zoom */}
-                  <div style={{
-                    background: '#0f172a',
-                    padding: '20px',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    position: 'relative',
-                    borderRight: '1px solid #e2e8f0'
-                  }}>
-                    <div
-                      style={{
-                        position: 'relative',
-                        width: '100%',
-                        maxHeight: '440px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        borderRadius: '12px',
-                        overflow: 'hidden',
-                        cursor: 'pointer'
-                      }}
-                      onClick={() => openAfichePreview(getAficheForCurso(selectedCurso), selectedCurso.nombre)}
-                      title="Haz clic para ver en pantalla completa"
-                    >
-                      <img
-                        src={getAficheForCurso(selectedCurso)}
-                        alt={`Afiche de ${selectedCurso.nombre}`}
-                        style={{
-                          maxHeight: '440px',
-                          maxWidth: '100%',
-                          objectFit: 'contain',
-                          borderRadius: '10px',
-                          boxShadow: '0 8px 24px rgba(0,0,0,0.5)'
-                        }}
-                      />
-                      <div style={{
-                        position: 'absolute',
-                        bottom: '12px',
-                        background: 'rgba(15, 23, 42, 0.85)',
-                        color: '#ffffff',
-                        padding: '6px 14px',
-                        borderRadius: '20px',
-                        fontSize: '11px',
-                        fontWeight: 700,
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '6px',
-                        backdropFilter: 'blur(4px)',
-                        boxShadow: '0 2px 8px rgba(0,0,0,0.3)'
-                      }}>
-                        <Eye size={13} color="#60a5fa" /> Clic para ver afiche completo
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Detalles del Curso y Llamado a la Acción */}
-                  <div style={{ padding: '24px 28px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-                    <div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px', flexWrap: 'wrap' }}>
-                        <span style={{
-                          background: '#dbeafe',
-                          color: '#1e40af',
-                          fontSize: '11px',
-                          fontWeight: 800,
-                          padding: '3px 10px',
-                          borderRadius: '999px',
-                          textTransform: 'uppercase'
-                        }}>
-                          CURSO SELECCIONADO
-                        </span>
-                        <span style={{ background: '#dcfce7', color: '#15803d', fontSize: '11px', fontWeight: 800, padding: '3px 10px', borderRadius: '999px' }}>
-                          MATRÍCULA: BS. {selectedCurso.costo || 150}
-                        </span>
-                      </div>
-
-                      <h2 style={{ margin: '0 0 12px 0', fontSize: '22px', fontWeight: 900, color: '#0f172a', lineHeight: '1.3' }}>
-                        {selectedCurso.nombre}
-                      </h2>
-
-                      {/* Beneficios Oficiales */}
-                      <div style={{
-                        background: '#f8fafc',
-                        borderRadius: '12px',
-                        border: '1px solid #e2e8f0',
-                        padding: '14px',
-                        marginBottom: '16px'
-                      }}>
-                        <div style={{ fontSize: '12px', fontWeight: 800, color: '#1e293b', marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                          <ShieldCheck size={16} color="#16a34a" /> Beneficios y Certificación Garantizada:
-                        </div>
-                        <ul style={{ margin: 0, paddingLeft: '18px', fontSize: '12px', color: '#475569', lineHeight: '1.5' }}>
-                          <li><strong>Resolución Ministerial:</strong> Valor curricular oficial para el escalafón.</li>
-                          <li><strong>Fotocopia Legalizada:</strong> Válida para Compulsas de Mérito y Convocatorias.</li>
-                          <li><strong>Licitaciones SICOES & Ascensos:</strong> Cumplimiento de personal clave ante el MTEPS.</li>
-                          <li><strong>Modalidad:</strong> Teórico - Práctico con soporte continuo.</li>
-                        </ul>
-                      </div>
-
-                      {/* Temario / Lo que aprenderás */}
-                      {(selectedCurso.temario || selectedCurso.descripcion) && (
-                        <div style={{ marginBottom: '18px' }}>
-                          <span style={{ fontSize: '12px', fontWeight: 800, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.4px', display: 'block', marginBottom: '4px' }}>
-                            📖 Contenido Temático del Curso:
-                          </span>
-                          <p style={{ margin: 0, fontSize: '13px', color: '#475569', lineHeight: '1.5', background: '#f1f5f9', padding: '10px 14px', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
-                            {selectedCurso.temario || selectedCurso.descripcion}
-                          </p>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Botón Asistido Principal */}
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '14px' }}>
-                      <button
-                        type="button"
-                        onClick={handleProceedFromStep1}
-                        style={{
-                          width: '100%',
-                          padding: '15px 22px',
-                          borderRadius: '12px',
-                          background: 'linear-gradient(135deg, #16a34a 0%, #15803d 100%)',
-                          color: '#ffffff',
-                          fontWeight: 800,
-                          fontSize: '16px',
-                          border: 'none',
-                          cursor: 'pointer',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          gap: '10px',
-                          boxShadow: '0 6px 20px rgba(22, 163, 74, 0.35)',
-                          transition: 'all 0.2s ease'
-                        }}
-                      >
-                        <span>Inscribirme a este Curso (Paso 2: Mis Datos)</span>
-                        <ArrowRight size={20} />
-                      </button>
-
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
-                        <button
-                          type="button"
-                          onClick={() => openAfichePreview(getAficheForCurso(selectedCurso), selectedCurso.nombre)}
-                          style={{
-                            background: 'none',
-                            border: 'none',
-                            color: '#2563eb',
-                            fontSize: '13px',
-                            fontWeight: 700,
-                            cursor: 'pointer',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '5px'
-                          }}
-                        >
-                          <Eye size={15} /> Ver afiche en pantalla completa
-                        </button>
-
-                        <span style={{ fontSize: '12px', color: '#64748b' }}>
-                          ⚡ Inscripción asistida paso a paso
-                        </span>
-                      </div>
-                    </div>
-                  </div>
+                  <label style={{ display: 'block', fontSize: '13px', fontWeight: 800, color: '#1e293b', marginBottom: '6px' }}>
+                    Seleccione el Curso de Capacitación:
+                  </label>
+                  <select
+                    value={selectedCursoId}
+                    onChange={(e) => handleSelectCurso(e.target.value)}
+                    style={{
+                      width: '100%',
+                      padding: '10px 14px',
+                      borderRadius: '10px',
+                      border: '1.5px solid #3b82f6',
+                      background: '#f8fafc',
+                      fontSize: '14px',
+                      fontWeight: 700,
+                      color: '#0f172a',
+                      outline: 'none',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    {cursos.map(c => (
+                      <option key={c.id} value={c.id}>
+                        {c.nombre} — (Inversión: Bs. {c.costo || 150})
+                      </option>
+                    ))}
+                  </select>
                 </div>
               )}
 
-              {/* CATÁLOGO DE TODOS LOS CURSOS DISPONIBLES */}
-              {cursos.length > 1 && (
-                <div style={{ marginTop: '10px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px', flexWrap: 'wrap', gap: '8px' }}>
-                    <div>
-                      <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 800, color: '#0f172a' }}>
-                        📚 ¿Quieres ver otros cursos disponibles?
-                      </h3>
-                      <p style={{ margin: '2px 0 0 0', fontSize: '12px', color: '#64748b' }}>
-                        Explora los afiches oficiales de todas nuestras capacitaciones y selecciona el que más te interese:
-                      </p>
-                    </div>
+              {/* VISTA DEL AFICHE OFICIAL AJUSTADO A 4:5 */}
+              {selectedCurso && (
+                <div style={{
+                  width: '100%',
+                  background: '#ffffff',
+                  borderRadius: '20px',
+                  border: '1px solid #e2e8f0',
+                  boxShadow: '0 10px 30px rgba(0,0,0,0.08)',
+                  overflow: 'hidden',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  padding: '16px'
+                }}>
+                  {/* Contenedor del Afiche en Ratio 4:5 estricto */}
+                  <div
+                    onClick={() => openAfichePreview(getAficheForCurso(selectedCurso), selectedCurso.nombre)}
+                    style={{
+                      width: '100%',
+                      aspectRatio: '4 / 5',
+                      borderRadius: '14px',
+                      overflow: 'hidden',
+                      position: 'relative',
+                      background: '#090d16',
+                      cursor: 'pointer',
+                      boxShadow: '0 8px 24px rgba(0,0,0,0.2)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center'
+                    }}
+                    title="Clic para ver en pantalla completa"
+                  >
+                    <img
+                      src={getAficheForCurso(selectedCurso)}
+                      alt={`Afiche Oficial - ${selectedCurso.nombre}`}
+                      style={{
+                        width: '100%',
+                        height: '100%',
+                        objectFit: 'contain',
+                        display: 'block'
+                      }}
+                    />
                   </div>
 
-                  <div style={{
-                    display: 'grid',
-                    gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))',
-                    gap: '16px'
-                  }}>
-                    {cursos.map((c) => {
-                      const isSelected = c.id === selectedCursoId;
-                      const aficheSrc = getAficheForCurso(c);
+                  {/* Datos del Curso y Botón de Inscripción */}
+                  <div style={{ width: '100%', textAlign: 'center', marginTop: '16px' }}>
+                    <h2 style={{
+                      fontSize: '20px',
+                      fontWeight: 900,
+                      color: '#0f172a',
+                      margin: '0 0 8px 0',
+                      lineHeight: '1.3'
+                    }}>
+                      {selectedCurso.nombre}
+                    </h2>
 
-                      return (
-                        <div
-                          key={c.id}
-                          style={{
-                            background: '#ffffff',
-                            borderRadius: '14px',
-                            border: isSelected ? '2px solid #2563eb' : '1px solid #e2e8f0',
-                            overflow: 'hidden',
-                            boxShadow: isSelected ? '0 8px 24px rgba(37,99,235,0.18)' : '0 2px 8px rgba(0,0,0,0.04)',
-                            display: 'flex',
-                            flexDirection: 'column',
-                            justifyContent: 'space-between',
-                            transition: 'transform 0.15s, box-shadow 0.15s'
-                          }}
-                        >
-                          {/* Afiche en miniatura */}
-                          <div
-                            style={{
-                              position: 'relative',
-                              height: '210px',
-                              background: '#0f172a',
-                              overflow: 'hidden',
-                              cursor: 'pointer',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center'
-                            }}
-                            onClick={() => openAfichePreview(aficheSrc, c.nombre)}
-                            title="Clic para ver afiche completo"
-                          >
-                            <img
-                              src={aficheSrc}
-                              alt={c.nombre}
-                              style={{ width: '100%', height: '100%', objectFit: 'contain' }}
-                            />
-                            <div style={{
-                              position: 'absolute',
-                              top: '8px',
-                              right: '8px',
-                              background: 'rgba(0,0,0,0.7)',
-                              color: '#fff',
-                              borderRadius: '20px',
-                              padding: '3px 8px',
-                              fontSize: '10px',
-                              fontWeight: 700,
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: '4px'
-                            }}>
-                              <Eye size={12} /> Ver Afiche
-                            </div>
-                            {isSelected && (
-                              <div style={{
-                                position: 'absolute',
-                                top: '8px',
-                                left: '8px',
-                                background: '#16a34a',
-                                color: '#fff',
-                                borderRadius: '20px',
-                                padding: '3px 8px',
-                                fontSize: '10px',
-                                fontWeight: 800
-                              }}>
-                                ✓ Activo
-                              </div>
-                            )}
-                          </div>
+                    <div style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '8px',
+                      background: '#ecfdf5',
+                      border: '1px solid #a7f3d0',
+                      padding: '6px 14px',
+                      borderRadius: '999px',
+                      marginBottom: '16px',
+                      flexWrap: 'wrap'
+                    }}>
+                      <span style={{ fontSize: '13px', fontWeight: 800, color: '#047857' }}>
+                        Inversión: Bs. {selectedCurso.costo || 150}
+                      </span>
+                      <span style={{ color: '#94a3b8' }}>•</span>
+                      <span style={{ fontSize: '12px', fontWeight: 700, color: '#065f46' }}>
+                        {(selectedCurso as any).modalidad || 'Teórico - Práctico'}
+                      </span>
+                      <span style={{ color: '#94a3b8' }}>•</span>
+                      <span style={{ fontSize: '12px', fontWeight: 700, color: '#065f46' }}>
+                        Resolución Ministerial
+                      </span>
+                    </div>
 
-                          {/* Info y botón */}
-                          <div style={{ padding: '14px', display: 'flex', flexDirection: 'column', gap: '8px', flex: 1, justifyContent: 'space-between' }}>
-                            <div>
-                              <span style={{ fontSize: '11px', fontWeight: 800, color: '#16a34a' }}>
-                                Bs. {c.costo || 150} • Con Resolución
-                              </span>
-                              <h4 style={{ margin: '4px 0 0 0', fontSize: '13px', fontWeight: 800, color: '#1e293b', lineHeight: '1.3' }}>
-                                {c.nombre}
-                              </h4>
-                            </div>
-
-                            <button
-                              type="button"
-                              onClick={() => {
-                                handleSelectCurso(c.id);
-                                window.scrollTo({ top: 120, behavior: 'smooth' });
-                              }}
-                              style={{
-                                width: '100%',
-                                padding: '8px 12px',
-                                borderRadius: '8px',
-                                border: 'none',
-                                background: isSelected ? '#16a34a' : '#0d3b66',
-                                color: '#ffffff',
-                                fontSize: '12px',
-                                fontWeight: 700,
-                                cursor: 'pointer',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                gap: '6px'
-                              }}
-                            >
-                              {isSelected ? (
-                                <>
-                                  <Check size={14} /> Curso Seleccionado
-                                </>
-                              ) : (
-                                <>
-                                  Seleccionar este Curso 👉
-                                </>
-                              )}
-                            </button>
-                          </div>
-                        </div>
-                      );
-                    })}
+                    {/* Botón Asistido de Inscripción */}
+                    <button
+                      type="button"
+                      onClick={handleProceedFromStep1}
+                      style={{
+                        width: '100%',
+                        padding: '16px 24px',
+                        borderRadius: '12px',
+                        background: 'linear-gradient(135deg, #16a34a 0%, #15803d 100%)',
+                        color: '#ffffff',
+                        fontWeight: 800,
+                        fontSize: '16px',
+                        border: 'none',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '10px',
+                        boxShadow: '0 6px 20px rgba(22, 163, 74, 0.35)',
+                        transition: 'all 0.2s ease'
+                      }}
+                    >
+                      <span>Inscribirme a este Curso</span>
+                      <ArrowRight size={20} />
+                    </button>
                   </div>
                 </div>
               )}
@@ -2012,9 +1806,9 @@ function InscripcionesPublicContent() {
               background: '#0a192f',
               borderRadius: '16px',
               padding: '16px',
-              maxWidth: '650px',
+              maxWidth: '540px',
               width: '100%',
-              maxHeight: '90vh',
+              maxHeight: '92vh',
               display: 'flex',
               flexDirection: 'column',
               alignItems: 'center',
@@ -2022,10 +1816,10 @@ function InscripcionesPublicContent() {
               position: 'relative'
             }}
           >
-            <div style={{ width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', color: '#ffffff' }}>
+            <div style={{ width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px', color: '#ffffff' }}>
               <div>
                 <h3 style={{ margin: 0, fontSize: '15px', fontWeight: 800, color: '#f8fafc' }}>
-                  Afiche Oficial del Curso
+                  Afiche Oficial
                 </h3>
                 <span style={{ fontSize: '12px', color: '#93c5fd' }}>
                   {modalAficheInfo?.nombre || selectedCurso?.nombre || 'Capacitación Profesional'}
@@ -2040,11 +1834,21 @@ function InscripcionesPublicContent() {
               </button>
             </div>
 
-            <div style={{ borderRadius: '10px', overflow: 'hidden', maxHeight: '72vh', width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#000' }}>
+            <div style={{
+              borderRadius: '10px',
+              overflow: 'hidden',
+              width: '100%',
+              aspectRatio: '4 / 5',
+              maxHeight: '78vh',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              background: '#000'
+            }}>
               <img
                 src={modalAficheInfo?.url || activeAficheUrl || (selectedCurso ? getAficheForCurso(selectedCurso) : '/plantilla_afiche.jpg')}
                 alt={`Afiche de ${modalAficheInfo?.nombre || selectedCurso?.nombre || 'Curso'}`}
-                style={{ maxHeight: '72vh', maxWidth: '100%', objectFit: 'contain' }}
+                style={{ height: '100%', width: '100%', objectFit: 'contain' }}
               />
             </div>
           </div>
