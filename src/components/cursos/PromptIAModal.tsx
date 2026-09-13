@@ -42,6 +42,45 @@ export interface PromptIAModalProps {
   onAficheSaved?: (aficheUrl: string) => void;
 }
 
+export interface PlantillaSlot {
+  id: number;
+  nombre: string;
+  descripcion: string;
+  url: string;
+  defaultUrl: string;
+}
+
+const DEFAULT_PLANTILLAS: PlantillaSlot[] = [
+  {
+    id: 1,
+    nombre: 'Plantilla 1: Oficial C.E.A.',
+    descripcion: 'Diseño azul marino y amarillo, logo institucional y banner ministerial',
+    url: '',
+    defaultUrl: '/plantilla_afiche.jpg'
+  },
+  {
+    id: 2,
+    nombre: 'Plantilla 2: Corporativa Azul',
+    descripcion: 'Estilo formal y estructurado de alto impacto para cursos técnicos',
+    url: '',
+    defaultUrl: '/plantilla_afiche.jpg'
+  },
+  {
+    id: 3,
+    nombre: 'Plantilla 3: Moderna Tech',
+    descripcion: 'Diseño oscuro de alta tecnología con tipografía moderna y nítida',
+    url: '',
+    defaultUrl: '/plantilla_afiche.jpg'
+  },
+  {
+    id: 4,
+    nombre: 'Plantilla 4: Ejecutiva Dorada',
+    descripcion: 'Acabado premium de prestigio para licitaciones y cargos directivos',
+    url: '',
+    defaultUrl: '/plantilla_afiche.jpg'
+  }
+];
+
 export default function PromptIAModal({ curso, onClose, onAficheSaved }: PromptIAModalProps) {
   // Tab activo: 'prompt' | 'plantilla_qr' | 'afiche'
   const [activeTab, setActiveTab] = useState<'prompt' | 'plantilla_qr' | 'afiche'>('prompt');
@@ -66,11 +105,38 @@ export default function PromptIAModal({ curso, onClose, onAficheSaved }: PromptI
   const [costo, setCosto] = useState<number>(curso.costo || 150);
   const [modalidad, setModalidad] = useState<string>('Teórico - Práctico');
 
-  // Estados de QR y Plantilla
-  const [qrDataUrl, setQrDataUrl] = useState<string>('');
-  const [plantillaUrl, setPlantillaUrl] = useState<string>('/plantilla_afiche.jpg');
-  const [plantillaBase64, setPlantillaBase64] = useState<string>('');
+  // Estados de las 4 Plantillas Oficiales (Persistentes globalmente en localStorage para todos los cursos)
+  const [plantillas, setPlantillas] = useState<PlantillaSlot[]>(() => {
+    if (typeof window !== 'undefined') {
+      return DEFAULT_PLANTILLAS.map(p => {
+        const saved = localStorage.getItem(`plantilla_oficial_slot_${p.id}`);
+        return {
+          ...p,
+          url: saved || (p.id === 1 ? '/plantilla_afiche.jpg' : '')
+        };
+      });
+    }
+    return DEFAULT_PLANTILLAS;
+  });
+
+  const [activeSlotId, setActiveSlotId] = useState<number>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('plantilla_oficial_activa_slot');
+      return saved ? Number(saved) || 1 : 1;
+    }
+    return 1;
+  });
+
+  const [uploadingSlotId, setUploadingSlotId] = useState<number>(1);
   const [isUpdatingPlantilla, setIsUpdatingPlantilla] = useState<boolean>(false);
+
+  // Determinar la plantilla activa actual
+  const activePlantilla = plantillas.find(p => p.id === activeSlotId) || plantillas[0];
+  const plantillaUrl = activePlantilla.url || activePlantilla.defaultUrl || '/plantilla_afiche.jpg';
+
+  // Estados de QR y Canvas Base64
+  const [qrDataUrl, setQrDataUrl] = useState<string>('');
+  const [plantillaBase64, setPlantillaBase64] = useState<string>('');
   const [enlaceInscripcion, setEnlaceInscripcion] = useState<string>('');
 
   // Estados de carga de afiche
@@ -111,7 +177,7 @@ export default function PromptIAModal({ curso, onClose, onAficheSaved }: PromptI
         console.error('Error generando QR:', err);
       });
 
-      // Cargar plantilla oficial y convertir a base64 para copiado inteligente
+      // Cargar plantilla activa y convertir a base64 para copiado inteligente
       const img = new Image();
       img.crossOrigin = 'anonymous';
       img.src = plantillaUrl;
@@ -127,8 +193,12 @@ export default function PromptIAModal({ curso, onClose, onAficheSaved }: PromptI
             setPlantillaBase64(data64);
           } catch (e) {
             console.warn('Canvas toDataURL warning:', e);
+            setPlantillaBase64(plantillaUrl);
           }
         }
+      };
+      img.onerror = () => {
+        setPlantillaBase64(plantillaUrl);
       };
     }
   }, [curso.id, plantillaUrl]);
@@ -250,15 +320,22 @@ Aprenderás: ${aprenderas}
   // 3. Copiar Imagen de Plantilla como PNG
   const handleCopyPlantillaImage = async () => {
     try {
-      const response = await fetch(plantillaUrl);
-      const blob = await response.blob();
-      // Convertir a PNG para compatibilidad con ClipboardItem
       const img = new Image();
-      img.src = URL.createObjectURL(blob);
-      await new Promise(res => { img.onload = res; });
+      if (plantillaUrl.startsWith('data:')) {
+        img.src = plantillaUrl;
+      } else {
+        const response = await fetch(plantillaUrl);
+        const blob = await response.blob();
+        img.src = URL.createObjectURL(blob);
+      }
+      await new Promise((res, rej) => {
+        img.onload = res;
+        img.onerror = rej;
+      });
+
       const canvas = document.createElement('canvas');
-      canvas.width = img.naturalWidth;
-      canvas.height = img.naturalHeight;
+      canvas.width = img.naturalWidth || 800;
+      canvas.height = img.naturalHeight || 1000;
       const ctx = canvas.getContext('2d');
       ctx?.drawImage(img, 0, 0);
 
@@ -267,9 +344,8 @@ Aprenderás: ${aprenderas}
           await navigator.clipboard.write([
             new ClipboardItem({ 'image/png': pngBlob })
           ]);
-          showCopiedFeedback('plantilla', 'Imagen de la plantilla copiada. Puedes pegarla (Ctrl+V) directamente en tu editor o chat con IA.');
+          showCopiedFeedback('plantilla', `Plantilla Oficial (${activePlantilla.nombre}) copiada al portapapeles.`);
         } else {
-          // Descarga directa si el navegador no permite escribir imagen al portapapeles
           handleDownloadPlantilla();
         }
       }, 'image/png');
@@ -297,14 +373,18 @@ Aprenderás: ${aprenderas}
     }
   };
 
-  // 5. Copiar AMBAS imágenes (Plantilla de Referencia + Código QR Oficial)
+  // 5. Copiar AMBAS imágenes (Plantilla Oficial Activa + Código QR Oficial)
   const handleCopyBothImages = async () => {
     try {
-      // 1. Cargar imagen de la plantilla
-      const plantillaResp = await fetch(plantillaUrl);
-      const plantillaBlob = await plantillaResp.blob();
+      // 1. Cargar imagen de la plantilla activa
       const imgPlantilla = new Image();
-      imgPlantilla.src = URL.createObjectURL(plantillaBlob);
+      if (plantillaUrl.startsWith('data:')) {
+        imgPlantilla.src = plantillaUrl;
+      } else {
+        const plantillaResp = await fetch(plantillaUrl);
+        const plantillaBlob = await plantillaResp.blob();
+        imgPlantilla.src = URL.createObjectURL(plantillaBlob);
+      }
       await new Promise((res, rej) => {
         imgPlantilla.onload = res;
         imgPlantilla.onerror = rej;
@@ -389,7 +469,7 @@ Aprenderás: ${aprenderas}
 
         const htmlContent = `
           <div>
-            <h3>Plantilla de Referencia Visual:</h3>
+            <h3>Plantilla Oficial (${activePlantilla.nombre}):</h3>
             <p><img src="${plantillaBase64 || plantillaUrl}" alt="Plantilla" style="max-width: 450px;" /></p>
             <h3>Código QR Oficial (Sin Modificaciones):</h3>
             <p><img src="${qrDataUrl}" alt="Código QR" style="max-width: 300px;" /></p>
@@ -441,50 +521,101 @@ Aprenderás: ${aprenderas}
   const handleDownloadPlantilla = () => {
     const a = document.createElement('a');
     a.href = plantillaUrl;
-    a.download = 'plantilla_afiche_referencia.jpg';
+    a.download = `plantilla_oficial_opcion_${activeSlotId}.jpg`;
     a.click();
   };
 
-  // Actualizar Plantilla Oficial de Referencia
+  // Selección de slot oficial activo
+  const handleSelectSlot = (slotId: number) => {
+    setActiveSlotId(slotId);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('plantilla_oficial_activa_slot', String(slotId));
+    }
+    const selected = plantillas.find(p => p.id === slotId);
+    Swal.fire({
+      icon: 'success',
+      title: `¡${selected?.nombre || `Plantilla ${slotId}`} Seleccionada!`,
+      text: 'Esta plantilla ahora es la oficial activa para afiches, copiado y generación de prompts en todos los cursos.',
+      toast: true,
+      position: 'top-end',
+      timer: 2600,
+      showConfirmButton: false
+    });
+  };
+
+  // Disparar input para subir imagen en slot específico
+  const triggerUploadForSlot = (slotId: number) => {
+    setUploadingSlotId(slotId);
+    plantillaFileInputRef.current?.click();
+  };
+
   const handlePlantillaFileInputChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    await handleUpdatePlantilla(file);
+    await handleUpdateSlotImage(uploadingSlotId, file);
     e.target.value = '';
   };
 
-  const handleUpdatePlantilla = async (file: File) => {
+  const handleUpdateSlotImage = async (slotId: number, file: File) => {
     try {
       setIsUpdatingPlantilla(true);
-      const formData = new FormData();
-      formData.append('file', file);
-      formData.append('isPlantilla', 'true');
 
-      const res = await fetch('/api/afiche/upload', {
-        method: 'POST',
-        body: formData,
+      // Leer localmente como base64 data URL (100% inmune a EROFS en servidores/Vercel)
+      const reader = new FileReader();
+      const base64Url: string = await new Promise((resolve, reject) => {
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
       });
 
-      const data = await res.json();
-      if (!res.ok || !data.success) {
-        throw new Error(data.message || 'Error al actualizar plantilla');
+      // Guardar en localStorage para persistencia permanente en todos los cursos
+      if (typeof window !== 'undefined') {
+        localStorage.setItem(`plantilla_oficial_slot_${slotId}`, base64Url);
+        localStorage.setItem('plantilla_oficial_activa_slot', String(slotId));
       }
 
-      const newUrl = `${data.url || '/plantilla_afiche.jpg'}?t=${Date.now()}`;
-      setPlantillaUrl(newUrl);
+      setPlantillas(prev => prev.map(p => p.id === slotId ? { ...p, url: base64Url } : p));
+      setActiveSlotId(slotId);
+
+      // Intentar sincronizar en backend de forma segura y opcional
+      try {
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('isPlantilla', 'true');
+        formData.append('slotId', String(slotId));
+        await fetch('/api/afiche/upload', { method: 'POST', body: formData });
+      } catch (e) {
+        console.warn('Backend sync opcional ignorado:', e);
+      }
 
       Swal.fire({
         icon: 'success',
-        title: '¡Plantilla Oficial Actualizada!',
-        text: 'La nueva plantilla oficial de afiche se ha guardado y sincronizado exitosamente.',
+        title: `¡Plantilla ${slotId} Guardada!`,
+        text: `La imagen se guardó exitosamente y se configuró como la Plantilla Oficial Activa para todos los cursos.`,
         confirmButtonColor: '#2563eb'
       });
     } catch (err: any) {
-      console.error('Error al actualizar plantilla oficial:', err);
-      Swal.fire('Error', err.message || 'No se pudo actualizar la plantilla.', 'error');
+      console.error('Error al actualizar plantilla:', err);
+      Swal.fire('Error', 'No se pudo procesar la imagen.', 'error');
     } finally {
       setIsUpdatingPlantilla(false);
     }
+  };
+
+  const handleResetSlot = (slotId: number, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem(`plantilla_oficial_slot_${slotId}`);
+    }
+    setPlantillas(prev => prev.map(p => p.id === slotId ? { ...p, url: p.defaultUrl } : p));
+    Swal.fire({
+      icon: 'info',
+      title: `Plantilla ${slotId} restablecida a su diseño por defecto`,
+      toast: true,
+      position: 'top-end',
+      timer: 2200,
+      showConfirmButton: false
+    });
   };
 
   // Manejo de Arrastrar y Soltar para Afiche
@@ -1223,94 +1354,231 @@ Aprenderás: ${aprenderas}
           {/* ======================================================== */}
           {activeTab === 'plantilla_qr' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
-              {/* Barra de acción rápida para copiar ambas imágenes */}
+              
+              {/* SELECTOR DE LAS 4 PLANTILLAS OFICIALES */}
               <div style={{
-                background: 'linear-gradient(135deg, #f5f3ff 0%, #ede9fe 100%)',
-                borderRadius: '14px',
-                border: '1px solid #ddd6fe',
-                padding: '14px 20px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                flexWrap: 'wrap',
-                gap: '12px'
+                background: '#ffffff',
+                borderRadius: '16px',
+                border: '1.5px solid #e2e8f0',
+                padding: '18px 20px',
+                boxShadow: '0 4px 14px rgba(0,0,0,0.03)'
               }}>
-                <div>
-                  <h4 style={{ margin: 0, fontSize: '14px', fontWeight: 800, color: '#5b21b6' }}>
-                    ¿Vas a generar el afiche en Gemini o ChatGPT?
-                  </h4>
-                  <p style={{ margin: '2px 0 0 0', fontSize: '12px', color: '#6d28d9' }}>
-                    Copia la Plantilla de Referencia + el Código QR juntos en alta resolución para pegarlos con Ctrl+V.
-                  </p>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', flexWrap: 'wrap', gap: '8px' }}>
+                  <div>
+                    <h3 style={{ margin: 0, fontSize: '15px', fontWeight: 800, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <Layers size={18} color="#2563eb" /> Variedad de Plantillas Oficiales (4 Opciones)
+                    </h3>
+                    <p style={{ margin: '3px 0 0 0', fontSize: '12px', color: '#64748b' }}>
+                      Puedes subir imágenes personalizadas a cada espacio. La que selecciones será la <strong>Plantilla Oficial activa</strong> para todos los cursos.
+                    </p>
+                  </div>
+
+                  <span style={{
+                    fontSize: '12px',
+                    fontWeight: 800,
+                    padding: '4px 12px',
+                    borderRadius: '20px',
+                    background: '#eff6ff',
+                    color: '#1d4ed8',
+                    border: '1px solid #bfdbfe',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '5px'
+                  }}>
+                    <CheckCircle2 size={14} color="#16a34a" /> Oficial Activa: Opción {activeSlotId}
+                  </span>
                 </div>
 
-                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                  <button
-                    type="button"
-                    onClick={handleCopyBothImages}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '7px',
-                      padding: '9px 16px',
-                      background: copiedType === 'both_images' ? '#15803d' : 'linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%)',
-                      color: '#ffffff',
-                      border: 'none',
-                      borderRadius: '8px',
-                      fontSize: '12px',
-                      fontWeight: 800,
-                      cursor: 'pointer',
-                      boxShadow: '0 2px 8px rgba(124, 58, 237, 0.3)'
-                    }}
-                  >
-                    {copiedType === 'both_images' ? <Check size={15} /> : <ImageIcon size={15} />}
-                    {copiedType === 'both_images' ? '¡Ambas Imágenes Copiadas!' : '🖼️📱 Copiar Plantilla + QR (Ambas Imágenes)'}
-                  </button>
+                {/* 4 Tarjetas de Plantillas */}
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))',
+                  gap: '12px'
+                }}>
+                  {plantillas.map((p) => {
+                    const isSelected = p.id === activeSlotId;
+                    const previewImg = p.url || p.defaultUrl || '/plantilla_afiche.jpg';
+                    const hasCustom = !!p.url && p.url !== p.defaultUrl;
 
-                  <a
-                    href="https://gemini.google.com/app"
-                    target="_blank"
-                    rel="noreferrer"
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '6px',
-                      padding: '9px 14px',
-                      background: '#1e3a8a',
-                      color: '#ffffff',
-                      borderRadius: '8px',
-                      fontSize: '12px',
-                      fontWeight: 700,
-                      textDecoration: 'none'
-                    }}
-                  >
-                    <Sparkles size={13} color="#fbbf24" /> Abrir Gemini AI
-                  </a>
+                    return (
+                      <div
+                        key={p.id}
+                        onClick={() => handleSelectSlot(p.id)}
+                        style={{
+                          border: isSelected ? '2.5px solid #2563eb' : '1.5px solid #e2e8f0',
+                          backgroundColor: isSelected ? '#f0f7ff' : '#ffffff',
+                          borderRadius: '12px',
+                          padding: '12px',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '8px',
+                          boxShadow: isSelected ? '0 4px 14px rgba(37, 99, 235, 0.16)' : 'none',
+                          transition: 'all 0.15s'
+                        }}
+                      >
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <span style={{
+                            fontSize: '11px',
+                            fontWeight: 800,
+                            color: isSelected ? '#1d4ed8' : '#475569',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '4px'
+                          }}>
+                            {isSelected && <CheckCircle2 size={13} color="#2563eb" />}
+                            Opción {p.id}
+                          </span>
+
+                          {isSelected ? (
+                            <span style={{
+                              background: '#16a34a',
+                              color: '#ffffff',
+                              fontSize: '10px',
+                              fontWeight: 800,
+                              padding: '2px 8px',
+                              borderRadius: '999px'
+                            }}>
+                              OFICIAL ACTIVA
+                            </span>
+                          ) : (
+                            <span style={{
+                              background: '#f1f5f9',
+                              color: '#64748b',
+                              fontSize: '10px',
+                              fontWeight: 700,
+                              padding: '2px 6px',
+                              borderRadius: '6px'
+                            }}>
+                              Clic para activar
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Miniatura */}
+                        <div style={{
+                          height: '130px',
+                          borderRadius: '8px',
+                          overflow: 'hidden',
+                          background: '#0f172a',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          border: '1px solid #cbd5e1'
+                        }}>
+                          <img
+                            src={previewImg}
+                            alt={p.nombre}
+                            style={{ maxHeight: '130px', width: '100%', objectFit: 'contain' }}
+                          />
+                        </div>
+
+                        <div>
+                          <div style={{ fontSize: '12px', fontWeight: 800, color: '#1e293b' }}>
+                            {p.nombre}
+                          </div>
+                          <div style={{ fontSize: '11px', color: '#64748b', marginTop: '2px', lineHeight: '1.25' }}>
+                            {p.descripcion}
+                          </div>
+                        </div>
+
+                        <div style={{ display: 'flex', gap: '6px', marginTop: 'auto' }}>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              triggerUploadForSlot(p.id);
+                            }}
+                            disabled={isUpdatingPlantilla}
+                            style={{
+                              flex: 1,
+                              padding: '6px 8px',
+                              borderRadius: '6px',
+                              background: isSelected ? '#2563eb' : '#ffffff',
+                              color: isSelected ? '#ffffff' : '#334155',
+                              border: isSelected ? 'none' : '1px solid #cbd5e1',
+                              fontSize: '11px',
+                              fontWeight: 700,
+                              cursor: isUpdatingPlantilla ? 'not-allowed' : 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              gap: '4px'
+                            }}
+                            title={`Subir una imagen personalizada para la Plantilla ${p.id}`}
+                          >
+                            <UploadCloud size={12} /> {hasCustom ? 'Cambiar' : 'Subir'}
+                          </button>
+
+                          {hasCustom && (
+                            <button
+                              type="button"
+                              onClick={(e) => handleResetSlot(p.id, e)}
+                              style={{
+                                padding: '6px 8px',
+                                borderRadius: '6px',
+                                background: '#fef2f2',
+                                color: '#991b1b',
+                                border: '1px solid #fecaca',
+                                fontSize: '11px',
+                                fontWeight: 600,
+                                cursor: 'pointer'
+                              }}
+                              title="Restablecer diseño original"
+                            >
+                              Reset
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
 
+              {/* Input oculto para cambiar cualquier slot de plantilla */}
+              <input
+                ref={plantillaFileInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handlePlantillaFileInputChange}
+                style={{ display: 'none' }}
+              />
+
+              {/* Detalle en tamaño grande de la Plantilla Oficial Activa + Código QR */}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
                 
-                {/* Tarjeta: Plantilla Oficial de Referencia */}
+                {/* Tarjeta: Plantilla Oficial Activa */}
                 <div style={{
                   background: '#f8fafc',
                   borderRadius: '16px',
                   padding: '20px',
-                  border: '1px solid #e2e8f0',
+                  border: '1.5px solid #2563eb',
                   display: 'flex',
                   flexDirection: 'column',
                   alignItems: 'center',
-                  textAlign: 'center'
+                  textAlign: 'center',
+                  boxShadow: '0 4px 16px rgba(37, 99, 235, 0.08)'
                 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
                     <ImageIcon size={20} color="#2563eb" />
-                    <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 800, color: '#0f172a' }}>
-                      Plantilla Oficial de Referencia
+                    <h3 style={{ margin: 0, fontSize: '15px', fontWeight: 800, color: '#0f172a' }}>
+                      {activePlantilla.nombre}
                     </h3>
                   </div>
-                  <p style={{ fontSize: '12px', color: '#64748b', margin: '0 0 16px 0', maxWidth: '380px' }}>
-                    Esta imagen sirve como guía visual exacta de colores (azul, amarillo, blanco), tipografía, logo y estructura corporativa.
-                  </p>
+                  <div style={{ marginBottom: '14px' }}>
+                    <span style={{
+                      background: '#16a34a',
+                      color: '#ffffff',
+                      fontSize: '11px',
+                      fontWeight: 800,
+                      padding: '3px 10px',
+                      borderRadius: '999px',
+                      letterSpacing: '0.4px'
+                    }}>
+                      ★ PLANTILLA OFICIAL ACTIVA
+                    </span>
+                  </div>
 
                   <div style={{
                     borderRadius: '12px',
@@ -1323,19 +1591,10 @@ Aprenderás: ${aprenderas}
                   }}>
                     <img
                       src={plantillaUrl}
-                      alt="Plantilla Afiche Referencia"
+                      alt="Plantilla Oficial Activa"
                       style={{ maxHeight: '340px', width: 'auto', display: 'block', objectFit: 'contain' }}
                     />
                   </div>
-
-                  {/* Input oculto para cambiar plantilla */}
-                  <input
-                    ref={plantillaFileInputRef}
-                    type="file"
-                    accept="image/*"
-                    onChange={handlePlantillaFileInputChange}
-                    style={{ display: 'none' }}
-                  />
 
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', width: '100%', maxWidth: '360px' }}>
                     <div style={{ display: 'flex', gap: '10px', width: '100%' }}>
@@ -1386,7 +1645,7 @@ Aprenderás: ${aprenderas}
                     <button
                       type="button"
                       disabled={isUpdatingPlantilla}
-                      onClick={() => plantillaFileInputRef.current?.click()}
+                      onClick={() => triggerUploadForSlot(activeSlotId)}
                       style={{
                         width: '100%',
                         padding: '9px 14px',
@@ -1403,10 +1662,10 @@ Aprenderás: ${aprenderas}
                         gap: '6px',
                         transition: 'all 0.2s'
                       }}
-                      title="Sube una nueva imagen para cambiar la plantilla oficial de afiche"
+                      title="Sube una nueva imagen para cambiar esta plantilla oficial"
                     >
                       <UploadCloud size={15} />
-                      {isUpdatingPlantilla ? 'Actualizando plantilla...' : '🔄 Cambiar Plantilla Oficial'}
+                      {isUpdatingPlantilla ? 'Cargando imagen...' : `🔄 Cambiar Imagen de Plantilla ${activeSlotId}`}
                     </button>
                   </div>
                 </div>

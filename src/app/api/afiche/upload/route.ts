@@ -68,37 +68,59 @@ export async function POST(request: Request) {
     }
 
     const timestamp = Date.now();
+    const mimeType = fileExtension === 'jpg' || fileExtension === 'jpeg' ? 'image/jpeg' : `image/${fileExtension}`;
+    const base64FallbackUrl = `data:${mimeType};base64,${fileBuffer.toString('base64')}`;
 
     if (isPlantilla) {
-      const plantillaPath = path.join(process.cwd(), 'public', 'plantilla_afiche.jpg');
-      fs.writeFileSync(plantillaPath, fileBuffer);
+      try {
+        const plantillaPath = path.join(process.cwd(), 'public', 'plantilla_afiche.jpg');
+        fs.writeFileSync(plantillaPath, fileBuffer);
+        return NextResponse.json({
+          success: true,
+          url: `/plantilla_afiche.jpg?v=${timestamp}`,
+          fileName: 'plantilla_afiche.jpg',
+          isPlantilla: true
+        });
+      } catch (fsErr: any) {
+        console.warn('Filesystem read-only (EROFS en servidor/Vercel). Usando base64 data URL:', fsErr?.message);
+        return NextResponse.json({
+          success: true,
+          url: base64FallbackUrl,
+          fileName: 'plantilla_afiche.jpg',
+          isPlantilla: true
+        });
+      }
+    }
+
+    try {
+      // Asegurar directorio public/afiches si el entorno lo permite
+      const publicDir = path.join(process.cwd(), 'public', 'afiches');
+      if (!fs.existsSync(publicDir)) {
+        fs.mkdirSync(publicDir, { recursive: true });
+      }
+
+      const fileName = `afiche-${cursoId}-${timestamp}.${fileExtension}`;
+      const filePath = path.join(publicDir, fileName);
+
+      fs.writeFileSync(filePath, fileBuffer);
+
+      const relativeUrl = `/afiches/${fileName}`;
+
       return NextResponse.json({
         success: true,
-        url: `/plantilla_afiche.jpg?v=${timestamp}`,
-        fileName: 'plantilla_afiche.jpg',
-        isPlantilla: true
+        url: relativeUrl,
+        fileName,
+        cursoId
+      });
+    } catch (fsErr: any) {
+      console.warn('Filesystem read-only (EROFS en servidor/Vercel). Usando base64 data URL para afiche:', fsErr?.message);
+      return NextResponse.json({
+        success: true,
+        url: base64FallbackUrl,
+        fileName: `afiche-${cursoId}-${timestamp}.${fileExtension}`,
+        cursoId
       });
     }
-
-    // Asegurar directorio public/afiches
-    const publicDir = path.join(process.cwd(), 'public', 'afiches');
-    if (!fs.existsSync(publicDir)) {
-      fs.mkdirSync(publicDir, { recursive: true });
-    }
-
-    const fileName = `afiche-${cursoId}-${timestamp}.${fileExtension}`;
-    const filePath = path.join(publicDir, fileName);
-
-    fs.writeFileSync(filePath, fileBuffer);
-
-    const relativeUrl = `/afiches/${fileName}`;
-
-    return NextResponse.json({
-      success: true,
-      url: relativeUrl,
-      fileName,
-      cursoId
-    });
 
   } catch (error: any) {
     console.error('Error en /api/afiche/upload:', error);
